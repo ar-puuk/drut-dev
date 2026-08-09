@@ -1,0 +1,61 @@
+classification,distinct_files,total_occurrences,control_count,variable_count,hybrid_count,token_normalized,token_example_casing,example_file,example_line
+CONTROL,108,2934,2934,0,0,"IF","if","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/3_Highway/_Network Processing Tools/Merge MAG-WFRC/__Merge_MAG_WFRCnets.s",30
+CONTROL,95,1591,1591,0,0,"ENDIF","endif","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/3_Highway/_Network Processing Tools/Merge MAG-WFRC/__Merge_MAG_WFRCnets.s",38
+CONTROL,86,387,387,0,0,"RUN","RUN","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/3_Highway/_Network Processing Tools/Copy SEGID field from One Master Network to Another/CopySEGIDfieldfromOneMasterNetworktoAnother.s",1
+CONTROL,86,386,386,0,0,"ENDRUN","ENDRUN","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/3_Highway/_Network Processing Tools/Copy SEGID field from One Master Network to Another/CopySEGIDfieldfromOneMasterNetworktoAnother.s",133
+CONTROL,84,1140,1140,0,0,"FILEI","FILEI","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/3_Highway/_Network Processing Tools/Copy SEGID field from One Master Network to Another/CopySEGIDfieldfromOneMasterNetworktoAnother.s",4
+CONTROL,83,613,613,0,0,"PRINT","PRINT","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/3_Highway/_Network Processing Tools/Update & Export Merged Master Net/_Update & Export MergedMasterNet.s",53
+CONTROL,73,721,721,0,0,"ELSE","else","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/3_Highway/_Network Processing Tools/Merge MAG-WFRC/__Merge_MAG_WFRCnets.s",79
+CONTROL,70,478,478,0,0,"FILEO","FILEO","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/3_Highway/_Network Processing Tools/Copy SEGID field from One Master Network to Another/CopySEGIDfieldfromOneMasterNetworktoAnother.s",13
+CONTROL,44,529,529,0,0,"ELSEIF","elseif","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/3_Highway/_Network Processing Tools/Merge MAG-WFRC/__Merge_MAG_WFRCnets.s",32
+MIXED,35,138,0,123,15,"PHASE","PHASE","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/3_Highway/_Network Processing Tools/Copy SEGID field from One Master Network to Another/CopySEGIDfieldfromOneMasterNetworktoAnother.s",15
+CONTROL,35,214,214,0,0,"LOOP","LOOP","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/0_InputProcessing/a_Setup/1_InputSetup.s",244
+CONTROL,35,214,214,0,0,"ENDLOOP","ENDLOOP","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/0_InputProcessing/a_Setup/1_InputSetup.s",263
+CONTROL,35,138,138,0,0,"ENDPHASE","ENDPHASE","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/3_Highway/_Network Processing Tools/Copy SEGID field from One Master Network to Another/CopySEGIDfieldfromOneMasterNetworktoAnother.s",131
+CONTROL,30,88,88,0,0,"JLOOP","JLOOP","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/0_InputProcessing/b_SEProcessing/2_UrbanizationTermTime.s",97
+CONTROL,30,88,88,0,0,"ENDJLOOP","ENDJLOOP","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/0_InputProcessing/b_SEProcessing/2_UrbanizationTermTime.s",455
+CONTROL,30,100,100,0,0,"ARRAY","ARRAY","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/3_Highway/_Network Processing Tools/Update & Export Merged Master Net/_Update & Export MergedMasterNet.s",285
+CONTROL,29,320,320,0,0,"READ","READ","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/4_Transit/_chk Transit Compile on Net/_TransitRouteTester - 1 - BY_2019.s",114
+CONTROL,21,42,42,0,0,"DISTRIBUTE","DISTRIBUTE","/d/GitHub/WF-TDM-Official-Releases/Scenarios/_default/1ControlCenter - BY_2019.block",172
+CONTROL,20,62,62,0,0,"WRITE","WRITE","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/3_Highway/_Network Processing Tools/Reset Link AB Field Widths/_Reset_LinkShape_AB_FieldWidths.s",22
+CONTROL,19,45,45,0,0,"DISTRIBUTEINTRASTEP","DistributeINTRASTEP","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/0_InputProcessing/c_NetworkProcessing/2_FFSkim.s",22
+CONTROL,16,65,65,0,0,"LOOKUP","LOOKUP","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/0_InputProcessing/b_SEProcessing/1_DemographicsAnalysis.s",224
+CONTROL,15,109,109,0,0,"GENERATE","GENERATE","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/4_Transit/_chk Transit Compile on Net/_TransitRouteTester - 1 - BY_2019.s",143
+CONTROL,14,58,58,0,0,"PARAMETERS","PARAMETERS","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/4_Transit/_chk Transit Compile on Net/_TransitRouteTester - 1 - BY_2019.s",137
+CONTROL,11,19,19,0,0,"PROMPT","PROMPT","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/0_InputProcessing/a_Setup/0_FolderSetup.s",48
+CONTROL,11,19,19,0,0,"ABORT","ABORT","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/0_InputProcessing/a_Setup/0_FolderSetup.s",53
+CONTROL,11,18,18,0,0,"**""@PARENTDIR@2_MODELSCRIPTS\_PYTHON\PY-TDM-ENV\PYTHON.EXE""","**""@ParentDir@2_ModelScripts\_Python\py-tdm-env\python.exe""","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/0_InputProcessing/a_Setup/0_FolderSetup.s",42
+CONTROL,10,18,18,0,0,"GOTO","GOTO","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/0_InputProcessing/a_Setup/0_FolderSetup.s",51
+CONTROL,9,12,12,0,0,"MERGE","MERGE","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/3_Highway/_Network Processing Tools/Copy SEGID field from One Master Network to Another/CopySEGIDfieldfromOneMasterNetworktoAnother.s",11
+CONTROL,8,9,9,0,0,"WAIT4FILES,","WAIT4FILES,","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/3_Distribute/1_Distribution.s",2089
+CONTROL,8,38,38,0,0,"ENDDISTRIBUTEMULTISTEP","EndDistributeMULTISTEP","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/3_Distribute/1_Distribution.s",1795
+CONTROL,8,38,38,0,0,"DISTRIBUTEMULTISTEP","DistributeMULTISTEP","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/3_Distribute/1_Distribution.s",1714
+CONTROL,7,8,8,0,0,"LOG","LOG","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/0_InputProcessing/c_NetworkProcessing/1_NetProcessor.s",1109
+CONTROL,7,8,8,0,0,"'\N',","'\n',","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/0_InputProcessing/a_Setup/1_InputSetup.s",130
+CONTROL,7,104,104,0,0,"PATHLOAD","PATHLOAD","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/0_InputProcessing/c_NetworkProcessing/2_FFSkim.s",48
+CONTROL,6,28,28,0,0,"BREAK","BREAK","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/0_InputProcessing/c_NetworkProcessing/1_NetProcessor.s",1547
+HYBRID,4,6,0,0,6,"MATO[3]","MATO[3]","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/4_ModeChoice/03_Skim_auto.s",70
+CONTROL,4,8,8,0,0,"DELETE","DELETE","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/3_Highway/_Network Processing Tools/Update & Export Merged Master Net/_Update & Export MergedMasterNet.s",571
+HYBRID,3,3,0,0,3,"MATO[2]","MATO[2]","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/4_ModeChoice/03_Skim_auto.s",27
+HYBRID,3,3,0,0,3,"COMBINE","COMBINE","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/3_Distribute/block/4pd_mainbody_distribution.block",10
+CONTROL,3,5,5,0,0,"LINKLOOP","LINKLOOP","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/3_Distribute/block/4pd_mainbody_distribution.block",416
+CONTROL,3,5,5,0,0,"ENDLINKLOOP","ENDLINKLOOP","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/3_Distribute/block/4pd_mainbody_distribution.block",734
+CONTROL,3,3,3,0,0,"FUNCTION","FUNCTION","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/3_Distribute/block/4pd_mainbody_distribution.block",842
+CONTROL,3,3,3,0,0,"}","}","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/3_Distribute/block/4pd_mainbody_distribution.block",900
+MIXED,2,3,0,2,1,"GEOGKEY","GEOGKEY","/d/GitHub/WF-TDM-Official-Releases/1_Inputs/3_Highway/_Network Processing Tools/Merge MAG-WFRC/__Merge_MAG_WFRCnets.s",44
+HYBRID,2,5,0,0,5,"MATO[1]","MATO[1]","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/4_ModeChoice/07_HBW_dest_choice.s",244
+HYBRID,2,4,0,0,4,"MATO[9]","MATO[9]","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/4_ModeChoice/07_HBW_dest_choice.s",622
+HYBRID,2,4,0,0,4,"MATO[7]","MATO[7]","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/4_ModeChoice/07_HBW_dest_choice.s",595
+HYBRID,2,4,0,0,4,"MATO[5]","MATO[5]","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/4_ModeChoice/07_HBW_dest_choice.s",575
+HYBRID,2,2,0,0,2,"MATO[4]","MATO[4]","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/4_ModeChoice/03_Skim_auto.s",113
+CONTROL,2,8,8,0,0,"RENUMBER","RENUMBER","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/3_Distribute/3_SumToDistricts_GRAVITY.s",137
+CONTROL,2,7,7,0,0,"SETPA","SETPA","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/0_InputProcessing/d_TripTable/2_External_TripTable.s",610
+CONTROL,2,5,5,0,0,"FILLMW","FILLMW","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/3_Distribute/1_Distribution.s",1681
+CONTROL,2,5,5,0,0,"@SGRPY@","@SGRPY@","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/5_AssignHwy/02_Assign_AM_MD_PM_EV.s",310
+CONTROL,2,4,4,0,0,"SENDMAIL,","SENDMAIL,","/d/GitHub/WF-TDM-Official-Releases/Scenarios/_default/_HailMary.s",221
+CONTROL,2,21,21,0,0,"BSEARCH","BSEARCH","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/0_InputProcessing/b_SEProcessing/1_DemographicsAnalysis.s",249
+CONTROL,2,20,20,0,0,"@SCENARIOY@","@ScenarioY@","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/5_AssignHwy/block/4pd_mainbody_managedlanes.block",595
+CONTROL,2,20,20,0,0,"@SCENARION@","@ScenarioN@","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/5_AssignHwy/block/4pd_mainbody_managedlanes.block",584
+CONTROL,2,2,2,0,0,"EXIT","Exit","/d/GitHub/WF-TDM-Official-Releases/Scenarios/_default/_HailMary.s",243
+CONTROL,2,2,2,0,0,"**@PYTHONPATH@","**@PythonPath@","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/6_REMM/6_Run_Parcel_Vol_Python_Script.s",36
+CONTROL,2,16,16,0,0,"REPORT","REPORT","/d/GitHub/WF-TDM-Official-Releases/2_ModelScripts/0_InputProcessing/c_NetworkProcessing/1_NetProcessor.s",1089
