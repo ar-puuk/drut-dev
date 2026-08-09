@@ -2,3 +2,16 @@
 # evidence (T049) — their exact bytes, including original line endings, matter
 # for fixture fidelity. Stop Git's CRLF/LF normalization on them entirely.
 crates/voyager-core/tests/fixtures/valid/real_corpus/** -text
+
+# 002-cli-check-format's encoding-fallback fixtures deliberately contain raw
+# non-UTF-8 bytes (a Windows-1252-recoverable byte and a genuinely
+# undecodable one, FR-034/FR-013(b)/FR-025) whose exact byte values are the
+# entire point of the fixture — never let Git normalize them.
+crates/voyager-core/tests/fixtures/encoding_fallback/** -text
+
+# format()/format_bytes() deliberately preserves each line's original
+# line-ending style (FR-012) rather than normalizing it, so the golden
+# copies of real_corpus/ must keep the exact same CRLF fidelity as their
+# source — same reasoning as real_corpus/** above, just for the derived
+# (not source) files this time.
+crates/voyager-core/tests/fixtures/golden/real_corpus/** -text

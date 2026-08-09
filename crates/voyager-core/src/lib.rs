@@ -10,6 +10,7 @@
 pub mod block;
 pub mod decode;
 pub mod diagnostic;
+pub mod format;
 pub mod grammar_notes;
 pub mod lexer;
 pub mod span;
@@ -18,6 +19,7 @@ pub mod token;
 
 pub use block::{Block, BlockKind};
 pub use diagnostic::{Diagnostic, DiagnosticKind};
+pub use format::{format, format_bytes, CasingConvention, EncodingFidelity, FormatOptions, FormatResult};
 pub use span::{Position, Span};
 pub use statement::{Statement, StatementKind};
 pub use token::{Token, TokenKind};

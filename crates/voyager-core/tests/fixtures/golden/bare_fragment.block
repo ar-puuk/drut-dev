@@ -1,0 +1,9 @@
+; A bare-fragment .block shape: no top-level RUN/ENDRUN wrapper, meant to be
+; read into an already-open program box via READ FILE=.
+PHASE=LINKREAD
+    T0 = LI.DISTANCE / LI.SPEED
+ENDPHASE
+
+PHASE=ILOOP
+    PATHLOAD PATH=T0, VOL[1]=MI.1.1
+ENDPHASE

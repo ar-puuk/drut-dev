@@ -1,0 +1,10 @@
+; A self-contained .block shape: fully wrapped in its own RUN PGM=.../ENDRUN.
+RUN PGM=HIGHWAY
+    FILEI NETI=mynet.net
+    PROCESS PHASE=LINKREAD
+        C = LI.CAP
+    ENDPROCESS
+    PROCESS PHASE=ILOOP
+        PATHLOAD PATH=TIME, VOL[1]=MI.1.1
+    ENDPROCESS
+ENDRUN
