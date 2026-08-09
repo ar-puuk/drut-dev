@@ -7,8 +7,12 @@ use crate::span::{Position, Span};
 use crate::token::{Token, TokenKind};
 
 /// Characters that split a word run into a standalone, single-character
-/// `Punctuation` token. `;` and `@` are handled separately (they open a
-/// line comment / variable reference respectively) and are not in this set.
+/// `Punctuation` token. `;` and `@` are handled separately (they open a line
+/// comment / variable reference respectively) and are not in this set. `'`
+/// and `"` *are* in this set (word-scanning still needs to stop at them) but
+/// are also matched by their own dedicated arms earlier in the main loop's
+/// `match`, purely to toggle quote-tracking state — see that loop's
+/// `in_single_quote`/`in_double_quote`.
 fn is_delimiter(ch: char) -> bool {
     matches!(
         ch,
@@ -87,6 +91,17 @@ pub fn tokenize_with_diagnostics(source: &str) -> (Vec<Token>, Vec<Diagnostic>) 
     // matching correctly reproduces nested-comment semantics (FR-005): the
     // next `*/` always closes the most recently opened comment.
     let mut open_comments: Vec<usize> = Vec::new();
+    // Whether we're currently inside an odd-count run of `'`/`"` — i.e.
+    // inside a quoted string literal (FR-004/FR-005 amendment, discovered
+    // via 002-cli-check-format's real-corpus review: a `;` or `/*` that's
+    // part of a string's own text, e.g. a decorative `;===...` divider
+    // inside a `PRINT ... LIST='...'` message, MUST NOT be read as starting
+    // a real comment — same naive, non-escape-aware toggle the rest of this
+    // lexer already uses for quotes generally, just tracked now instead of
+    // discarded). Tracked independently per quote character since Voyager
+    // scripts use both `'...'` and `"..."`.
+    let mut in_single_quote = false;
+    let mut in_double_quote = false;
 
     while i < n {
         if !open_comments.is_empty() {
@@ -114,8 +129,9 @@ pub fn tokenize_with_diagnostics(source: &str) -> (Vec<Token>, Vec<Diagnostic>) 
         }
 
         let ch = chars[i].0;
+        let in_quote = in_single_quote || in_double_quote;
         match ch {
-            ';' => {
+            ';' if !in_quote => {
                 let start = i;
                 let mut j = i;
                 while j < n && chars[j].0 != '\n' {
@@ -128,9 +144,42 @@ pub fn tokenize_with_diagnostics(source: &str) -> (Vec<Token>, Vec<Diagnostic>) 
                 ));
                 i = j;
             }
-            '/' if i + 1 < n && chars[i + 1].0 == '*' => {
+            '/' if !in_quote && i + 1 < n && chars[i + 1].0 == '*' => {
                 open_comments.push(i);
                 i += 2;
+            }
+            '\'' => {
+                in_single_quote = !in_single_quote;
+                tokens.push(Token::new(
+                    TokenKind::Punctuation,
+                    span_of(&chars, i, i + 1),
+                    text_of(&chars, i, i + 1),
+                ));
+                i += 1;
+            }
+            '"' => {
+                in_double_quote = !in_double_quote;
+                tokens.push(Token::new(
+                    TokenKind::Punctuation,
+                    span_of(&chars, i, i + 1),
+                    text_of(&chars, i, i + 1),
+                ));
+                i += 1;
+            }
+            ';' => {
+                // Reached only when `in_quote` was true — the guarded arm
+                // above already handles the real-comment case. A `;` inside
+                // an open quote is ordinary string content (e.g. a
+                // decorative `;===...` divider in a log-header message),
+                // tokenized as a lone `Punctuation`, the same treatment any
+                // other incidental punctuation inside a quoted string
+                // already gets.
+                tokens.push(Token::new(
+                    TokenKind::Punctuation,
+                    span_of(&chars, i, i + 1),
+                    text_of(&chars, i, i + 1),
+                ));
+                i += 1;
             }
             '@' => {
                 let mut j = i + 1;
@@ -289,6 +338,73 @@ mod tests {
         // The last non-comment token on the line is Word("MATRIX"), not a
         // continuation character, so nothing gets retagged.
         assert!(!toks.iter().any(|t| t.kind == TokenKind::ContinuationMarker));
+    }
+
+    #[test]
+    fn semicolon_inside_single_quoted_string_is_not_a_comment_start() {
+        // The exact real-world shape that surfaced this bug (T023b review,
+        // 002-cli-check-format): a decorative `;===...` divider embedded in
+        // a PRINT/LIST log-header message. FR-004's ";" comment recognition
+        // MUST NOT fire while inside an open quote.
+        let toks = tokenize("LIST=';=============================\\n',\n");
+        assert!(
+            !toks.iter().any(|t| t.kind == TokenKind::LineComment),
+            "a ';' inside a quoted string must not start a real comment: {toks:?}"
+        );
+        // The line still ends in a real continuation comma (outside the
+        // quote), so the statement should still be able to continue.
+        assert!(toks.iter().any(|t| t.kind == TokenKind::ContinuationMarker));
+    }
+
+    #[test]
+    fn semicolon_inside_double_quoted_string_is_not_a_comment_start() {
+        let toks = tokenize("MSG=\"warning; check this\"\n");
+        assert!(!toks.iter().any(|t| t.kind == TokenKind::LineComment));
+    }
+
+    #[test]
+    fn real_multiline_print_list_statement_joins_into_one_control_statement() {
+        // Reproduces the exact real fixture line shape (redacted/shortened)
+        // that originally exposed this bug: a PRINT ... LIST='...', '...',
+        // continuation chain whose first value contains a literal ';'.
+        let src = "PRINT FILE='x.txt', \n    APPEND=F, \n    LIST=';====\\n',\n         '\\n',\n         'done\\n'\n";
+        let stmts = crate::statement::build_statements(tokenize(src));
+        assert_eq!(stmts.len(), 1, "expected one joined statement, got: {stmts:?}");
+        match &stmts[0].kind {
+            crate::statement::StatementKind::Control { word, pairs } => {
+                assert_eq!(word, "PRINT");
+                let keys: Vec<&str> = pairs.iter().map(|(k, _)| k.as_str()).collect();
+                assert_eq!(keys, vec!["FILE", "APPEND", "LIST"]);
+            }
+            other => panic!("expected a Control statement, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn slash_star_inside_quoted_string_does_not_open_a_block_comment() {
+        let (toks, diags) = tokenize_with_diagnostics("X = 'a /* not a comment'\nY = 2\n");
+        assert!(
+            !toks.iter().any(|t| matches!(t.kind, TokenKind::BlockComment { .. })),
+            "a '/*' inside a quoted string must not open a block comment: {toks:?}"
+        );
+        assert!(diags.is_empty(), "must not report an unclosed block comment: {diags:?}");
+    }
+
+    #[test]
+    fn real_comment_after_a_closed_quote_still_works() {
+        // Confirms the fix is scoped to *inside* a quote — a real comment
+        // immediately after a string closes must still be recognized.
+        let toks = tokenize("X = 'value' ; a real trailing comment\n");
+        assert!(toks.iter().any(|t| t.kind == TokenKind::LineComment));
+    }
+
+    #[test]
+    fn real_block_comment_after_a_closed_quote_still_works() {
+        let (toks, diags) = tokenize_with_diagnostics("X = 'value' /* a real block comment */\nY = 2\n");
+        assert!(toks
+            .iter()
+            .any(|t| matches!(t.kind, TokenKind::BlockComment { unterminated: false })));
+        assert!(diags.is_empty());
     }
 
     #[test]

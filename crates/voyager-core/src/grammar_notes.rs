@@ -32,7 +32,11 @@ pub const NOTES: &[GrammarNote] = &[
         fr: "FR-004",
         baseline: "Voyager 6.5",
         note: "A semicolon starts a line comment that runs to the end of its \
-               physical line, no matter where on the line it appears.",
+               physical line, wherever it appears in ordinary code — except \
+               inside an open quoted string, where it's just part of the \
+               string's own text, not a comment start (amended 2026-08-09 \
+               after a real script's log-header divider text, containing a \
+               literal semicolon, was found silently misread as a comment).",
     },
     GrammarNote {
         fr: "FR-005",
@@ -42,7 +46,9 @@ pub const NOTES: &[GrammarNote] = &[
                starts its own nested comment; the outer comment only finishes \
                once every comment nested inside it has closed. An unclosed \
                comment is reported at whichever `/*` — outer or inner — never \
-               found its own `*/`.",
+               found its own `*/`. Like FR-004's semicolon, a `/*` inside an \
+               open quoted string is just string content, not a comment \
+               start (same 2026-08-09 amendment).",
     },
     GrammarNote {
         fr: "FR-006",

@@ -216,14 +216,20 @@ correct source position and, for `@variable@`, the variable name.
   whichever pair preceded it — not merely mis-tagged, but structurally lost from
   `Control.pairs`.
 - **FR-004**: The parser MUST recognize line comments beginning with `;` and running
-  to the end of the physical line.
+  to the end of the physical line — **except** a `;` that occurs inside an open
+  quoted string literal (`'...'` or `"..."`, tracked by a naive, non-escape-aware
+  toggle: the lexer already has no other notion of matched-quote pairing, so this
+  doesn't introduce one), which MUST be treated as ordinary string content, not a
+  comment start (amended 2026-08-09, `002-cli-check-format` T023b — see below).
 - **FR-005**: The parser MUST recognize block comments delimited by `/*` and `*/`,
   including block comments that span multiple physical lines, and MUST match them as
   a nesting construct rather than a flat one: a `/*` encountered while a block
   comment is already open starts its own inner comment, and the enclosing comment
   isn't complete until every comment nested inside it has its own matching `*/`.
   Confirmed against vendor reference documentation; the fixture corpus has not yet
-  exercised a nested block comment either way (see Assumptions).
+  exercised a nested block comment either way (see Assumptions). Carries the same
+  inside-a-quoted-string exception as FR-004: a `/*` inside an open quote MUST NOT
+  open a block comment (same amendment).
 - **FR-006**: The parser MUST treat a statement as continuing onto the next physical
   line whenever the last non-comment, non-whitespace character on the line is one of:
   `,` `+` `-` `/` `*` `^` `&` `|` `=`. Any number of fully blank lines (no content at
@@ -704,3 +710,57 @@ correct source position and, for `@variable@`, the variable name.
   either way. Because the shape and fix were identical (both reuse the same
   subscript-scanning logic), this was fixed under FR-003 in the same pass as FR-023,
   not deferred as a separate cycle.
+- **`;`/`/*` comment-start recognition inside a quoted string literal (resolved,
+  2026-08-09, discovered and fixed during `002-cli-check-format` T023b's real-corpus
+  golden-fixture review — not a `002` defect, a pre-existing gap in this crate)**:
+  the lexer had no notion of "inside a quoted string" at all — `'`/`"` were plain
+  `is_delimiter` punctuation like any other, with no pairing/toggle tracked. This
+  meant a `;` or `/*` occurring *inside* a string literal's own text was read as
+  starting a real comment, exactly as if it had appeared in bare code. Confirmed
+  real, not hypothetical: `real_corpus/InputProcessing/1_InputSetup.s`'s
+  `PRINT FILE=..., LIST=';===...===\n', '\n', ...` — a decorative log-header divider
+  whose value contains a literal `;` — silently split what should be one `Control`
+  statement (`PRINT`, three pairs: `FILE`/`APPEND`/`LIST`) into three fragments, two
+  of them bogus empty-target `Assignment` nodes, with **zero diagnostic** (a silent
+  structural misclassification, not a rejected-input false positive). Spec-silent
+  before this amendment — FR-004/FR-005 said nothing about quoted-string context
+  either way — but with no plausible alternative reading: a file path or log message
+  containing a semicolon obviously isn't meant to truncate the statement it sits in.
+  Treated as a direct fix (per this file's own FR-023/subscripted-pair-keyword
+  precedent immediately above) rather than a fresh `/speckit-clarify` cycle, given
+  the near-total absence of any competing interpretation. **Fix**: track a naive,
+  non-escape-aware open/close toggle per quote character (`'`, `"` independently);
+  while either is open, `;` and `/*` fall through to ordinary `Punctuation` tokens
+  instead of opening a comment — the same treatment any other incidental punctuation
+  inside a quoted string already got. Deliberately does **not** change how quoted
+  strings are tokenized otherwise (still not a single atomic "string" token — `@var@`
+  references, words, and punctuation inside a quote remain individually tokenized,
+  per FR-010's existing, tested behavior). **Revalidated**: full `cargo test -p
+  voyager-core` suite (94 unit + 8 fixture-corpus + 5 format-corpus, all passing, 7
+  new regression tests added) and a full, read-only 161-file
+  `WF-TDM-Official-Releases` pass — **161/161 clean, zero diagnostics, zero
+  panics**, confirming the fix introduces no new false positives from unbalanced
+  quotes elsewhere in any real file (the concrete risk a naive, non-nesting-aware
+  toggle carries).
+- **Residual risk of the quote-toggle fix: a genuinely unbalanced quote "stuck
+  open" (deferred, narrow/zero-evidence — same tier as `DistributeINTRASTEP` and
+  the `WORD=value keyword=value...` finding above)**: the toggle above is naive —
+  it has no escape-sequence or string-termination grammar behind it, just "does
+  this quote character's running count go odd or even." If a real file ever has a
+  genuinely unpaired `'` or `"` sitting in actual code (not inside a comment — a
+  stray apostrophe inside a `;` or `/* */` comment is confirmed safe, since
+  comment-body scanning never reaches the toggle logic at all, verified directly),
+  the toggle would stay "open" for the remainder of the file, silently suppressing
+  every subsequent real `;`/`/*` comment-start rather than recognizing it. This is
+  a bounded, non-corrupting failure mode — no panic, no crash, no false positive
+  on a well-formed file, "only" a silent misclassification of whatever follows,
+  the same *class* of consequence (not severity) as the bug this toggle fixes.
+  **Zero evidence this occurs**: the full 161-file `WF-TDM-Official-Releases`
+  corpus is completely clean under the fix, with no new diagnostics or panics.
+  **Deliberately not addressed now**: a real fix (an `UnclosedString`-style
+  diagnostic, or genuine string-termination tracking) requires first researching
+  how Voyager actually delimits/escapes a string literal — no escape-sequence or
+  doubled-quote convention is evidenced anywhere in this codebase or corpus today
+  — which is a new grammar question in its own right, not a tail-end addition to
+  a comment-scanning bugfix. Revisit if real evidence of this shape ever surfaces,
+  the same deferral standard already applied to the two precedents named above.
