@@ -118,7 +118,10 @@ No `NEEDS CLARIFICATION` markers remain in the Technical Context.
   easy-to-drift risk a struct removes); investigating a fix/workaround for the
   Application Control block itself — out of scope for this feature and not
   something a spec-level decision can resolve, since it's a property of the
-  specific build machine, not the crate or the code.
+  specific build machine, not the crate or the code. See
+  `docs/known-environment-quirks.md` for the general pattern (it recurred with an
+  unrelated crate during later `.gitattributes` verification work) — that's the
+  durable home for this machine-property note going forward, not this file.
 
 ## 5. Diff generation for `format --diff`
 
