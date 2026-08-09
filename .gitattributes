@@ -1,0 +1,4 @@
+# Real production Voyager scripts under real_corpus/ are frozen ground-truth
+# evidence (T049) — their exact bytes, including original line endings, matter
+# for fixture fidelity. Stop Git's CRLF/LF normalization on them entirely.
+crates/voyager-core/tests/fixtures/valid/real_corpus/** -text
