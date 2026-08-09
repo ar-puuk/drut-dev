@@ -129,7 +129,9 @@ crates/
 └── voyager-core/                # this feature: tokenizer + structural parser
     ├── Cargo.toml                # name = "voyager-core"; no runtime dependencies
     ├── src/
-    │   ├── lib.rs                 # public API: tokenize(), parse(), re-exports
+    │   ├── lib.rs                 # public API: tokenize()/parse() and their
+    │   │                             # byte-oriented siblings tokenize_bytes()/
+    │   │                             # parse_bytes() (FR-034), re-exports
     │   ├── span.rs                 # Span/Position: line/column source locations
     │   ├── token.rs                # Token, TokenKind (incl. @variable@, comments)
     │   ├── lexer.rs                 # char-level scanning, comment recognition,
@@ -142,6 +144,8 @@ crates/
     │   │                             # JLoop, LinkLoop, DistributeMultistep,
     │   │                             # nesting, BREAK validity
     │   ├── diagnostic.rs               # Diagnostic, DiagnosticKind, rendering
+    │   ├── decode.rs                     # byte-oriented decoding: UTF-8 first,
+    │   │                             # per-byte Windows-1252 fallback (FR-034)
     │   └── grammar_notes.rs              # per-rule "validated against Voyager 6.5"
     │                                     # notes, in the project's own words
     │                                     # (constitution Principle II, FR-024)

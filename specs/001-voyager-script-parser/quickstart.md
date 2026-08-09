@@ -52,9 +52,10 @@ Manual spot-check (no test harness needed) for a single file:
 cargo run -p voyager-core --example parse_file -- path\to\some.s
 ```
 
-(An `examples/parse_file.rs` that reads a path via `std::fs`, calls `parse()`, and
-prints the resulting nodes/diagnostics is a reasonable implementation task — the
-library itself still never touches the filesystem; only this example binary does.)
+(An `examples/parse_file.rs` that reads a path via `std::fs`, calls `parse_bytes()`
+(FR-034 — real production scripts aren't guaranteed to be valid UTF-8), and prints
+the resulting nodes/diagnostics is a reasonable implementation task — the library
+itself still never touches the filesystem; only this example binary does.)
 
 ## Scenario 3 — Token-level detail for editor-style features (User Story 3, P3)
 
