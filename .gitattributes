@@ -1,17 +1,16 @@
-# Real production Voyager scripts under real_corpus/ are frozen ground-truth
-# evidence (T049) — their exact bytes, including original line endings, matter
-# for fixture fidelity. Stop Git's CRLF/LF normalization on them entirely.
-crates/voyager-core/tests/fixtures/valid/real_corpus/** -text
-
-# 002-cli-check-format's encoding-fallback fixtures deliberately contain raw
-# non-UTF-8 bytes (a Windows-1252-recoverable byte and a genuinely
-# undecodable one, FR-034/FR-013(b)/FR-025) whose exact byte values are the
-# entire point of the fixture — never let Git normalize them.
-crates/voyager-core/tests/fixtures/encoding_fallback/** -text
-
-# format()/format_bytes() deliberately preserves each line's original
-# line-ending style (FR-012) rather than normalizing it, so the golden
-# copies of real_corpus/ must keep the exact same CRLF fidelity as their
-# source — same reasoning as real_corpus/** above, just for the derived
-# (not source) files this time.
-crates/voyager-core/tests/fixtures/golden/real_corpus/** -text
+# The entire fixture corpus — real production scripts, hand-written
+# structural-shape fixtures, their golden formatted counterparts, and the
+# deliberately-malformed encoding fixtures — is byte-exactness-sensitive:
+# format()/format_bytes() (002-cli-check-format, FR-012) deliberately
+# preserves each line's original line-ending style rather than normalizing
+# it, so a golden-file comparison against `git`-mangled line endings is
+# spurious, not a real drift. Discovered the hard way: the narrower rules
+# below (originally scoped to just real_corpus/ and encoding_fallback/) left
+# tests/fixtures/golden/'s hand-written-fixture counterparts unprotected,
+# and core.autocrlf=true silently rewrote them to CRLF on a fresh checkout
+# (the 002-cli-check-format -> main fast-forward merge), failing
+# hand_written_fixtures_match_golden_output even though nothing about the
+# actual formatter had changed. One broad rule for the whole tree closes
+# this permanently rather than requiring a new carve-out every time a new
+# fixture subdirectory is added.
+crates/voyager-core/tests/fixtures/** -text
