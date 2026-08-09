@@ -1,7 +1,8 @@
 [workspace]
 resolver = "2"
-members = ["crates/voyager-core"]
+members = ["crates/voyager-core", "crates/drut-cli"]
 
-# Future members: cli/, lsp/, mcp/, formatter/ — added in later phases, all
-# depending on crates/voyager-core per constitution Principle I (single source
-# of truth for grammar/parsing logic).
+# Future members: lsp/, mcp/, formatter/ — added in later phases, all depending
+# on crates/voyager-core per constitution Principle I (single source of truth
+# for grammar/parsing logic). drut-cli (the `drut` binary) now lives at
+# crates/drut-cli, per 002-cli-check-format/plan.md's Structure Decision.
