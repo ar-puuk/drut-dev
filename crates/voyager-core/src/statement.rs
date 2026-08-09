@@ -68,6 +68,41 @@ fn is_punct(tok: &Token, text: &str) -> bool {
     tok.kind == TokenKind::Punctuation && tok.text == text
 }
 
+/// If `grp` starts with a `Word` immediately followed by zero or more
+/// bracketed subscripts and then `=` — e.g. `MW =`, `MW[1] =`,
+/// `SUBAREAID[Seg_Idx][idx_SUBAREAID] =` (FR-023) — returns the index of that
+/// `=` token, so the caller knows the assignment target runs from `grp[0]` up
+/// to (not including) it. Returns `None` for anything else, including
+/// unbalanced brackets (never panics; just falls through to ordinary `Control`
+/// classification).
+fn assignment_equals_index(grp: &[Token]) -> Option<usize> {
+    if grp.first()?.kind != TokenKind::Word {
+        return None;
+    }
+    let mut i = 1;
+    while i < grp.len() && is_punct(&grp[i], "[") {
+        let mut depth = 1;
+        let mut j = i + 1;
+        while j < grp.len() && depth > 0 {
+            if is_punct(&grp[j], "[") {
+                depth += 1;
+            } else if is_punct(&grp[j], "]") {
+                depth -= 1;
+            }
+            j += 1;
+        }
+        if depth != 0 {
+            return None; // unbalanced brackets; not a recognizable subscript
+        }
+        i = j;
+    }
+    if i < grp.len() && is_punct(&grp[i], "=") {
+        Some(i)
+    } else {
+        None
+    }
+}
+
 /// Builds the statement sequence for a full token stream. Never panics: any
 /// shape it doesn't recognize falls back to a permissive `Assignment` (or, in
 /// pathological cases, an empty-target one) rather than failing.
@@ -302,9 +337,13 @@ fn classify_statement(grp: Vec<Token>) -> Statement {
                 extract_pairs(&grp[1..])
             };
         StatementKind::Control { word, pairs }
-    } else if grp[0].kind == TokenKind::Word && grp.len() >= 2 && is_punct(&grp[1], "=") {
-        let target = grp[0].text.clone();
-        let value = grp[2..].to_vec();
+    } else if let Some(eq_idx) = assignment_equals_index(&grp) {
+        // `target` includes any bracketed subscripts' literal text too (e.g.
+        // "MW[1]"), not just the leading identifier (FR-023) — confirmed
+        // common in real fixtures (single-subscript targets alone: 6,000+
+        // occurrences in one file).
+        let target: String = grp[0..eq_idx].iter().map(|t| t.text.as_str()).collect();
+        let value = grp[eq_idx + 1..].to_vec();
         StatementKind::Assignment { target, value }
     } else if grp[0].kind == TokenKind::Word {
         let word = grp[0].text.clone();
@@ -383,6 +422,67 @@ mod tests {
         assert_eq!(stmts.len(), 1);
         match &stmts[0].kind {
             StatementKind::Control { word, .. } => assert_eq!(word, "PHASE"),
+            other => panic!("expected Control, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn subscripted_target_is_assignment_not_control() {
+        // Real fixture shape (08_TripTablesByPeriod.s, 6,000+ occurrences):
+        // `MW[1] = mi.2.hbw0` was misclassified as Control{word:"MW"} before
+        // this fix (FR-023).
+        let stmts = statements_of("MW[1] = mi.2.hbw0\n");
+        assert_eq!(stmts.len(), 1);
+        match &stmts[0].kind {
+            StatementKind::Assignment { target, .. } => assert_eq!(target, "MW[1]"),
+            other => panic!("expected Assignment, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn double_subscripted_target_is_assignment_not_control() {
+        // Real fixture shape (5_SegmentSummary_Dist.s):
+        // `SUBAREAID[Seg_Idx][idx_SUBAREAID] = ...`
+        let stmts = statements_of(
+            "SUBAREAID[Seg_Idx][idx_SUBAREAID] = SUBAREAID[Seg_Idx][idx_SUBAREAID] + 1\n",
+        );
+        assert_eq!(stmts.len(), 1);
+        match &stmts[0].kind {
+            StatementKind::Assignment { target, .. } => {
+                assert_eq!(target, "SUBAREAID[Seg_Idx][idx_SUBAREAID]")
+            }
+            other => panic!("expected Assignment, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unsubscripted_target_still_works_after_the_fix() {
+        let stmts = statements_of("ScriptStartTime = currenttime()\n");
+        assert_eq!(stmts.len(), 1);
+        match &stmts[0].kind {
+            StatementKind::Assignment { target, .. } => assert_eq!(target, "ScriptStartTime"),
+            other => panic!("expected Assignment, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unbalanced_bracket_in_target_falls_back_to_control_without_panicking() {
+        // Pathological/malformed input must never panic — falling back to a
+        // generic Control classification is an acceptable, safe outcome.
+        let stmts = statements_of("MW[1 = 2\n");
+        assert_eq!(stmts.len(), 1);
+        assert!(matches!(stmts[0].kind, StatementKind::Control { .. }));
+    }
+
+    #[test]
+    fn control_statement_with_space_separated_keyword_is_unaffected() {
+        // A subscript check on grp[1] must not misfire for ordinary Control
+        // statements like `ARRAY AN=LINKS, BN=LINKS` (grp[1] is a Word, not
+        // `[`, so this was never ambiguous, but confirm explicitly).
+        let stmts = statements_of("ARRAY AN=LINKS, BN=LINKS\n");
+        assert_eq!(stmts.len(), 1);
+        match &stmts[0].kind {
+            StatementKind::Control { word, .. } => assert_eq!(word, "ARRAY"),
             other => panic!("expected Control, got {other:?}"),
         }
     }

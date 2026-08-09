@@ -191,6 +191,9 @@ correct source position and, for `@variable@`, the variable name.
 - An `IF (...)` statement is immediately followed on the same line by exactly one
   further statement, with no `ENDIF` anywhere in the file (short-`IF`, FR-007) — this
   is a complete, valid block on its own.
+- An assignment target carries a bracketed subscript, single (`MW[1] = value`) or
+  double (`SUBAREAID[Seg_Idx][idx_SUBAREAID] = value`) — this is still `Assignment`,
+  not `Control` (FR-023), with the subscript included as part of the target.
 
 ## Requirements *(mandatory)*
 
@@ -316,7 +319,14 @@ correct source position and, for `@variable@`, the variable name.
   a valid statement form, both at a file's top level (with no enclosing block) and
   nested inside a `RUN PGM=.../ENDRUN` block. A statement is `Assignment` rather than
   `Control` (FR-003) whenever its first token is not one of the recognized control
-  words; no separate keyword=value pairs follow a bare `identifier=value`.
+  words; no separate keyword=value pairs follow a bare `identifier=value`. The
+  identifier MAY be immediately followed by one or more bracketed subscripts before
+  the `=` (e.g. `MW[1] = value` or the double-subscript `SUBAREAID[Seg_Idx]
+  [idx_SUBAREAID] = value`) — the whole subscripted expression, not just the leading
+  name, is the assignment target. Confirmed against real fixtures: `MW[1] = ...`-style
+  single-subscript targets alone appear over 6,000 times in one file
+  (`08_TripTablesByPeriod.s`), and double-subscript targets appear across multiple
+  files — this is not a rare shape.
 - **FR-024**: The project MUST record, for each grammar rule, which Cube Voyager
   version (baseline: 6.5) it was validated against, written in the project's own
   words rather than copied from vendor documentation.
@@ -431,7 +441,8 @@ correct source position and, for `@variable@`, the variable name.
   operating system shell rather than to Voyager's own grammar; any parentheses
   present are just part of the command text, not a required delimiter (FR-022).
 - **Assignment Statement**: A plain `identifier = value` statement with no preceding
-  control word.
+  control word; the identifier may carry one or more trailing `[...]` subscripts
+  (e.g. `MW[1] = value`), which are part of the assignment target (FR-023).
 - **Diagnostic**: A structured record of a parsing problem: its defect category
   (e.g. unmatched block, unclosed comment, invalid continuation), a description in
   the project's own words, and the source location it applies to.
@@ -659,3 +670,31 @@ correct source position and, for `@variable@`, the variable name.
   exactly as originally encoded, or normalize the whole file to UTF-8 on write. Either
   is defensible; neither is decided here, since no formatter exists yet. Flagged so
   the decision is made deliberately in Phase 2, not by accident.
+- **`DistributeINTRASTEP` (deferred, narrow-evidence — same tier as the earlier
+  `WORD=value keyword=value...` deferral)**: the full-corpus validation run that
+  found the subscripted-assignment-target gap (FR-023) also turned up
+  `DistributeINTRASTEP PROCESSID=..., PROCESSLIST=...` — a real, literal sibling to
+  `DistributeMULTISTEP` (FR-030), but confirmed in only one file
+  (`1_Distribution.s`, 10+ occurrences), and unpaired: no `EndDistributeINTRASTEP`
+  appears anywhere, so it's a standalone directive, not a block. It already parses
+  correctly as an ordinary `Control` statement (FR-003) — nothing is broken — it's
+  just not recognized by name as its own construct the way `DistributeMULTISTEP` is.
+  Deferred rather than promoted to its own FR, on the same one-file evidentiary
+  standard already applied to the `WORD=value keyword=value...` finding above; revisit
+  if broader real-world usage is found.
+- **Subscripted `keyword=value` pair names inside a `Control` statement (found, not
+  fixed — narrower than FR-023's fix, tracked separately)**: the same full-corpus run
+  that found FR-023's subscripted-*assignment-target* gap also found a related but
+  distinct gap one level down: a subscripted *pair keyword* inside an ordinary
+  `Control` statement, e.g. `VOL[01]=mw[01]` within a `PATHLOAD`-style statement's
+  keyword list (confirmed real: 300+ double-subscript pair-keyword occurrences alone,
+  e.g. in `4pd_mainbody_distribution.block`). This is a real usage, and vendor
+  reference documentation independently describes subscripted keywords like
+  `VOL[1]`/`VOL[2]` as a documented pattern for `FUNCTION V`. FR-023's fix only
+  covers the top-level `Assignment`-vs-`Control` statement-classification boundary;
+  it does not touch `Control.pairs`' own keyword-boundary detection, which has the
+  same subscript-blindness bug — a pair keyword immediately followed by `[...]=` is
+  not currently recognized as starting a new pair, so its value is silently absorbed
+  into whatever pair preceded it. Not fixed this pass — narrower in scope than the
+  FR-023 fix, and correctly out of the boundary that fix was scoped to. Flagged here
+  as a known, evidenced gap for a future FR/pass, not a hypothetical one.

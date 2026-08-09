@@ -399,6 +399,31 @@ Windows-1252 fallback, rather than requiring every caller to solve this itself.
 
 ---
 
+## Phase 8: FR-023 fix — subscripted assignment targets
+
+**Purpose**: A full-corpus validation run (research.md §3) found that
+`classify_statement` misclassified any assignment target carrying a bracketed
+subscript (`MW[1] = ...`, 6,000+ real occurrences in one file alone) as a `Control`
+statement instead of `Assignment` — SC-001-invisible (no diagnostic fires either
+way) but a real `StatementKind` defect a future formatter would consume directly.
+
+- [X] T057 Amend FR-023 (spec.md) to state an assignment target MAY carry one or
+  more trailing bracketed subscripts, and update data-model.md's `Assignment` entity
+  and spec.md's Key Entities/Edge Cases sections to match — depends on nothing new
+- [X] T058 Add `assignment_equals_index` to `crates/voyager-core/src/statement.rs`
+  and use it in `classify_statement` in place of the old "immediately followed by
+  `=`" check — handles zero or more `[...]` subscript groups (including
+  double-subscript `SUBAREAID[Seg_Idx][idx_SUBAREAID]`), never panics on unbalanced
+  brackets (falls back to `Control`) — depends on T057
+- [X] T059 [P] Add `statement.rs` unit tests (single-subscript, double-subscript,
+  unsubscripted-still-works, unbalanced-bracket-safety, ordinary-Control-unaffected)
+  and a `tests/fixtures/valid/subscripted_assignment_targets.s` fixture using the
+  real `MW[1] = ...`/double-subscript shapes, plus a `fixture_corpus.rs` test
+  asserting `StatementKind` directly (a zero-diagnostics check alone would not catch
+  this class of bug) — depends on T058
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -419,6 +444,10 @@ Windows-1252 fallback, rather than requiring every caller to solve this itself.
   Discovered during T049 (real fixture corpus), after Phase 6 had already landed, so
   it sits after Polish in file order despite its actual dependency being much
   earlier; nothing in Phase 6 depends on it.
+- **FR-023 fix (Phase 8)**: Depends only on US1's statement-building code (T012,
+  T014) already existing to amend — not on Phase 7/FR-034 at all, despite sitting
+  after it in file order (discovered later, by a separate full-corpus validation
+  pass). Nothing depends on it either.
 
 ### User Story Dependencies
 

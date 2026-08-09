@@ -70,6 +70,26 @@ Technical Context.
 - **Open follow-up**: Confirm sourcing/licensing for the actual fixture set with the
   project owner before or during implementation; this is a prerequisite for closing
   out FR-025/SC-001/SC-002, not a blocker for designing the parser itself.
+- **Resolved, 2026-08-09 (T049)**: The project owner directed copying a curated,
+  redaction-checked 9-file subset (~5,200 lines) of `WF-TDM-Official-Releases` into
+  `crates/voyager-core/tests/fixtures/valid/real_corpus/` — see that directory's own
+  `README.md` for per-file provenance and the redaction check performed before
+  copying. This resolves the open follow-up above for that subset specifically.
+- **Full-corpus validation (2026-08-09, beyond the committed subset)**: Separately,
+  and without copying any additional files into the repository, `voyager-core`'s
+  `parse_bytes()` was run read-only against all 161 `.s`/`.block` files in
+  `WF-TDM-Official-Releases` (not just the 9-file committed subset) via a throwaway,
+  uncommitted example script. Result: **161/161 files parsed with zero diagnostics**,
+  and **zero panics** — every call was wrapped in `std::panic::catch_unwind` and
+  confirmed rather than assumed not to panic. This is materially stronger evidence for
+  SC-001 (zero false positives) than the 9-file subset alone provides, though it isn't
+  itself fixture-corpus evidence (research is read-only; T049's committed subset
+  remains the actual `tests/fixtures/` corpus SC-001/SC-002 are graded against). The
+  same full-corpus pass also surfaced the subscript-assignment-target classification
+  gap now tracked as FR-023's amendment (see spec.md; single-subscript targets alone
+  appear 6,000+ times in one file, `08_TripTablesByPeriod.s`) and the
+  `DistributeINTRASTEP` finding (see spec.md Assumptions) — this validation run is
+  what found both.
 
 ## 4. RUN PGM nesting — structural vs. semantic scope
 

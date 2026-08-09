@@ -247,3 +247,62 @@ fn real_non_utf8_fixture_decodes_silently() {
         result.diagnostics
     );
 }
+
+/// FR-023 (subscripted assignment targets): a plain "zero diagnostics" check
+/// would NOT have caught the classify_statement bug this fixture regresses —
+/// misclassifying `MW[1] = ...` as `Control{word:"MW"}` instead of
+/// `Assignment` produces zero diagnostics either way, since "MW" isn't a
+/// recognized block keyword. `StatementKind` has to be checked directly.
+#[test]
+fn subscripted_assignment_targets_are_classified_as_assignment() {
+    let path = fixtures_dir("valid").join("subscripted_assignment_targets.s");
+    let bytes = read_fixture_bytes(&path);
+    let result = parse_bytes(&bytes);
+    assert!(
+        result.diagnostics.is_empty(),
+        "got {:#?}",
+        result.diagnostics
+    );
+
+    // The fixture's one top-level node is the RUN block; walk its children.
+    let run_block = result
+        .nodes
+        .iter()
+        .find_map(|n| match n {
+            voyager_core::Node::Block(b)
+                if matches!(b.kind, voyager_core::BlockKind::Run { .. }) =>
+            {
+                Some(b)
+            }
+            _ => None,
+        })
+        .expect("expected a top-level RUN block");
+
+    let targets: Vec<&str> = run_block
+        .children
+        .iter()
+        .filter_map(|n| match n {
+            voyager_core::Node::Statement(s) => match &s.kind {
+                voyager_core::StatementKind::Assignment { target, .. } => Some(target.as_str()),
+                _ => None,
+            },
+            _ => None,
+        })
+        .collect();
+
+    for expected in [
+        "MW[1]",
+        "MW[2]",
+        "MW[3]",
+        "SUBAREAID[Seg_Idx][idx_SUBAREAID]",
+    ] {
+        assert!(
+            targets.contains(&expected),
+            "expected an Assignment with target {expected:?}, got targets {targets:?}"
+        );
+    }
+    assert!(
+        !targets.iter().any(|t| *t == "MW" || *t == "SUBAREAID"),
+        "a subscripted target must never be classified with just the bare identifier as its target"
+    );
+}

@@ -79,7 +79,10 @@ continuation.
   zero or more `keyword=value` pairs; `word` and each `keyword` are compared
   case-insensitively (FR-011).
 - `Assignment { target: String, value: Vec<Token> }` — a plain `identifier = value`
-  statement with no control word (FR-023).
+  statement with no control word (FR-023). `target` is the literal text of the
+  identifier plus any trailing bracketed subscripts (`MW[1]`,
+  `SUBAREAID[Seg_Idx][idx_SUBAREAID]`), not just the leading name — confirmed common
+  in real fixtures (single-subscript targets alone: 6,000+ occurrences in one file).
 - `Label { name: String }` — a `:identifier` line (FR-021).
 - `ShellEscape { command_tokens: Vec<Token> }` — a `*` or `**` line; the command text
   that follows (parenthesized or not) is stored opaquely, not parsed as Voyager
