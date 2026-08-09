@@ -1,16 +1,29 @@
-# The entire fixture corpus — real production scripts, hand-written
-# structural-shape fixtures, their golden formatted counterparts, and the
-# deliberately-malformed encoding fixtures — is byte-exactness-sensitive:
-# format()/format_bytes() (002-cli-check-format, FR-012) deliberately
-# preserves each line's original line-ending style rather than normalizing
-# it, so a golden-file comparison against `git`-mangled line endings is
-# spurious, not a real drift. Discovered the hard way: the narrower rules
-# below (originally scoped to just real_corpus/ and encoding_fallback/) left
-# tests/fixtures/golden/'s hand-written-fixture counterparts unprotected,
-# and core.autocrlf=true silently rewrote them to CRLF on a fresh checkout
-# (the 002-cli-check-format -> main fast-forward merge), failing
-# hand_written_fixtures_match_golden_output even though nothing about the
-# actual formatter had changed. One broad rule for the whole tree closes
-# this permanently rather than requiring a new carve-out every time a new
-# fixture subdirectory is added.
-crates/voyager-core/tests/fixtures/** -text
+# Cube Voyager control-statement scripts (.s/.block) are this project's
+# actual subject matter, wherever they're committed — today's fixture corpus
+# (valid/, broken/, golden/, encoding_fallback/, and their nested
+# real_corpus/ subtrees under crates/voyager-core/tests/fixtures/), and any
+# future fixture directory a later phase adds (e.g. 003-lsp-server test
+# fixtures, wherever in the tree they land). format()/format_bytes()
+# (002-cli-check-format, FR-012) deliberately preserves each line's original
+# line-ending style rather than normalizing it, so letting Git's
+# core.autocrlf normalize these on checkout produces byte-level corruption
+# that looks exactly like real formatter drift in every golden-file/
+# idempotency comparison. An extension-based rule closes this permanently,
+# rather than a directory-based carve-out that has to be remembered and
+# re-added every time a new fixture directory appears — which is exactly how
+# this bug reached main once already (see git history: core.autocrlf=true
+# silently rewrote tests/fixtures/golden/ to CRLF on the
+# 002-cli-check-format -> main fast-forward merge, because the rule at the
+# time was scoped to specific subdirectories that didn't include it).
+*.s -text
+*.block -text
+
+# Vendored reference data: fetched verbatim from an external authoritative
+# source (or hand-curated as primary research evidence) and worth protecting
+# by content, not just current use — so no contributor's local autocrlf
+# setting can silently make their checkout diverge byte-for-byte from
+# everyone else's, even for files nothing currently byte-compares against.
+# The SARIF schema is parsed, not diffed, today; it's still the authoritative
+# copy this project checks conformance against, so its provenance matters.
+crates/drut-cli/tests/schemas/*.json -text
+specs/**/*.csv -text
