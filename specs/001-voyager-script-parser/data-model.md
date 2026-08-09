@@ -18,6 +18,14 @@ The source-location primitive every other entity carries.
 
 **Validation rule**: `end` is never before `start`.
 
+**Column semantics (FR-034)**: `start_column`/`end_column` count Unicode scalar
+values (`char`s), not bytes and not UTF-16 code units. `InvalidEncoding` (FR-034) is
+no exception — its position is computed via the same running `char` count as every
+other diagnostic, not a raw byte offset, so it doesn't introduce a second,
+inconsistent position scheme. A future LSP adapter will need UTF-16 code-unit
+positions per the LSP wire protocol; reconciling that is explicitly out of scope here
+(see spec.md Assumptions).
+
 ## Token
 
 The smallest recognized lexical unit.
@@ -178,15 +186,18 @@ A structured record of a parsing problem.
 
 | Field | Type | Notes |
 |---|---|---|
-| `kind` | `DiagnosticKind` (enum) | `UnmatchedIf`, `UnmatchedLoop`, `UnclosedBlockComment`, `InvalidContinuation`, `UnmatchedRun`, `MisplacedBreak` (see research.md §2) |
-| `span` | `Span` | Anchored at the offending statement/token (FR-012–FR-016, FR-026) |
+| `kind` | `DiagnosticKind` (enum) | `UnmatchedIf`, `UnmatchedLoop`, `UnclosedBlockComment`, `InvalidContinuation`, `UnmatchedRun`, `MisplacedBreak`, `InvalidEncoding` (see research.md §2; `InvalidEncoding` added by FR-034) |
+| `span` | `Span` | Anchored at the offending statement/token (FR-012–FR-016, FR-026), or at the offending decoded character (FR-034) |
 | `message` | `String` | Original wording, composed once per kind (constitution Principle II, FR-024) |
 
 **Validation rules**:
-- Every `DiagnosticKind` maps to exactly one of the six required categories
-  (FR-012–FR-016, FR-026) — downstream tools should not assume the kind set is closed
-  at six; new structural-defect kinds may be added later within the same
-  structural-not-semantic scope.
+- Every `DiagnosticKind` maps to exactly one of the required categories
+  (FR-012–FR-016, FR-026, FR-034) — downstream tools should not assume the kind set is
+  closed; new structural-defect (or, for `InvalidEncoding`, decoding-fallback) kinds
+  may be added later within the same non-semantic scope.
+- `InvalidEncoding` is only ever produced by `tokenize_bytes`/`parse_bytes`
+  (FR-034) — `tokenize`/`parse` only accept a `&str`, which is already valid UTF-8 by
+  Rust's own type guarantee, so this kind can't occur through them.
 - Diagnostics never cause the parse to abort early; the parser accumulates them and
   keeps going wherever structurally feasible (FR-018).
 

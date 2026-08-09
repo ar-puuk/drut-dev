@@ -1,9 +1,11 @@
 //! Manual spot-check: reads a `.s`/`.block` file's path from the command
-//! line, calls `voyager_core::parse()`, and prints the resulting top-level
-//! node count and any diagnostics.
+//! line, calls `voyager_core::parse_bytes()`, and prints the resulting
+//! top-level node count and any diagnostics.
 //!
 //! All file I/O happens here, in the example — `voyager_core` itself never
-//! touches the filesystem (FR-001).
+//! touches the filesystem (FR-001). Bytes, not `String`, are read: real
+//! production Voyager scripts are not guaranteed to be valid UTF-8 (FR-034);
+//! `parse_bytes` handles that instead of this example needing to.
 //!
 //! Usage: `cargo run -p voyager-core --example parse_file -- path\to\some.s`
 
@@ -19,15 +21,15 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     };
 
-    let source = match fs::read_to_string(&path) {
-        Ok(s) => s,
+    let source = match fs::read(&path) {
+        Ok(bytes) => bytes,
         Err(e) => {
             eprintln!("could not read {path}: {e}");
             return ExitCode::FAILURE;
         }
     };
 
-    let result = voyager_core::parse(&source);
+    let result = voyager_core::parse_bytes(&source);
     println!(
         "{path}: {} top-level node(s), {} diagnostic(s)",
         result.nodes.len(),

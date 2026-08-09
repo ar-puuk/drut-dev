@@ -245,19 +245,32 @@ pub const NOTES: &[GrammarNote] = &[
                nest inside `If`, `Loop`, `Run`, or `Process` blocks, but not \
                inside another `LinkLoop`.",
     },
+    GrammarNote {
+        fr: "FR-034",
+        baseline: "n/a — general byte-decoding behavior, not Voyager-version-specific",
+        note: "The byte-oriented entry points decode raw input as UTF-8 first; \
+               any individual byte that isn't valid UTF-8 falls back to its \
+               Windows-1252 interpretation instead of rejecting the whole \
+               file, since real production scripts have been observed with a \
+               stray non-UTF-8 byte. A byte with no defined Windows-1252 \
+               interpretation either is replaced with the Unicode replacement \
+               character and reported as `InvalidEncoding`; a byte that \
+               resolves successfully under either encoding is not reported at \
+               all — recovering from an encoding quirk is not a defect.",
+    },
 ];
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// T050: every FR this crate implements (FR-003 through FR-033 — FR-001/
-    /// FR-002 are architectural, not grammar, and documented elsewhere;
-    /// FR-031/FR-032 were never adopted, see spec.md FR-033's note) must have
-    /// exactly one grammar note.
+    /// T050/T051: every FR this crate implements (FR-003 through FR-034 —
+    /// FR-001/FR-002 are architectural, not grammar, and documented
+    /// elsewhere; FR-031/FR-032 were never adopted, see spec.md FR-033's
+    /// note) must have exactly one grammar note.
     #[test]
     fn covers_every_implemented_grammar_fr_exactly_once() {
-        let expected: Vec<u32> = (3..=30).chain(std::iter::once(33)).collect();
+        let expected: Vec<u32> = (3..=30).chain(33..=34).collect();
         let mut present: Vec<u32> = NOTES
             .iter()
             .map(|n| {

@@ -1,0 +1,1156 @@
+        
+        ;The basic measure of equilibrium is total system user cost.  Cost involves some measure of time. 
+        ;Time is generally the measurable quantity that can be directly related to congestion.  Thus, most equilibrium formulations are based upon time. 
+        ;
+        ;To determine the weight to apply to each iteration’s volume in the volume combining process, a factor Lambda is estimated for the iteration. 
+        ;If LAMBDA reaches zero, the assignment process stops since there will be no more convergence of the results. 
+        
+        
+        ;convergence parameters
+        COMBINE     = EQUI ENHANCE=2, SMOOTH=1, MULTITHREAD=@CoresAvailable@, MEMORY=T
+        
+        RELATIVEGAP = @RelGapCriteria@
+        MAXITERS    = 100           ;used as fail safe in case cannot achieve convergence
+        
+        RMSE        = 0             ;set all other criteria to 0 so default value not used in convergence
+        AAD         = 0
+        RAAD        = 0
+        GAP         = 0
+        PDIFF       = 0
+        PDIFFVALUE  = 0
+        
+        
+        
+        ;define arrays
+        ARRAY GPID_LinkNo   = 2000  ,
+              CapArray      = 999999,
+              
+              _HOTZone_Dist = 10000 ,
+              _HOTZone_VMT  = 10000 ,
+              _HOTZone_Vol  = 10000 ,
+              _HOTZone_Toll = 10000 
+        
+        
+        
+        ;define Ramp Penalty lookup
+        LOOKUP LOOKUPI=1, 
+            INTERPOLATE=T,
+            NAME=LU_RampPen,
+            LOOKUP[1]=1, RESULT=2,    ;Ramp Penalty (minutes)
+            LOOKUP[2]=1, RESULT=3     ;Ramp Penalty adjustment factors
+        
+        ;define RMPGPID lookup
+        LOOKUP LOOKUPI=2, 
+            INTERPOLATE=F,
+            NAME=LU_RmpGPID,
+            LOOKUP[01]=1, RESULT=02,    ; 1st GP Link ID
+            LOOKUP[02]=1, RESULT=03,    ; 2nd GP Link ID
+            LOOKUP[03]=1, RESULT=04,    ; 3rd GP Link ID
+            LOOKUP[04]=1, RESULT=05,    ; 4th GP Link ID
+            LOOKUP[05]=1, RESULT=06,    ; 5th GP Link ID
+            LOOKUP[06]=1, RESULT=07,    ; 6th GP Link ID
+            LOOKUP[07]=1, RESULT=08,    ; 7th GP Link ID
+            LOOKUP[08]=1, RESULT=09,    ; 8th GP Link ID
+            LOOKUP[09]=1, RESULT=10,    ; 9th GP Link ID
+            LOOKUP[10]=1, RESULT=11     ;10th GP Link ID
+        
+        ;define Maximum Ramp Penalty lookup (based on year)
+        LOOKUP LOOKUPI=3, 
+            INTERPOLATE=F,
+            NEAREST=T,
+            NAME=lu_MaxRampPenalty,
+            LOOKUP[1]=1, RESULT=2    ;Maximum Ramp Penalty (minutes)
+        
+        
+        
+        PHASE=LINKREAD
+            
+            ;calculate addition to freeway GP capacity for HOV/HOT lanes (Distribution only) ---------------------------
+            ;  note: HOV_LYEAR is coded on GP lanes to add capacity to GP lanes to account for adjacent HOV/HOT lane
+            if (li.AdHOVCap1H>0)
+                
+                lw.AddHOVCap_AM = li.AdHOVCap1H * 3 
+                lw.AddHOVCap_MD = li.AdHOVCap1H * 6 
+                lw.AddHOVCap_PM = li.AdHOVCap1H * 3 
+                lw.AddHOVCap_EV = li.AdHOVCap1H * 12
+                
+            endif  ;(li.HOV_LYEAR>0)
+            
+            
+            
+            ;calculate period capacity, time & speed variables ---------------------------------------------------------
+            ;initial, free flow time
+            T0 = li.FF_TIME
+            
+            
+            ;set period specific variables
+            ;AM
+            if (whatperiod=1)
+                T1    = li.AM_TIME
+                SPEED = li.AM_SPD
+                C     = li.AM_CAP + lw.AddHOVCap_AM
+            
+            ;MD
+            elseif (whatperiod=2)
+                T1    = li.MD_TIME
+                SPEED = li.MD_SPD
+                C     = li.MD_CAP + lw.AddHOVCap_MD
+            
+            ;PM
+            elseif (whatperiod=3)
+                T1    = li.PM_TIME
+                SPEED = li.PM_SPD
+                C     = li.PM_CAP + lw.AddHOVCap_PM
+            
+            ;EV
+            elseif (whatperiod=4)
+                T1    = li.EV_TIME
+                SPEED = li.EV_SPD
+                C     = li.EV_CAP + lw.AddHOVCap_EV
+            
+            ;PM 1 Hr (final assignment only)
+            elseif (whatperiod=5)
+                T1    = li.PM_TIME
+                SPEED = li.PM_SPD
+                C     = li.PM_CAP / 3   +  li.AdHOVCap1H    ;note: this is 1 hour capacity
+                
+            endif  ;whatperiod
+            
+            
+            
+            ;assign LINKCLASS for VDF lookup ---------------------------------------------------------------------------
+            ;centroid connectors
+            if (li.FT=1)
+                LINKCLASS = 10
+            
+            ;freeways, including sys-sys ramps and GP, HOV, HOT, HOV-HOT Access & Toll lanes
+            elseif (li.FT=20-21, 30-40)
+                LINKCLASS = 1
+            
+            ;managed motorways main line
+            elseif (li.FT=22-27)
+                LINKCLASS = 6
+            
+            ;ramps
+            elseif (li.FT=28-29, 41-42)
+                LINKCLASS = 2
+            
+            ;expressways
+            elseif (li.FT=12-15)
+                LINKCLASS = 3
+            
+            ;principal and minor arterials
+            elseif (li.FT=2-3)
+                LINKCLASS = 4
+            
+            ;collectors & locals
+            elseif (li.FT=4-7)
+                LINKCLASS = 5
+            
+            ;default to arterial
+            else
+                LINKCLASS = 4
+                
+            endif
+            
+            
+            
+            ;set lane GROUPS -------------------------------------------------------------------------------------------
+            if (li.FT=37)          ADDTOGROUP = 1           ;HOV
+            if (li.FT=38)          ADDTOGROUP = 2           ;HOT
+            if (li.FT=39)          ADDTOGROUP = 3           ;HOV & HOT access links
+            if (li.FT=40)          ADDTOGROUP = 4           ;Tollway
+            if (li.TRK_RSTRCT<>0)  ADDTOGROUP = 5           ;truck restricted links
+            
+            
+            ;relibility lane 11-19 (reversible lanes) on freeways, exclude off-peak direction from path choice
+            if (li.FT>=20 & li.Rel_LN=11-19)
+                
+                ;AM & EV lane excluded from OB direction, MD & PM lane excluded from IB direction
+                if (whatperiod=1,4   & li.IB_OB='OB')  ADDTOGROUP = 7
+                if (whatperiod=2-3,5 & li.IB_OB='IB')  ADDTOGROUP = 7
+            
+            endif  ;(li.FT>=20 & li.Rel_LN=11-19)
+            
+            
+            
+            ;add toll penalty for Tollway (in cents) ------------------------------------------------------------------
+            if (li.FT=40)
+                
+                if (whatperiod=1,3,5)
+                    lw.TPen = li.DISTANCE * @Cost_Toll_Pk@
+                    
+                elseif (whatperiod=2,4)
+                    lw.TPen = li.DISTANCE * @Cost_Toll_Ok@
+                    
+                endif
+                
+            endif  ;li.FT=40
+            
+            
+            
+            ;initialize path costs ==========================================================================================
+            ;  varialbes that will be updated in each iteration, or static arrays that only need to be populated once
+            if (ITERATION=0)
+                
+                ;;HOT toll ----------------------------------------------------------------------------------------------
+                ;;add HOT toll penalty (in cents)
+                ;if (li.HOT_ZONEID>0 & li.HOT_CHRGPT>0)
+                ;    
+                ;    if (whatperiod=1)
+                ;        lw.TPen = li.HOT_CHRGAM
+                ;        
+                ;    elseif (whatperiod=2)
+                ;        lw.TPen = li.HOT_CHRGMD
+                ;        
+                ;    elseif (whatperiod=3,5)
+                ;        lw.TPen = li.HOT_CHRGPM
+                ;        
+                ;    elseif (whatperiod=4)
+                ;        lw.TPen = li.HOT_CHRGEV
+                ;    
+                ;    endif  ;whatperiod
+                ;    
+                ;endif  ;li.HOT_ZONEID>0 & li.HOT_CHRGPT>0
+                ;
+                ;
+                ;;sum HOT lane distance for each unique HOT ZONEID
+                ;if (li.HOT_ZONEID>0 & li.FT=38)  _HOTZone_Dist[li.HOT_ZONEID] = _HOTZone_Dist[li.HOT_ZONEID] + li.DISTANCE
+                
+                
+                
+                ;ramp penalty ------------------------------------------------------------------------------------------
+                ;set capacity array for use in Managed Motorways ramp penalty calculations
+                CapArray[LINKNO] = C
+                
+                
+                ;populate GPID_LinkNo array
+                if (li.RMPGPID>0)  GPID_LinkNo[li.RMPGPID] = LINKNO
+                
+                
+                ;set initial ramp penalty
+                if (whatperiod=1)
+                    lw.RPen = li.AM_RampPen
+                
+                elseif (whatperiod=2)
+                    lw.RPen = li.MD_RampPen
+                
+                elseif (whatperiod=3,5)
+                    lw.RPen = li.PM_RampPen
+                
+                elseif (whatperiod=4)
+                    lw.RPen = li.EV_RampPen
+                
+                endif  ;whatperiod
+                
+                
+                ;set maximum ramp penalty
+                MaxRPen = lu_MaxRampPenalty(1, @NetworkYear@)
+                
+                
+                
+                ;slow down trucks on all facilities --------------------------------------------------------------------
+                ;slow down trucks by 3mph for MD, 5mph for HV
+                ;    Medium Truck
+                ;                   Auto   Truck  Speed   Time 
+                ;                   Speed  Speed  Factor  Factor
+                ;      Freeway       70      67    0.96    1.04
+                ;      Expressway    50      47    0.94    1.06
+                ;      Arterial      40      37    0.93    1.08
+                ;      Collector     30      27    0.90    1.11
+                ;    
+                ;    Heavy Truck
+                ;                   Auto   Truck  Speed   Time 
+                ;                   Speed  Speed  Factor  Factor
+                ;      Freeway       70      65    0.93    1.08
+                ;      Expressway    50      45    0.90    1.11
+                ;      Arterial      40      35    0.88    1.14
+                ;      Collector     30      25    0.83    1.20
+                
+                ;assign congested speed & time to link-work variable
+                lw.Spd_Auto  = SPEED
+                lw.Time_Auto = T1
+                
+                ;set truck speed (minimum truck speed: MD=4mph, HV=3mph)
+                lw.TrkSpd_MD = MAX(4, (lw.Spd_Auto - 3))
+                lw.TrkSpd_HV = MAX(3, (lw.Spd_Auto - 5))
+                
+                ;calculate truck time penalty (in minutes)
+                lw.TrkTime_MD = li.DISTANCE * 60 / lw.TrkSpd_MD
+                lw.TrkTime_HV = li.DISTANCE * 60 / lw.TrkSpd_HV
+                
+                ;calculate truck penalty
+                lw.TrkPen_MD = MAX(0, lw.TrkTime_MD - lw.Time_Auto)
+                lw.TrkPen_HV = MAX(0, lw.TrkTime_HV - lw.Time_Auto)
+                
+                
+                
+                ;generalized cost (in minutes) used to determine best path between zones -------------------------------
+                ;  note: COST  =  Travel Time  +  Distance converted to time  +  Penalties (toll, ramp, truck) converted to time
+                lw.COST_Auto_Wrk  =  T1  +  li.DISTANCE * @AOC_Auto@ / @VOT_Auto_Wrk@  +  lw.RPen * @RampPenWeight@  +  lw.TPen / @VOT_Toll@
+                lw.COST_Auto_Per  =  T1  +  li.DISTANCE * @AOC_Auto@ / @VOT_Auto_Per@  +  lw.RPen * @RampPenWeight@  +  lw.TPen / @VOT_Toll@
+                lw.COST_Auto_Ext  =  T1  +  li.DISTANCE * @AOC_Auto@ / @VOT_Auto_Ext@  +  lw.RPen * @RampPenWeight@  +  lw.TPen / @VOT_Toll@
+                
+                lw.COST_Truck_LT  =  T1  +  li.DISTANCE * @AOC_LT@   / @VOT_LT@        +  lw.RPen * @RampPenWeight@  +  lw.TPen / @VOT_Toll@
+                lw.COST_Truck_MD  =  T1  +  li.DISTANCE * @AOC_MD@   / @VOT_MD@        +  lw.RPen * @RampPenWeight@  +  lw.TPen / @VOT_Toll@  +  lw.TrkPen_MD
+                lw.COST_Truck_HV  =  T1  +  li.DISTANCE * @AOC_HV@   / @VOT_HV@        +  lw.RPen * @RampPenWeight@  +  lw.TPen / @VOT_Toll@  +  lw.TrkPen_HV
+                
+            endif  ;ITERATION=0
+            
+        ENDPHASE
+        
+        
+        
+        PHASE=ILOOP
+            
+            ;finish work-link variable calulations to update HOT toll & ramp penalties ======================================
+            if (ITERATION>1 & I=FIRSTZONE)
+                
+                ;;calculate HOT Toll ------------------------------------------------------------------------------------
+                ;;summarize HOT lane VMT by HOT Zone --------------------------------------
+                ;LINKLOOP
+                ;    
+                ;    ;calculate HOT lane VMT
+                ;    lw.HOTLn_VMT = lw.TotVol_PCE * li.DISTANCE
+                ;    
+                ;    if (li.HOT_ZONEID>0 & li.FT=38)  _HOTZone_VMT[li.HOT_ZONEID] = _HOTZone_VMT[li.HOT_ZONEID] + lw.HOTLn_VMT
+                ;    
+                ;ENDLINKLOOP
+                ;
+                ;
+                ;;loop through HOT Zones
+                ;LOOP _HOTZoneIdx = 1, 10000
+                ;    
+                ;    ;set HOT Zone toll to minimum toll for all HOT Zones -----------------
+                ;    _HOTZone_Toll[_HOTZoneIdx] = @HOT_Toll_Min@
+                ;    
+                ;    
+                ;    ;calculate new toll only for HOT Zones with volume & distance --------
+                ;    if (_HOTZone_VMT[_HOTZoneIdx]>0 & _HOTZone_Dist[_HOTZoneIdx]>0)
+                ;        
+                ;        ;calculate average volume in HOT Zone
+                ;        _HOTZone_Vol[_HOTZoneIdx] = _HOTZone_VMT[_HOTZoneIdx] / _HOTZone_Dist[_HOTZoneIdx]
+                ;        
+                ;        
+                ;        ;calculate HOT toll (in cents)
+                ;        ;  note: cubic polynomial parameters for HOT toll calculation were estimated from emperical UDOT data
+                ;        ;low volumes use min toll
+                ;        if (_HOTZone_Vol[_HOTZoneIdx]<=725)
+                ;            _HOTZone_Toll[_HOTZoneIdx] = @HOT_Toll_Min@
+                ;            
+                ;        
+                ;        ;for volumes between 725-1180, calculate toll from parameters estimated for Curve 1
+                ;        elseif (_HOTZone_Vol[_HOTZoneIdx]<1180)
+                ;            ;Curve 1 parameters
+                ;            _HOT_Toll_CoefX3 = 0.00000010571046
+                ;            _HOT_Toll_CoefX2 = -0.0002206
+                ;            _HOT_Toll_CoefX1 = 0.19307
+                ;            _HOT_Toll_CoefX0 = -39.31
+                ;            
+                ;            _base_toll = _HOT_Toll_CoefX3 * _HOTZone_Vol[_HOTZoneIdx]^3 +
+                ;                         _HOT_Toll_CoefX2 * _HOTZone_Vol[_HOTZoneIdx]^2 +
+                ;                         _HOT_Toll_CoefX1 * _HOTZone_Vol[_HOTZoneIdx]   +
+                ;                         _HOT_Toll_CoefX0
+                ;            
+                ;            ;scale toll to account for min/max tolls in this scenario that may be different from min/max tolls from the emperical data
+                ;            ;  note: Toll  =  MinToll  +  (CalcToll - BaseMinToll)  *  (MaxToll - MinToll)  /  (BaseMaxToll - BaseMinToll)
+                ;            _HOTZone_Toll[_HOTZoneIdx] = @HOT_Toll_Min@ + (_base_toll - 25) * (@HOT_Toll_Max@ - @HOT_Toll_Min@) / (100 - 25)
+                ;            
+                ;        
+                ;        ;for volumes between 1180-1430, calculate base toll from parameters estimated for Curve 2
+                ;        elseif (_HOTZone_Vol[_HOTZoneIdx]<1430)
+                ;            ;Curve 2 parameters
+                ;            _HOT_Toll_CoefX3 = -0.0000024095080
+                ;            _HOT_Toll_CoefX2 = 0.0093588
+                ;            _HOT_Toll_CoefX1 = -11.8984
+                ;            _HOT_Toll_CoefX0 = 5022.78
+                ;            
+                ;            _base_toll = _HOT_Toll_CoefX3 * _HOTZone_Vol[_HOTZoneIdx]^3 +
+                ;                         _HOT_Toll_CoefX2 * _HOTZone_Vol[_HOTZoneIdx]^2 +
+                ;                         _HOT_Toll_CoefX1 * _HOTZone_Vol[_HOTZoneIdx]   +
+                ;                         _HOT_Toll_CoefX0
+                ;            
+                ;            ;scale toll to account for min/max tolls in this scenario that may be different from min/max tolls from the emperical data
+                ;            ;  note: Toll  =  MinToll  +  (CalcToll - BaseMinToll)  *  (MaxToll - MinToll)  /  (BaseMaxToll - BaseMinToll)
+                ;            _HOTZone_Toll[_HOTZoneIdx] = @HOT_Toll_Min@ + (_base_toll - 25) * (@HOT_Toll_Max@ - @HOT_Toll_Min@) / (100 - 25)
+                ;            
+                ;        
+                ;        ;for high volumes use max toll
+                ;        else
+                ;            _HOTZone_Toll[_HOTZoneIdx] = @HOT_Toll_Max@
+                ;            
+                ;        endif  ;_HOTZone_Vol[_HOTZoneIdx]
+                ;        
+                ;        
+                ;        ;round toll to nearest 5 cent incrament --------------------------
+                ;        ;set incrament value
+                ;        _incrament = 5
+                ;        
+                ;        ;round initial toll
+                ;        _Ini_Toll = ROUND(_HOTZone_Toll[_HOTZoneIdx])
+                ;        
+                ;        ;determine the value in the 'ones' position (i.e. #,##D.##)
+                ;        _D_Toll = (_Ini_Toll / 10  -  INT(_Ini_Toll / 10) )  *  10
+                ;        
+                ;        ;calculate amount to add to the initial value to round to nearest incrament
+                ;        if (_D_Toll < 1/2 * _incrament)
+                ;            _add_Toll = 0 * _incrament - _D_Toll
+                ;        
+                ;        elseif (_D_Toll >= 1/2 * _incrament & _D_Toll < 3/2 * _incrament)
+                ;            _add_Toll = 1 * _incrament - _D_Toll
+                ;        
+                ;        elseif (_D_Toll >= 3/2 * _incrament)
+                ;            _add_Toll = 2 * _incrament - _D_Toll
+                ;        
+                ;        endif
+                ;        
+                ;        ;calculate toll rounded to nearest incrament
+                ;        _HOTZone_Toll[_HOTZoneIdx] = _Ini_Toll + _add_Toll
+                ;        
+                ;    endif  ;_HOTZone_Time_GP[_HOTZoneIdx]>0
+                ;    
+                ;ENDLOOP  ;_HOTZoneIdx = 1, 10000
+                
+                
+                
+                LINKLOOP
+                    
+                    ;;set HOT charge point using updated tolls ----------------------------------------------------------
+                    ;if (li.HOT_ZONEID>0 & li.HOT_CHRGPT>0)  lw.TPen = _HOTZone_Toll[li.HOT_ZONEID]
+                    
+                    
+                    
+                    ;update ramp penalty for Managed Motorways part 2 --------------------------------------------------
+                    if (li.MANFWYID=1-2)
+                        
+                        ;read in downstream GP links
+                        lw.GP_1  = LU_RmpGPID(01, li.RMPGPID)
+                        lw.GP_2  = LU_RmpGPID(02, li.RMPGPID)
+                        lw.GP_3  = LU_RmpGPID(03, li.RMPGPID)
+                        lw.GP_4  = LU_RmpGPID(04, li.RMPGPID)
+                        lw.GP_5  = LU_RmpGPID(05, li.RMPGPID)
+                        lw.GP_6  = LU_RmpGPID(06, li.RMPGPID)
+                        lw.GP_7  = LU_RmpGPID(07, li.RMPGPID)
+                        lw.GP_8  = LU_RmpGPID(08, li.RMPGPID)
+                        lw.GP_9  = LU_RmpGPID(09, li.RMPGPID)
+                        lw.GP_10 = LU_RmpGPID(10, li.RMPGPID)
+                        
+                        
+                        ;look up link number & calculate v/c for GP links
+                        if (lw.GP_1>0)
+                            lw.LinkNo_1     = GPID_LinkNo[lw.GP_1]
+                            lw.VC_GP1       = lw.TotVol_PCE[lw.LinkNo_1] / CapArray[lw.LinkNo_1]
+                            
+                            lw.RampID_1     = lw.GP_1 - 1000
+                            lw.LinkNo_Rmp_1 = GPID_LinkNo[lw.RampID_1]
+                            lw.MaxAdjFac_1  = MAX(@MaxRampPenAdjFac@, MIN(1, (lw.TotVol_PCE[lw.LinkNo_Rmp_1] - @RampVolAdjMin@) / (@RampVolAdjMax@ - @RampVolAdjMin@) * (1-@MaxRampPenAdjFac@) + @MaxRampPenAdjFac@))
+                            lw.MaxRampPen_1 = ROUND(MaxRPen * lw.MaxAdjFac_1 * 10) / 10
+                            lw.RampPen0_1   = lw.RPen0[lw.LinkNo_Rmp_1]
+                        else
+                            lw.VC_GP1 = 0
+                        endif
+                        
+                        
+                        if (lw.GP_2>0)
+                            lw.LinkNo_2     = GPID_LinkNo[lw.GP_2]
+                            lw.VC_GP2       = lw.TotVol_PCE[lw.LinkNo_2] / CapArray[lw.LinkNo_2]
+                            
+                            lw.RampID_2     = lw.GP_2 - 1000
+                            lw.LinkNo_Rmp_2 = GPID_LinkNo[lw.RampID_2]
+                            lw.MaxAdjFac_2  = MAX(@MaxRampPenAdjFac@, MIN(1, (lw.TotVol_PCE[lw.LinkNo_Rmp_2] - @RampVolAdjMin@) / (@RampVolAdjMax@ - @RampVolAdjMin@) * (1-@MaxRampPenAdjFac@) + @MaxRampPenAdjFac@))
+                            lw.MaxRampPen_2 = ROUND(MaxRPen * lw.MaxAdjFac_2 * 10) / 10
+                            lw.RampPen0_2   = lw.RPen0[lw.LinkNo_Rmp_2]
+                        else
+                            lw.VC_GP2 = 0
+                        endif
+                        
+                        
+                        if (lw.GP_3>0)
+                            lw.LinkNo_3     = GPID_LinkNo[lw.GP_3]
+                            lw.VC_GP3       = lw.TotVol_PCE[lw.LinkNo_3] / CapArray[lw.LinkNo_3]
+                            
+                            lw.RampID_3     = lw.GP_3 - 1000
+                            lw.LinkNo_Rmp_3 = GPID_LinkNo[lw.RampID_3]
+                            lw.MaxAdjFac_3  = MAX(@MaxRampPenAdjFac@, MIN(1, (lw.TotVol_PCE[lw.LinkNo_Rmp_3] - @RampVolAdjMin@) / (@RampVolAdjMax@ - @RampVolAdjMin@) * (1-@MaxRampPenAdjFac@) + @MaxRampPenAdjFac@))
+                            lw.MaxRampPen_3 = ROUND(MaxRPen * lw.MaxAdjFac_3 * 10) / 10
+                            lw.RampPen0_3   = lw.RPen0[lw.LinkNo_Rmp_3]
+                        else
+                            lw.VC_GP3 = 0
+                        endif
+                        
+                        
+                        if (lw.GP_4>0)
+                            lw.LinkNo_4     = GPID_LinkNo[lw.GP_4]
+                            lw.VC_GP4       = lw.TotVol_PCE[lw.LinkNo_4] / CapArray[lw.LinkNo_4]
+                            
+                            lw.RampID_4     = lw.GP_4 - 1000
+                            lw.LinkNo_Rmp_4 = GPID_LinkNo[lw.RampID_4]
+                            lw.MaxAdjFac_4  = MAX(@MaxRampPenAdjFac@, MIN(1, (lw.TotVol_PCE[lw.LinkNo_Rmp_4] - @RampVolAdjMin@) / (@RampVolAdjMax@ - @RampVolAdjMin@) * (1-@MaxRampPenAdjFac@) + @MaxRampPenAdjFac@))
+                            lw.MaxRampPen_4 = ROUND(MaxRPen * lw.MaxAdjFac_4 * 10) / 10
+                            lw.RampPen0_4   = lw.RPen0[lw.LinkNo_Rmp_4]
+                        else
+                            lw.VC_GP4 = 0
+                        endif
+                        
+                        
+                        if (lw.GP_5>0)
+                            lw.LinkNo_5     = GPID_LinkNo[lw.GP_5]
+                            lw.VC_GP5       = lw.TotVol_PCE[lw.LinkNo_5] / CapArray[lw.LinkNo_5]
+                            
+                            lw.RampID_5     = lw.GP_5 - 1000
+                            lw.LinkNo_Rmp_5 = GPID_LinkNo[lw.RampID_5]
+                            lw.MaxAdjFac_5  = MAX(@MaxRampPenAdjFac@, MIN(1, (lw.TotVol_PCE[lw.LinkNo_Rmp_5] - @RampVolAdjMin@) / (@RampVolAdjMax@ - @RampVolAdjMin@) * (1-@MaxRampPenAdjFac@) + @MaxRampPenAdjFac@))
+                            lw.MaxRampPen_5 = ROUND(MaxRPen * lw.MaxAdjFac_5 * 10) / 10
+                            lw.RampPen0_5   = lw.RPen0[lw.LinkNo_Rmp_5]
+                        else
+                            lw.VC_GP5 = 0
+                        endif
+                        
+                        
+                        if (lw.GP_6>0)
+                            lw.LinkNo_6     = GPID_LinkNo[lw.GP_6]
+                            lw.VC_GP6       = lw.TotVol_PCE[lw.LinkNo_6] / CapArray[lw.LinkNo_6]
+                            
+                            lw.RampID_6     = lw.GP_6 - 1000
+                            lw.LinkNo_Rmp_6 = GPID_LinkNo[lw.RampID_6]
+                            lw.MaxAdjFac_6  = MAX(@MaxRampPenAdjFac@, MIN(1, (lw.TotVol_PCE[lw.LinkNo_Rmp_6] - @RampVolAdjMin@) / (@RampVolAdjMax@ - @RampVolAdjMin@) * (1-@MaxRampPenAdjFac@) + @MaxRampPenAdjFac@))
+                            lw.MaxRampPen_6 = ROUND(MaxRPen * lw.MaxAdjFac_6 * 10) / 10
+                            lw.RampPen0_6   = lw.RPen0[lw.LinkNo_Rmp_6]
+                        else
+                            lw.VC_GP6 = 0
+                        endif
+                        
+                        
+                        if (lw.GP_7>0)
+                            lw.LinkNo_7     = GPID_LinkNo[lw.GP_7]
+                            lw.VC_GP7       = lw.TotVol_PCE[lw.LinkNo_7] / CapArray[lw.LinkNo_7]
+                            
+                            lw.RampID_7     = lw.GP_7 - 1000
+                            lw.LinkNo_Rmp_7 = GPID_LinkNo[lw.RampID_7]
+                            lw.MaxAdjFac_7  = MAX(@MaxRampPenAdjFac@, MIN(1, (lw.TotVol_PCE[lw.LinkNo_Rmp_7] - @RampVolAdjMin@) / (@RampVolAdjMax@ - @RampVolAdjMin@) * (1-@MaxRampPenAdjFac@) + @MaxRampPenAdjFac@))
+                            lw.MaxRampPen_7 = ROUND(MaxRPen * lw.MaxAdjFac_7 * 10) / 10
+                            lw.RampPen0_7   = lw.RPen0[lw.LinkNo_Rmp_7]
+                        else
+                            lw.VC_GP7 = 0
+                        endif
+                        
+                        
+                        if (lw.GP_8>0)
+                            lw.LinkNo_8     = GPID_LinkNo[lw.GP_8]
+                            lw.VC_GP8       = lw.TotVol_PCE[lw.LinkNo_8] / CapArray[lw.LinkNo_8]
+                            
+                            lw.RampID_8     = lw.GP_8 - 1000
+                            lw.LinkNo_Rmp_8 = GPID_LinkNo[lw.RampID_8]
+                            lw.MaxAdjFac_8  = MAX(@MaxRampPenAdjFac@, MIN(1, (lw.TotVol_PCE[lw.LinkNo_Rmp_8] - @RampVolAdjMin@) / (@RampVolAdjMax@ - @RampVolAdjMin@) * (1-@MaxRampPenAdjFac@) + @MaxRampPenAdjFac@))
+                            lw.MaxRampPen_8 = ROUND(MaxRPen * lw.MaxAdjFac_8 * 10) / 10
+                            lw.RampPen0_8   = lw.RPen0[lw.LinkNo_Rmp_8]
+                        else
+                            lw.VC_GP8 = 0
+                        endif
+                        
+                        
+                        if (lw.GP_9>0)
+                            lw.LinkNo_9     = GPID_LinkNo[lw.GP_9]
+                            lw.VC_GP9       = lw.TotVol_PCE[lw.LinkNo_9] / CapArray[lw.LinkNo_9]
+                            
+                            lw.RampID_9     = lw.GP_9 - 1000
+                            lw.LinkNo_Rmp_9 = GPID_LinkNo[lw.RampID_9]
+                            lw.MaxAdjFac_9  = MAX(@MaxRampPenAdjFac@, MIN(1, (lw.TotVol_PCE[lw.LinkNo_Rmp_9] - @RampVolAdjMin@) / (@RampVolAdjMax@ - @RampVolAdjMin@) * (1-@MaxRampPenAdjFac@) + @MaxRampPenAdjFac@))
+                            lw.MaxRampPen_9 = ROUND(MaxRPen * lw.MaxAdjFac_9 * 10) / 10
+                            lw.RampPen0_9   = lw.RPen0[lw.LinkNo_Rmp_9]
+                        else
+                            lw.VC_GP9 = 0
+                        endif
+                        
+                        
+                        if (lw.GP_10>0)
+                            lw.LinkNo_10     = GPID_LinkNo[lw.GP_10]
+                            lw.VC_GP10       = lw.TotVol_PCE[lw.LinkNo_10] / CapArray[lw.LinkNo_10]
+                            
+                            lw.RampID_10     = lw.GP_10 - 1000
+                            lw.LinkNo_Rmp_10 = GPID_LinkNo[lw.RampID_10]
+                            lw.MaxAdjFac_10  = MAX(@MaxRampPenAdjFac@, MIN(1, (lw.TotVol_PCE[lw.LinkNo_Rmp_10] - @RampVolAdjMin@) / (@RampVolAdjMax@ - @RampVolAdjMin@) * (1-@MaxRampPenAdjFac@) + @MaxRampPenAdjFac@))
+                            lw.MaxRampPen_10 = ROUND(MaxRPen * lw.MaxAdjFac_10 * 10) / 10
+                            lw.RampPen0_10   = lw.RPen0[lw.LinkNo_Rmp_10]
+                        else
+                            lw.VC_GP10 = 0
+                        endif
+                        
+                        
+                        ;set ramp penalty
+                        if (ITERATION = 2-3)
+                            lw.RampPen_1 = max(@MinRampPen@, LU_RampPen(1,lw.VC_GP1) )  ;lw.RampPen0_1
+                            lw.RampPen_2 = max(@MinRampPen@, LU_RampPen(1,lw.VC_GP2) )  ;lw.RampPen0_2
+                            lw.RampPen_3 = max(@MinRampPen@, LU_RampPen(1,lw.VC_GP3) )  ;lw.RampPen0_3
+                            lw.RampPen_4 = max(@MinRampPen@, LU_RampPen(1,lw.VC_GP4) )  ;lw.RampPen0_4
+                            lw.RampPen_5 = max(@MinRampPen@, LU_RampPen(1,lw.VC_GP5) )  ;lw.RampPen0_5
+                            lw.RampPen_6 = max(@MinRampPen@, LU_RampPen(1,lw.VC_GP6) )  ;lw.RampPen0_6
+                            lw.RampPen_7 = max(@MinRampPen@, LU_RampPen(1,lw.VC_GP7) )  ;lw.RampPen0_7
+                            lw.RampPen_8 = max(@MinRampPen@, LU_RampPen(1,lw.VC_GP8) )  ;lw.RampPen0_8
+                            lw.RampPen_9 = max(@MinRampPen@, LU_RampPen(1,lw.VC_GP9) )  ;lw.RampPen0_9
+                            lw.RampPen_10= max(@MinRampPen@, LU_RampPen(1,lw.VC_GP10) )  ;lw.RampPen0_10
+                        else
+                            lw.RampPen_1 = max(@MinRampPen@, lw.RampPen0_1 * LU_RampPen(2,lw.VC_GP1) )  ;lw.RampPen0_1   ;LU_RampPen(1,lw.VC_GP1) 
+                            lw.RampPen_2 = max(@MinRampPen@, lw.RampPen0_2 * LU_RampPen(2,lw.VC_GP2) )  ;lw.RampPen0_2   ;LU_RampPen(1,lw.VC_GP2) 
+                            lw.RampPen_3 = max(@MinRampPen@, lw.RampPen0_3 * LU_RampPen(2,lw.VC_GP3) )  ;lw.RampPen0_3   ;LU_RampPen(1,lw.VC_GP3) 
+                            lw.RampPen_4 = max(@MinRampPen@, lw.RampPen0_4 * LU_RampPen(2,lw.VC_GP4) )  ;lw.RampPen0_4   ;LU_RampPen(1,lw.VC_GP4) 
+                            lw.RampPen_5 = max(@MinRampPen@, lw.RampPen0_5 * LU_RampPen(2,lw.VC_GP5) )  ;lw.RampPen0_5   ;LU_RampPen(1,lw.VC_GP5) 
+                            lw.RampPen_6 = max(@MinRampPen@, lw.RampPen0_6 * LU_RampPen(2,lw.VC_GP6) )  ;lw.RampPen0_6   ;LU_RampPen(1,lw.VC_GP6) 
+                            lw.RampPen_7 = max(@MinRampPen@, lw.RampPen0_7 * LU_RampPen(2,lw.VC_GP7) )  ;lw.RampPen0_7   ;LU_RampPen(1,lw.VC_GP7) 
+                            lw.RampPen_8 = max(@MinRampPen@, lw.RampPen0_8 * LU_RampPen(2,lw.VC_GP8) )  ;lw.RampPen0_8   ;LU_RampPen(1,lw.VC_GP8) 
+                            lw.RampPen_9 = max(@MinRampPen@, lw.RampPen0_9 * LU_RampPen(2,lw.VC_GP9) )  ;lw.RampPen0_9   ;LU_RampPen(1,lw.VC_GP9) 
+                            lw.RampPen_10= max(@MinRampPen@, lw.RampPen0_10* LU_RampPen(2,lw.VC_GP10) )  ;lw.RampPen0_10   ;LU_RampPen(1,lw.VC_GP10)
+                        endif
+                        
+                        
+                        ;determine contribution of ramp penalty 10 to ramp penalty 9
+                        if (lw.RampPen_10>=lw.MaxRampPen_10 & lw.RampID_10>0)
+                            lw.RampPen_9_10 = lw.RampPen_10 - lw.MaxRampPen_10
+                        else
+                            lw.RampPen_9_10 = 0
+                        endif
+                        
+                        
+                        ;calculate adjusted ramp penalty 9 and its contribution to ramp penalty 8
+                        lw.RampPen_9p = lw.RampPen_9 + lw.RampPen_9_10
+                        
+                        if (lw.RampPen_9p>=lw.MaxRampPen_9 & lw.RampID_9>0)
+                            lw.RampPen_8_9 = lw.RampPen_9p - lw.MaxRampPen_9
+                        else
+                            lw.RampPen_8_9 = 0
+                        endif
+                        
+                        
+                        ;calculate adjusted ramp penalty 8 and its contribution to ramp penalty 7
+                        lw.RampPen_8p = lw.RampPen_8 + lw.RampPen_8_9
+                        
+                        if (lw.RampPen_8p>=lw.MaxRampPen_8 & lw.RampID_8>0)
+                            lw.RampPen_7_8 = lw.RampPen_8p - lw.MaxRampPen_8
+                        else
+                            lw.RampPen_7_8 = 0
+                        endif
+                        
+                        
+                        ;calculate adjusted ramp penalty 7 and its contribution to ramp penalty 6
+                        lw.RampPen_7p = lw.RampPen_7 + lw.RampPen_7_8
+                        
+                        if (lw.RampPen_7p>=lw.MaxRampPen_7 & lw.RampID_7>0)
+                            lw.RampPen_6_7 = lw.RampPen_7p - lw.MaxRampPen_7
+                        else
+                            lw.RampPen_6_7 = 0
+                        endif
+                        
+                        
+                        ;calculate adjusted ramp penalty 6 and its contribution to ramp penalty 5
+                        lw.RampPen_6p = lw.RampPen_6 + lw.RampPen_6_7
+                        
+                        if (lw.RampPen_6p>=lw.MaxRampPen_6 & lw.RampID_6>0)
+                            lw.RampPen_5_6 = lw.RampPen_6p - lw.MaxRampPen_6
+                        else
+                            lw.RampPen_5_6 = 0
+                        endif
+                        
+                        
+                        ;calculate adjusted ramp penalty 5 and its contribution to ramp penalty 4
+                        lw.RampPen_5p = lw.RampPen_5 + lw.RampPen_5_6
+                        
+                        if (lw.RampPen_5p>=lw.MaxRampPen_5 & lw.RampID_5>0)
+                            lw.RampPen_4_5 = lw.RampPen_5p - lw.MaxRampPen_5
+                        else
+                            lw.RampPen_4_5 = 0
+                        endif
+                        
+                        
+                        ;calculate adjusted ramp penalty 4 and its contribution to ramp penalty 3
+                        lw.RampPen_4p = lw.RampPen_4 + lw.RampPen_4_5
+                        
+                        if (lw.RampPen_4p>=lw.MaxRampPen_4 & lw.RampID_4>0)
+                            lw.RampPen_3_4 = lw.RampPen_4p - lw.MaxRampPen_4
+                        else
+                            lw.RampPen_3_4 = 0
+                        endif
+                        
+                        
+                        ;calculate adjusted ramp penalty 3 and its contribution to ramp penalty 2
+                        lw.RampPen_3p = lw.RampPen_3 + lw.RampPen_3_4
+                        
+                        if (lw.RampPen_3p>=lw.MaxRampPen_3 & lw.RampID_3>0)
+                            lw.RampPen_2_3 = lw.RampPen_3p - lw.MaxRampPen_3
+                        else
+                            lw.RampPen_2_3 = 0
+                        endif
+                        
+                        
+                        ;calculate adjusted ramp penalty 2 and its contribution to ramp penalty 1
+                        lw.RampPen_2p = lw.RampPen_2 + lw.RampPen_2_3
+                        
+                        if (lw.RampPen_2p>=lw.MaxRampPen_2 & lw.RampID_2>0)
+                            lw.RampPen_1_2 = lw.RampPen_2p - lw.MaxRampPen_2
+                        else
+                            lw.RampPen_1_2 = 0
+                        endif
+                        
+                        
+                        ;determine ramp penalty for this ramp
+                        lw.RampPen_1p = lw.RampPen_1 + lw.RampPen_1_2
+                        
+                        ;set ramp penalty
+                        if (lw.RampPen_1p>lw.MaxRampPen_1)
+                            lw.RPen = lw.MaxRampPen_1
+                        elseif (lw.RampPen_1p<@MinRampPen@)
+                            lw.RPen = @MinRampPen@
+                        else
+                            lw.RPen = lw.RampPen_1p
+                        endif
+                        
+                        
+                        lw.RampPenAdj = lw.Lambda0 * lw.RPen  +  (1 - lw.Lambda0) * lw.RPen0
+                        
+                        lw.RPen = ROUND(lw.RPen * 10) / 10
+                        ;lw.RPen = ROUND(lw.RampPenAdj * 10) / 10
+                        
+                        
+                    elseif (li.RMPGPID=1-999 & li.FT<>30-31)
+                        
+                        lw.RPen = @MinRampPen@
+                        
+                    else
+                        
+                        lw.RPen = 0
+                        
+                    endif  ;li.MANFWYID=1-2
+                    
+                    
+                    
+                    ;update generalized cost paths for various volume groups ---------------------------------------------------
+                    lw.COST_Auto_Wrk  =  lw.Time_Auto  +  li.DISTANCE * @AOC_Auto@ / @VOT_Auto_Wrk@  +  lw.RPen * @RampPenWeight@  +  lw.TPen / @VOT_Toll@
+                    lw.COST_Auto_Per  =  lw.Time_Auto  +  li.DISTANCE * @AOC_Auto@ / @VOT_Auto_Per@  +  lw.RPen * @RampPenWeight@  +  lw.TPen / @VOT_Toll@
+                    lw.COST_Auto_Ext  =  lw.Time_Auto  +  li.DISTANCE * @AOC_Auto@ / @VOT_Auto_Ext@  +  lw.RPen * @RampPenWeight@  +  lw.TPen / @VOT_Toll@
+                    
+                    lw.COST_Truck_LT  =  lw.Time_Auto  +  li.DISTANCE * @AOC_LT@   / @VOT_LT@        +  lw.RPen * @RampPenWeight@  +  lw.TPen / @VOT_Toll@
+                    lw.COST_Truck_MD  =  lw.Time_Auto  +  li.DISTANCE * @AOC_MD@   / @VOT_MD@        +  lw.RPen * @RampPenWeight@  +  lw.TPen / @VOT_Toll@  +  lw.TrkPen_MD
+                    lw.COST_Truck_HV  =  lw.Time_Auto  +  li.DISTANCE * @AOC_HV@   / @VOT_HV@        +  lw.RPen * @RampPenWeight@  +  lw.TPen / @VOT_Toll@  +  lw.TrkPen_HV
+                    
+                ENDLINKLOOP
+                
+            endif  ;ITERATION>1 & I=FIRSTZONE
+            
+            
+            
+            ;continue normal ILOOP processing ===============================================================================
+            
+            ;assign working matrices -------------------------------------------------------------------------
+            mw[001] = mi.1.HBW
+            mw[002] = mi.1.HBShp
+            mw[003] = mi.1.HBOth
+            mw[004] = mi.1.HBSch_Pr
+            mw[005] = mi.1.HBSch_Sc
+            mw[006] = mi.1.HBC
+            mw[007] = mi.1.NHBW
+            mw[008] = mi.1.NHBNW
+            mw[009] = mi.1.IX
+            mw[010] = mi.1.XI
+            mw[011] = mi.1.XX
+            mw[012] = mi.1.SH_LT
+            mw[013] = mi.1.SH_MD
+            mw[014] = mi.1.SH_HV
+            mw[015] = mi.1.Ext_MD
+            mw[016] = mi.1.Ext_HV
+            
+            mw[020] = mi.1.HBSch
+            mw[021] = mi.1.HBO
+            mw[022] = mi.1.NHB
+            mw[023] = mi.1.TTUNIQUE
+            mw[024] = mi.1.HBOthnTT
+            
+            mw[030] = mi.1.Tot_HBW
+            mw[031] = mi.1.Tel_HBW
+            mw[032] = mi.1.Tot_NHBW
+            mw[033] = mi.1.Tel_NHBW
+            
+            
+            
+            ;assign trips ------------------------------------------------------------------------------------
+            
+            ;load HBW trips --------------------------------------------------------------
+            PATHLOAD PATH=lw.COST_Auto_Wrk, DEC=F2,
+                CONSOLIDATE=T, 
+                PENI=1,
+                EXCLUDEGROUP=1-2,7,    ;exclude HOV/HOT lanes
+                VOL[01]=mw[01],        ;HBW
+                VOL[31]=mw[31]         ;Tel_HBW
+            
+            
+            ;load HBO, NHB, HBC & HBSch trips --------------------------------------------
+            PATHLOAD PATH=lw.COST_Auto_Per, DEC=F2,
+                CONSOLIDATE=T, 
+                PENI=1,
+                EXCLUDEGROUP=1-2,7,    ;exclude HOV/HOT lanes
+                VOL[02]=mw[02],        ;HBShp   
+                VOL[03]=mw[03],        ;HBOth   
+                VOL[04]=mw[04],        ;HBSch_Pr
+                VOL[05]=mw[05],        ;HBSch_Sc
+                VOL[06]=mw[06],        ;HBC     
+                VOL[07]=mw[07],        ;NHBW    
+                VOL[08]=mw[08],        ;NHBNW   
+                VOL[23]=mw[23],        ;TTUNIQUE
+                VOL[33]=mw[33]         ;Tel_NHBW
+            
+            
+            ;load external trips ---------------------------------------------------------
+            PATHLOAD PATH=lw.COST_Auto_Ext, DEC=F2,
+                CONSOLIDATE=T, 
+                PENI=1,
+                EXCLUDEGROUP=1-2,7,    ;exclude HOV/HOT lanes
+                VOL[09]=mw[09],        ;IX
+                VOL[10]=mw[10],        ;XI
+                VOL[11]=mw[11]         ;XX
+            
+            
+            ;load light truck trips ------------------------------------------------------
+            PATHLOAD PATH=lw.COST_Truck_LT, DEC=F2,
+                CONSOLIDATE=T, 
+                PENI=1, 
+                EXCLUDEGROUP=1-2,7,    ;exclude HOV/HOT lanes
+                VOL[12]=mw[12]         ;SH_LT
+            
+            
+            ;load medium truck trips -----------------------------------------------------
+            PATHLOAD PATH=lw.COST_Truck_MD, DEC=F2,
+                CONSOLIDATE=T, 
+                PENI=1, 
+                EXCLUDEGROUP=1-2,5,7,  ;exclude HOV/HOT & truck restricted lanes
+                VOL[13]=mw[13],        ;SH_MD
+                VOL[15]=mw[15]         ;Ext_MD
+            
+            
+            ;load heavy truck trips ------------------------------------------------------
+            PATHLOAD PATH=lw.COST_Truck_HV, DEC=F2,
+                CONSOLIDATE=T, 
+                PENI=1, 
+                EXCLUDEGROUP=1-2,5,7,  ;exclude HOV/HOT & truck restricted lanes
+                VOL[14]=mw[14],        ;SH_HV
+                VOL[16]=mw[16]         ;Ext_HV
+            
+            
+        ENDPHASE
+        
+        
+        
+        PHASE=ADJUST
+            
+            FUNCTION {
+                
+                ;calculate volume flow rate (V) ------------------------------------------------------------------------
+                ;  specify to account for truck to passenger car equivalent for TC funciton and to exclude extra volume
+                ;  classes from select link analyses, rather than use internal default calculation
+                V = VOL[01]            +     ;HBW     
+                    VOL[02]            +     ;HBShp   
+                    VOL[03]            +     ;HBOth   
+                    VOL[04]            +     ;HBSch_Pr
+                    VOL[05]            +     ;HBSch_Sc
+                    VOL[06]            +     ;HBC     
+                    VOL[07]            +     ;NHBW    
+                    VOL[08]            +     ;NHBNW   
+                    VOL[09]            +     ;IX      
+                    VOL[10]            +     ;XI      
+                    VOL[11]            +     ;XX      
+                    VOL[12]            +     ;SH_LT   
+                    VOL[13] * @PCE_MD@ +     ;SH_MD   
+                    VOL[14] * @PCE_HV@ +     ;SH_HV   
+                    VOL[15] * @PCE_MD@ +     ;Ext_MD  
+                    VOL[16] * @PCE_HV@       ;Ext_HV  
+                
+                
+                
+                ;calculate link congested time by link class -----------------------------------------------------------
+                ;  note: TC functions use standard BPR functional form but with parameters specific to each link class
+                ;        Max v/c ratios prevent speeds from going below ~5mph
+                ;        For reference, the standard BPR form is:
+                ;           Congested Time = FF Time * (1 + COEFF * (V/C)^EXP), where BPR defaults are COEFF=0.15, EXP=4
+                TC[1]  = T0 * (1 + 0.7 * (V/C)^8)   ;MIN(V/C, 1.44)^8)    ;freeway
+                TC[2]  = T0 * (1 + 0.7 * (V/C)^3)   ;MIN(V/C, 1.65)^3)    ;ramp
+                TC[3]  = T0 * (1 + 0.6 * (V/C)^6)   ;MIN(V/C, 1.55)^6)    ;expressway
+                TC[4]  = T0 * (1 + 0.6 * (V/C)^4)   ;MIN(V/C, 1.80)^4)    ;arterial
+                TC[5]  = T0 * (1 + 0.6 * (V/C)^3)   ;MIN(V/C, 1.85)^3)    ;collector
+                TC[6]  = T0 * (1 + 0.7 * (V/C)^8)   ;MIN(V/C, 1.44)^8)    ;Managed Motorway main line
+                TC[10] = T0                                               ;no congestion degradation on centroid connectors
+                
+                
+                
+                ;calculate COST for Lambda calculation (needed for vol ave in EQUI assignment) -------------------------
+                ;  note: lw arrays are updated FOLLOWING the equilibrium processes in the ADJUST phase, therefore any lw
+                ;        arrays that are functions of volume changes (such as lw containing TIME) cannot be used in COST 
+                ;        function with COMBINE=EQUI assignment
+                
+                ;set COST to defulat value, TIME, for clarity
+                ;  note: if not specified, cost function defaults to TIME in Cube
+                COST = TIME
+                
+                
+                ;set COST to volume weighted avg of link general costs for multiclass assignment
+                ;  note: TPen, RPen & TrkPen are functions of volume changes and cannot be used in COST function with COMBINE=EQUI assignment
+                ;COST =( (TIME  +  li.DISTANCE * @AOC_Auto@ / @VOT_Auto_Wrk@ ) * V1                     +
+                ;        (TIME  +  li.DISTANCE * @AOC_Auto@ / @VOT_Auto_Per@ ) * (V2+V3+V4+V5+V6+V7+V8) +
+                ;        (TIME  +  li.DISTANCE * @AOC_Auto@ / @VOT_Auto_Ext@ ) * (V9+V10+V11)           +
+                ;        (TIME  +  li.DISTANCE * @AOC_LT@   / @VOT_LT@       ) * V12                    +
+                ;        (TIME  +  li.DISTANCE * @AOC_MD@   / @VOT_MD@       ) * (V13+V15) * @PCE_MD@   +
+                ;        (TIME  +  li.DISTANCE * @AOC_HV@   / @VOT_HV@       ) * (V14+V16) * @PCE_HV@    ) / CmpNumRetNum(V,'=',0,1,V)
+                
+            }  ;end functions
+            
+            
+            
+            ;update work-link arrays -----------------------------------------------------------------------------------
+            ;set congested auto speed and time
+            lw.Spd_Auto  = li.DISTANCE * 60 / TIME
+            lw.Time_Auto = TIME
+            
+            
+            ;set truck speed (minimum truck speed: MD=4mph, HV=3mph)
+            lw.TrkSpd_MD = MAX(4, (lw.Spd_Auto - 3))
+            lw.TrkSpd_HV = MAX(3, (lw.Spd_Auto - 5))
+            
+            ;calculate truck time (in minutes)
+            lw.TrkTime_MD = li.DISTANCE * 60 / lw.TrkSpd_MD
+            lw.TrkTime_HV = li.DISTANCE * 60 / lw.TrkSpd_HV
+            
+            ;calculate truck penalty
+            lw.TrkPen_MD = MAX(0, lw.TrkTime_MD - lw.Time_Auto)
+            lw.TrkPen_HV = MAX(0, lw.TrkTime_HV - lw.Time_Auto)
+            
+            
+            ;store combined volumes (PCE) in a link array for use in Managed Motorways ramp penalty calculations
+            lw.TotVol_PCE = V
+            lw.RPen0      = lw.RPen
+            
+            
+            ;update generalized cost work-link variables
+            ;  *** moved to beginning of ILOOP phase to accomodate toll cost and ramp penalty updates ***
+            
+            
+            
+            ;print output for checking ---------------------------------------------------------------------------------
+            if (li.MANFWYID>0)
+                
+                ;print ramp penalty to test output file
+                if (_print_RampPen_Head_@PrdTag@=0)
+                    
+                    PRINT FILE='@ParentDir@@ScenarioDir@Temp\3_Distribute\_RampPen_@PrdTag@_@RID@.@n@.csv', 
+                        FORM=10.0, 
+                        CSV=T, 
+                        LIST='FBLoop', 
+                             'ITERATION', 
+                             'A',
+                             'B',
+                             'LINKID',
+                             'RMPGPID',
+                             'MANFWYID',
+                             'RampPen',
+                             'LinkNo',
+                             'GP_1',
+                             'GP_2',
+                             'GP_3',
+                             'GP_4',
+                             'GP_5',
+                             'GP_6',
+                             'GP_7',
+                             'GP_8',
+                             'GP_9',
+                             'GP_10',
+                             'VC_GP1',
+                             'VC_GP2',
+                             'VC_GP3',
+                             'VC_GP4',
+                             'VC_GP5',
+                             'VC_GP6',
+                             'VC_GP7',
+                             'VC_GP8',
+                             'VC_GP9',
+                             'VC_GP10',
+                             'RampPen_1p',
+                             'RampPen_2p',
+                             'RampPen_3p',
+                             'RampPen_4p',
+                             'RampPen_5p',
+                             'RampPen_6p',
+                             'RampPen_7p',
+                             'RampPen_8p',
+                             'RampPen_9p',
+                             'MaxRampPen_1',
+                             'MaxRampPen_2',
+                             'MaxRampPen_3',
+                             'MaxRampPen_4',
+                             'MaxRampPen_5',
+                             'MaxRampPen_6',
+                             'MaxRampPen_7',
+                             'MaxRampPen_8',
+                             'MaxRampPen_9',
+                             'MaxRampPen_10',
+                             'RampPen_1_2',
+                             'RampPen_2_3',
+                             'RampPen_3_4',
+                             'RampPen_4_5',
+                             'RampPen_5_6',
+                             'RampPen_6_7',
+                             'RampPen_7_8',
+                             'RampPen_8_9',
+                             'RampPen_9_10',
+                             'RampPen0_1',
+                             'RampPen0_2',
+                             'RampPen0_3',
+                             'RampPen0_4',
+                             'RampPen0_5',
+                             'RampPen0_6',
+                             'RampPen0_7',
+                             'RampPen0_8',
+                             'RampPen0_9',
+                             'RampPen0_10',
+                             'LinkVol',
+                             'LinkCap',
+                             'LinkVC',
+                             'LinkSpd',
+                             'LinkSFF'
+                    
+                    _print_RampPen_Head_@PrdTag@ = 1
+                    
+                endif  ;_print_RampPen_Head_@PrdTag@=0
+                
+                
+                PRINT FILE='@ParentDir@@ScenarioDir@Temp\3_Distribute\_RampPen_@PrdTag@_@RID@.@n@.csv', 
+                    FORM=10.0, 
+                    CSV=T, 
+                    LIST=@n@, 
+                         ITERATION,
+                         li.A,
+                         li.B,
+                         li.LINKID,
+                         li.RMPGPID,
+                         li.MANFWYID,
+                         lw.RPen(10.2),
+                         LINKNO,
+                         lw.GP_1,
+                         lw.GP_2,
+                         lw.GP_3,
+                         lw.GP_4,
+                         lw.GP_5,
+                         lw.GP_6,
+                         lw.GP_7,
+                         lw.GP_8,
+                         lw.GP_9,
+                         lw.GP_10,
+                         lw.VC_GP1(10.3),
+                         lw.VC_GP2(10.3),
+                         lw.VC_GP3(10.3),
+                         lw.VC_GP4(10.3),
+                         lw.VC_GP5(10.3),
+                         lw.VC_GP6(10.3),
+                         lw.VC_GP7(10.3),
+                         lw.VC_GP8(10.3),
+                         lw.VC_GP9(10.3),
+                         lw.VC_GP10(10.3),
+                         lw.RampPen_1p(10.2),
+                         lw.RampPen_2p(10.2),
+                         lw.RampPen_3p(10.2),
+                         lw.RampPen_4p(10.2),
+                         lw.RampPen_5p(10.2),
+                         lw.RampPen_6p(10.2),
+                         lw.RampPen_7p(10.2),
+                         lw.RampPen_8p(10.2),
+                         lw.RampPen_9p(10.2),
+                         lw.MaxRampPen_1(10.2),
+                         lw.MaxRampPen_2(10.2),
+                         lw.MaxRampPen_3(10.2),
+                         lw.MaxRampPen_4(10.2),
+                         lw.MaxRampPen_5(10.2),
+                         lw.MaxRampPen_6(10.2),
+                         lw.MaxRampPen_7(10.2),
+                         lw.MaxRampPen_8(10.2),
+                         lw.MaxRampPen_9(10.2),
+                         lw.MaxRampPen_10(10.2),
+                         lw.RampPen_1_2(10.2),
+                         lw.RampPen_2_3(10.2),
+                         lw.RampPen_3_4(10.2),
+                         lw.RampPen_4_5(10.2),
+                         lw.RampPen_5_6(10.2),
+                         lw.RampPen_6_7(10.2),
+                         lw.RampPen_7_8(10.2),
+                         lw.RampPen_8_9(10.2),
+                         lw.RampPen_9_10(10.2),
+                         lw.RampPen0_1(10.2),
+                         lw.RampPen0_2(10.2),
+                         lw.RampPen0_3(10.2),
+                         lw.RampPen0_4(10.2),
+                         lw.RampPen0_5(10.2),
+                         lw.RampPen0_6(10.2),
+                         lw.RampPen0_7(10.2),
+                         lw.RampPen0_8(10.2),
+                         lw.RampPen0_9(10.2),
+                         lw.RampPen0_10(10.2),
+                         lw.TotVol_PCE,
+                         CapArray[LINKNO],
+                         lw.TotVol_PCE/CapArray[LINKNO](10.3),
+                         CSPD(10.1),
+                         li.FF_Spd(10.1)
+                
+            endif  ;MANFWY>0
+            
+        ENDPHASE
+        
+        
+        
+        PHASE=CONVERGE
+            
+            if (RGAP<=RGAPCUTOFF)  BALANCE = 1
+            
+            
+            ;iter, rgap gap rmse aad raad pdiff
+            if (_print_Conv_Head_@PrdTag@=0)
+                
+                PRINT FILE='@ParentDir@@ScenarioDir@Temp\3_Distribute\_Convergence - FB @n@ - @PrdTag@.csv', 
+                    CSV=T, 
+                    FORM=15.0, 
+                    LIST='FBLoop'     , 
+                         'ITERATION'  ,
+                         'LAMBDA'     ,
+                         'BALANCE'    ,
+                         'RGAP'       ,
+                         'RGAPCUTOFF' ,
+                         'GAP'        ,
+                         'GAPCUTOFF'  ,
+                         'RMSE'       ,
+                         'RMSECUTOFF' ,
+                         'AAD'        ,
+                         'AADCUTOFF'  ,
+                         'RAAD'       ,
+                         'RAADCUTOFF' ,
+                         'PDIFF'      ,
+                         'PDIFFCUTOFF'
+                
+                _print_Conv_Head_@PrdTag@ = 1
+                
+            endif
+            
+            
+            PRINT FILE='@ParentDir@@ScenarioDir@Temp\3_Distribute\_Convergence - FB @n@ - @PrdTag@.csv', 
+                CSV=T, 
+                FORM=10.7,
+                LIST=@n@(10.0), 
+                     ITERATION(10.0),
+                     LAMBDA(10.4)   ,
+                     BALANCE(10.0)  ,
+                     RGAP           ,
+                     RGAPCUTOFF     ,
+                     GAP            ,
+                     GAPCUTOFF      ,
+                     RMSE(10.2)     ,
+                     RMSECUTOFF     ,
+                     AAD(10.2)      ,
+                     AADCUTOFF      ,
+                     RAAD           ,
+                     RAADCUTOFF     ,
+                     PDIFF          ,
+                     PDIFFCUTOFF    
+            
+        ENDPHASE
+        

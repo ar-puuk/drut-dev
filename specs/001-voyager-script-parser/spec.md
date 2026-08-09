@@ -324,7 +324,7 @@ correct source position and, for `@variable@`, the variable name.
   real, working `.s`/`.block` scripts: it MUST produce zero false-positive diagnostics
   on every valid fixture, and MUST correctly flag every deliberately-broken fixture
   with a diagnostic matching its injected defect, covering every diagnostic category
-  defined in this specification (FR-012–FR-016 and FR-026).
+  defined in this specification (FR-012–FR-016, FR-026, and FR-034).
 - **FR-026**: The parser MUST emit a structured diagnostic when a `BREAK` statement
   appears with no enclosing block of any kind at all — that is, at a file's true top
   level, not nested inside an `IF`, `LOOP`, `RUN`, `PROCESS`/`PHASE` (FR-028),
@@ -386,6 +386,20 @@ correct source position and, for `@variable@`, the variable name.
   independently in two unrelated program chapters (Highway and Public Transport) as
   general-purpose syntax, not a one-off — reversing the earlier fixture-only call to
   defer it (see Assumptions).
+- **FR-034**: The parser MUST expose byte-oriented sibling entry points —
+  `tokenize_bytes` and `parse_bytes` — that decode raw bytes before delegating to
+  `tokenize`/`parse`, since real production Voyager scripts are not guaranteed to be
+  valid UTF-8 (confirmed by this project's own fixture corpus — see Assumptions).
+  Decoding MUST attempt UTF-8 first, and wherever an individual byte sequence isn't
+  valid UTF-8, MUST fall back to that byte's Windows-1252 interpretation rather than
+  rejecting the whole input — leaving every other valid byte, including legitimate
+  non-ASCII UTF-8 elsewhere in the same file, untouched. A byte with no defined
+  Windows-1252 interpretation MUST be replaced with the Unicode replacement character
+  and MUST produce an `InvalidEncoding` diagnostic (see Diagnostic in Key Entities)
+  anchored at that character's position; a byte that resolves successfully under
+  either encoding produces no diagnostic — recovering from an encoding quirk is not
+  itself a defect. `tokenize`/`parse`'s existing `&str`-based contract is unchanged;
+  these are additive entry points, not a breaking change to FR-001.
 
 ### Key Entities
 
@@ -433,12 +447,13 @@ correct source position and, for `@variable@`, the variable name.
   diagnostics.
 - **SC-002**: Every deliberately-broken script in the fixture corpus produces at least
   one diagnostic that correctly identifies its injected defect.
-- **SC-003**: Each diagnostic category defined in this specification (FR-012–FR-016
-  and FR-026 — unmatched IF/ENDIF, unmatched LOOP/ENDLOOP, unclosed block comment,
-  invalid/missing continuation, unclosed RUN/ENDRUN, and BREAK with no enclosing
-  block at all) is exercised by at least one corpus fixture that triggers exactly
-  that diagnostic. This criterion is defined by reference to the FR list, not a
-  hardcoded count, so it still holds if a diagnostic category is added later.
+- **SC-003**: Each diagnostic category defined in this specification (FR-012–FR-016,
+  FR-026, and FR-034 — unmatched IF/ENDIF, unmatched LOOP/ENDLOOP, unclosed block
+  comment, invalid/missing continuation, unclosed RUN/ENDRUN, BREAK with no enclosing
+  block at all, and undecodable input bytes) is exercised by at least one corpus
+  fixture that triggers exactly that diagnostic. This criterion is defined by
+  reference to the FR list, not a hardcoded count, so it still holds if a diagnostic
+  category is added later.
 - **SC-004**: A downstream tool can obtain a script's full statement/block structure
   and its full diagnostic list from a single call, supplying only the script's text —
   no file access or protocol dependency is required to get a result.
@@ -617,3 +632,30 @@ correct source position and, for `@variable@`, the variable name.
 - This library exposes its functionality as callable functions/types only; no
   particular API shape (e.g. streaming vs. whole-document) is mandated by this spec,
   since that is an implementation decision for the planning phase.
+- **Non-UTF-8 real-world input (confirmed, narrow)**: T049's real fixture corpus
+  (`WF-TDM-Official-Releases`) turned up exactly one file, out of 161, containing a
+  byte that isn't valid UTF-8 — a single Windows-1252 "smart quote" inside a comment.
+  Every other byte in every other file is valid UTF-8. This one occurrence is enough
+  to confirm FR-034 is solving a real (if rare) problem, not a hypothetical one, but
+  it does not by itself demonstrate the harder case FR-034 also has to handle: a byte
+  with no defined interpretation under either encoding. No real file exercises that
+  path; it's covered by a hand-written fixture instead.
+- **`Span`'s column is a `char` count, not bytes or UTF-16 code units (flagged for
+  Phase 3, not solved now)**: every `Position` this crate produces — including
+  `InvalidEncoding`'s (FR-034), which is deliberately computed via the same
+  char-counting the rest of the lexer already uses, precisely so it doesn't introduce
+  a second, inconsistent column scheme — counts Unicode scalar values, 1-based, per
+  line. A future LSP server (constitution Technology & Architecture Constraints)
+  will need positions in UTF-16 code units, per the LSP wire protocol's own
+  convention; for the realistic content this parser sees (ASCII/Latin-range technical
+  script text), `char` count and UTF-16 code-unit count coincide almost always, but
+  not by construction. Reconciling this — either by having the LSP adapter translate
+  at its boundary, or by changing what `Span` counts — is Phase 3's problem to solve,
+  not this phase's; flagged here so it isn't rediscovered from scratch then.
+- **Formatter write-back of non-UTF-8 source (flagged for Phase 2, not solved now)**:
+  FR-034 lets `voyager-core` *read* a script containing a stray non-UTF-8 byte without
+  failing. A future formatter (constitution Principle III) that reads such a script
+  and writes it back out still has to decide what to do with that byte — preserve it
+  exactly as originally encoded, or normalize the whole file to UTF-8 on write. Either
+  is defensible; neither is decided here, since no formatter exists yet. Flagged so
+  the decision is made deliberately in Phase 2, not by accident.

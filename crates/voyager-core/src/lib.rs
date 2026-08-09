@@ -8,6 +8,7 @@
 //! the binding contract behind [`tokenize`] and [`parse`].
 
 pub mod block;
+pub mod decode;
 pub mod diagnostic;
 pub mod grammar_notes;
 pub mod lexer;
@@ -33,6 +34,18 @@ pub use token::{Token, TokenKind};
 /// (no ambient state, clock, locale, or file-path dependency).
 pub fn tokenize(source: &str) -> Vec<Token> {
     lexer::tokenize(source)
+}
+
+/// Decodes raw `source` bytes (UTF-8 first, falling back per-byte to
+/// Windows-1252, FR-034) and tokenizes the result — for callers who only
+/// have bytes, not an already-valid `&str`. Any decoding fallback is silent
+/// here, same as [`tokenize`]'s own no-diagnostics contract; use
+/// [`parse_bytes`] if you need to know about undecodable bytes.
+///
+/// Never panics on any `&[u8]` input, including arbitrary non-text bytes.
+pub fn tokenize_bytes(source: &[u8]) -> Vec<Token> {
+    let (text, _decode_diagnostics) = decode::decode_bytes(source);
+    tokenize(&text)
 }
 
 /// A node in [`ParseResult`]'s top-level sequence: either a bare statement or
@@ -79,4 +92,24 @@ pub fn parse(source: &str) -> ParseResult {
     let (nodes, block_diagnostics) = block::match_blocks(statements);
     diagnostics.extend(block_diagnostics);
     ParseResult { nodes, diagnostics }
+}
+
+/// Decodes raw `source` bytes (UTF-8 first, falling back per-byte to
+/// Windows-1252, FR-034) and structurally parses the result — for callers
+/// who only have bytes, not an already-valid `&str`. A byte undecodable
+/// under either encoding produces an [`DiagnosticKind::InvalidEncoding`]
+/// diagnostic in the result, ahead of any tokenizing/parsing diagnostics,
+/// rather than a rejected call.
+///
+/// Never panics on any `&[u8]` input (contracts/public-api.md), the same
+/// guarantee [`parse`] makes for `&str` input.
+pub fn parse_bytes(source: &[u8]) -> ParseResult {
+    let (text, decode_diagnostics) = decode::decode_bytes(source);
+    let mut result = parse(&text);
+    if !decode_diagnostics.is_empty() {
+        let mut diagnostics = decode_diagnostics;
+        diagnostics.extend(result.diagnostics);
+        result.diagnostics = diagnostics;
+    }
+    result
 }

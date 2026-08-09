@@ -3,14 +3,22 @@
 //! broken fixture correctly flags its injected defect category), per
 //! constitution Principle IV and FR-025.
 //!
+//! Fixtures are read as raw bytes and parsed via `parse_bytes` (FR-034)
+//! uniformly, not `fs::read_to_string`/`parse` — real production Voyager
+//! scripts are not guaranteed to be valid UTF-8 (T049's real fixture corpus
+//! found exactly one that wasn't), and for pure-UTF-8 fixtures the two paths
+//! are equivalent, so there's no reason to special-case one file.
+//!
 //! Broken fixtures declare which `DiagnosticKind`(s) they expect via a
 //! `; EXPECT: Kind1, Kind2` marker on their first line — this is a test-only
-//! convention, not part of the crate's grammar.
+//! convention, not part of the crate's grammar. The marker itself is always
+//! pure ASCII, so it's read via a lossy decode even for the one fixture whose
+//! *content* is deliberately not valid UTF-8.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use voyager_core::{parse, DiagnosticKind};
+use voyager_core::{parse_bytes, DiagnosticKind};
 
 fn is_fixture_file(path: &Path) -> bool {
     matches!(
@@ -43,6 +51,10 @@ fn fixtures_dir(sub: &str) -> PathBuf {
         .join(sub)
 }
 
+fn read_fixture_bytes(path: &Path) -> Vec<u8> {
+    fs::read(path).unwrap_or_else(|e| panic!("fixture {path:?} should be readable: {e}"))
+}
+
 fn parse_diagnostic_kind(name: &str) -> Option<DiagnosticKind> {
     match name.trim() {
         "UnmatchedIf" => Some(DiagnosticKind::UnmatchedIf),
@@ -51,12 +63,16 @@ fn parse_diagnostic_kind(name: &str) -> Option<DiagnosticKind> {
         "InvalidContinuation" => Some(DiagnosticKind::InvalidContinuation),
         "UnmatchedRun" => Some(DiagnosticKind::UnmatchedRun),
         "MisplacedBreak" => Some(DiagnosticKind::MisplacedBreak),
+        "InvalidEncoding" => Some(DiagnosticKind::InvalidEncoding),
         _ => None,
     }
 }
 
-fn expected_kinds(source: &str) -> Vec<DiagnosticKind> {
-    let first_line = source.lines().next().unwrap_or("");
+fn expected_kinds(bytes: &[u8]) -> Vec<DiagnosticKind> {
+    // The marker line is always pure ASCII by convention; a lossy decode is
+    // fine here even for the one fixture whose real content isn't UTF-8.
+    let text = String::from_utf8_lossy(bytes);
+    let first_line = text.lines().next().unwrap_or("");
     let marker = "; EXPECT:";
     let rest = first_line
         .find(marker)
@@ -74,8 +90,8 @@ fn valid_fixtures_produce_zero_diagnostics() {
         "expected at least one valid fixture under {dir:?}"
     );
     for path in fixtures {
-        let source = fs::read_to_string(&path).expect("fixture should be readable UTF-8 text");
-        let result = parse(&source);
+        let bytes = read_fixture_bytes(&path);
+        let result = parse_bytes(&bytes);
         assert!(
             result.diagnostics.is_empty(),
             "expected zero diagnostics for valid fixture {path:?}, got {:#?}",
@@ -93,13 +109,13 @@ fn broken_fixtures_each_produce_their_expected_diagnostic() {
         "expected at least one broken fixture under {dir:?}"
     );
     for path in fixtures {
-        let source = fs::read_to_string(&path).expect("fixture should be readable UTF-8 text");
-        let expected = expected_kinds(&source);
+        let bytes = read_fixture_bytes(&path);
+        let expected = expected_kinds(&bytes);
         assert!(
             !expected.is_empty(),
             "fixture {path:?} is missing a valid '; EXPECT: Kind' marker on its first line"
         );
-        let result = parse(&source);
+        let result = parse_bytes(&bytes);
         for kind in &expected {
             assert!(
                 result.diagnostics.iter().any(|d| d.kind == *kind),
@@ -116,8 +132,7 @@ fn every_diagnostic_category_has_at_least_one_broken_fixture() {
     let fixtures = collect_fixtures(&dir);
     let mut seen = std::collections::HashSet::new();
     for path in &fixtures {
-        let source = fs::read_to_string(path).expect("fixture should be readable UTF-8 text");
-        seen.extend(expected_kinds(&source));
+        seen.extend(expected_kinds(&read_fixture_bytes(path)));
     }
     for kind in [
         DiagnosticKind::UnmatchedIf,
@@ -126,6 +141,7 @@ fn every_diagnostic_category_has_at_least_one_broken_fixture() {
         DiagnosticKind::InvalidContinuation,
         DiagnosticKind::UnmatchedRun,
         DiagnosticKind::MisplacedBreak,
+        DiagnosticKind::InvalidEncoding,
     ] {
         assert!(
             seen.contains(&kind),
@@ -151,8 +167,8 @@ fn block_extension_covers_both_observed_shapes() {
     let mut saw_bare_fragment = false;
     let mut saw_self_contained = false;
     for path in block_files {
-        let source = fs::read_to_string(path).expect("fixture should be readable UTF-8 text");
-        let result = parse(&source);
+        let bytes = read_fixture_bytes(path);
+        let result = parse_bytes(&bytes);
         let has_top_level_run = result.nodes.iter().any(|n| {
             matches!(n, voyager_core::Node::Block(b) if matches!(b.kind, voyager_core::BlockKind::Run { .. }))
         });
@@ -178,8 +194,8 @@ fn block_extension_covers_both_observed_shapes() {
 #[test]
 fn token_detail_fixture_exposes_expected_token_kinds() {
     let path = fixtures_dir("valid").join("token_detail.s");
-    let source = fs::read_to_string(&path).expect("token_detail.s fixture should exist");
-    let tokens = voyager_core::tokenize(&source);
+    let bytes = read_fixture_bytes(&path);
+    let tokens = voyager_core::tokenize_bytes(&bytes);
 
     assert!(
         tokens
@@ -209,5 +225,25 @@ fn token_detail_fixture_exposes_expected_token_kinds() {
     assert!(
         tokens.iter().any(|t| t.kind == voyager_core::TokenKind::ContinuationMarker),
         "expected a ContinuationMarker token (the @variable@ reference splits across a continuation)"
+    );
+}
+
+/// T049 / FR-034: the one real, non-UTF-8 file found in the real fixture
+/// corpus (a single Windows-1252 byte inside a comment) decodes silently —
+/// zero diagnostics, since that byte resolves successfully under the
+/// fallback encoding.
+#[test]
+fn real_non_utf8_fixture_decodes_silently() {
+    let path = fixtures_dir("valid").join("real_corpus/Distribute/4pd_mainbody_distribution.block");
+    let bytes = read_fixture_bytes(&path);
+    assert!(
+        std::str::from_utf8(&bytes).is_err(),
+        "this fixture is expected to contain a genuine non-UTF-8 byte; if this fails, the file changed"
+    );
+    let result = parse_bytes(&bytes);
+    assert!(
+        result.diagnostics.is_empty(),
+        "expected the one real non-UTF-8 byte to decode silently under Windows-1252 fallback, got {:#?}",
+        result.diagnostics
     );
 }

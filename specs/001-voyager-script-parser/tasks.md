@@ -347,14 +347,55 @@ fixture-corpus test gate.
 - [X] T048 Run `cargo test -p voyager-core` end-to-end and record results against every
   quickstart.md scenario and the Definition of Done (constitution Principle V gate
   before any later phase begins)
-- [ ] T049 Confirm or resolve the fixture-corpus sourcing/licensing open item
+- [X] T049 Confirm or resolve the fixture-corpus sourcing/licensing open item
   (research.md §3) before treating `tests/fixtures/` as the final corpus — replace any
   hand-written placeholder fixtures with the real, rights-cleared corpus once available
+  — **Resolved 2026-08-09**: a 9-file representative subset (~5,200 lines) from
+  `WF-TDM-Official-Releases` copied into `tests/fixtures/valid/real_corpus/`, checked
+  for sensitive content (none found), and validated against `parse_bytes()` — see
+  T051's real-file discovery below for how this subset directly motivated FR-034.
 - [X] T050 [P] Audit `crates/voyager-core/src/grammar_notes.rs` for completeness
   against the full current FR list (FR-003 through FR-033, including every rule
   amended or added by the 2026-08-08 documentation verification pass) — confirm every
   entry is original wording, not copied from vendor documentation (constitution
   Principle II, FR-024, SC-006)
+
+---
+
+## Phase 7: FR-034 — Byte-oriented decoding with Windows-1252 fallback
+
+**Purpose**: New work discovered during T049 — one file in the real fixture corpus
+(`4pd_mainbody_distribution.block`) contains a single Windows-1252 byte that isn't
+valid UTF-8, which `fs::read_to_string`/`parse(&str)` cannot even load. FR-034 (spec.md)
+adds byte-oriented sibling entry points that decode UTF-8-first with a per-byte
+Windows-1252 fallback, rather than requiring every caller to solve this itself.
+
+- [X] T051 Implement `crates/voyager-core/src/decode.rs`: the Windows-1252 lookup
+  table (`0x80`-`0x9F`; `0xA0`-`0xFF` matches Latin-1 identically), and
+  `decode_bytes(&[u8]) -> (String, Vec<Diagnostic>)` — surgical per-byte fallback via
+  `str::from_utf8`'s `valid_up_to()`, not a whole-file encoding guess, so valid UTF-8
+  elsewhere in the same file (including legitimate non-ASCII content) is untouched.
+  Position tracking reuses the same running `char`-count `Position::advance` the
+  lexer already uses, so `InvalidEncoding`'s span doesn't introduce a second,
+  inconsistent position scheme (data-model.md § Span) — depends on T005 (`Span`),
+  T006 (`Diagnostic`)
+- [X] T052 Add `DiagnosticKind::InvalidEncoding` to
+  `crates/voyager-core/src/diagnostic.rs` (FR-034; contracts/diagnostics.md) —
+  depends on T006
+- [X] T053 Wire `tokenize_bytes`/`parse_bytes` into `crates/voyager-core/src/lib.rs`
+  per the amended contracts/public-api.md — depends on T051, T052, T009, T020
+- [X] T054 Add a hand-crafted `broken/undecodable_byte.s` fixture (raw byte `0x81`,
+  one of the five Windows-1252-undefined code points, inside a comment) to exercise
+  the `InvalidEncoding` diagnostic path — the one real non-UTF-8 file found (T049)
+  resolves silently under Windows-1252 and so cannot exercise this branch itself —
+  depends on T053
+- [X] T055 Migrate `crates/voyager-core/tests/fixture_corpus.rs` from
+  `fs::read_to_string`/`parse` to `fs::read`/`parse_bytes` uniformly (pure-UTF-8
+  fixtures are unaffected; the real corpus's one non-UTF-8 file becomes loadable) and
+  add an assertion that it decodes with zero diagnostics — depends on T051, T053, T054
+- [X] T056 [P] Add the FR-034 grammar-note entry to
+  `crates/voyager-core/src/grammar_notes.rs` and extend T050's completeness audit to
+  FR-034 — depends on T051
 
 ---
 
@@ -373,6 +414,11 @@ fixture-corpus test gate.
   - US3 depends only on the Foundational `tokenize()` (T009), not on US1/US2 at all —
     it can, in principle, be built in parallel with US1/US2 by a different developer.
 - **Polish (Phase 6)**: Depends on all three user stories being complete.
+- **FR-034 (Phase 7)**: Depends on Foundational (T005 `Span`, T006 `Diagnostic`) and
+  US1's `tokenize`/`parse` entry points (T009, T020) to wrap — not on US2/US3.
+  Discovered during T049 (real fixture corpus), after Phase 6 had already landed, so
+  it sits after Polish in file order despite its actual dependency being much
+  earlier; nothing in Phase 6 depends on it.
 
 ### User Story Dependencies
 
