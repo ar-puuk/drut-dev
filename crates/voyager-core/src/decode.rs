@@ -81,6 +81,14 @@ pub fn decode_bytes(source: &[u8]) -> (String, Vec<Diagnostic>) {
                 break;
             }
             Err(err) => {
+                // Deliberately not reading `err.error_len()`: whether the
+                // failure is a genuinely invalid sequence (`Some(n)`) or a
+                // multi-byte sequence truncated by end-of-input (`None`),
+                // per-byte Windows-1252 fallback treats both identically —
+                // only `rest[valid_up_to]` is reinterpreted, one byte at a
+                // time, regardless of how many bytes Rust's UTF-8 validator
+                // groups into "the same" error. A truncated file is just
+                // another byte that couldn't complete a valid codepoint.
                 let valid_up_to = err.valid_up_to();
                 if valid_up_to > 0 {
                     let valid_part = std::str::from_utf8(&rest[..valid_up_to])
@@ -168,6 +176,25 @@ mod tests {
         assert_eq!(diags.len(), 1);
         // Line 1: 'é'(col1) 'X'(col2) '='(col3) <bad byte>(col4)
         assert_eq!(diags[0].span.start.column, 4);
+    }
+
+    #[test]
+    fn truncated_multibyte_sequence_at_eof_is_treated_like_any_other_invalid_byte() {
+        // 0xE2 alone is a valid lead byte for a 3-byte UTF-8 sequence (e.g. the
+        // start of '€', E2 82 AC) but the file ends right there with no
+        // continuation bytes — `error_len()` would report `None` for this,
+        // unlike the other tests' immediately-invalid bytes (`Some(1)`). Both
+        // paths are exercised identically here: this lone lead byte falls in
+        // Windows-1252's identity-mapped 0xA0..=0xFF range, so it recovers
+        // silently as 'â' (U+00E2), the same as any other resolvable byte.
+        let mut src = b"X".to_vec();
+        src.push(0xE2);
+        let (text, diags) = decode_bytes(&src);
+        assert_eq!(text, "X\u{00E2}");
+        assert!(
+            diags.is_empty(),
+            "a resolvable truncated byte should not produce a diagnostic"
+        );
     }
 
     #[test]
