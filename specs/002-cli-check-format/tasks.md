@@ -368,11 +368,12 @@ Concretely:
 
 ### CLI implementation for User Story 2
 
-- [ ] T026 [US2] Add mutually-exclusive `--write`/`--check`/`--diff` and
+- [x] T026 [US2] Add mutually-exclusive `--write`/`--check`/`--diff` and
       `--casing=upper|lower` (requiring an explicit value when present — no bare
       `--casing`) to `Command::Format` in `crates/drut-cli/src/cli.rs`. Depends on
-      T007.
-- [ ] T027 [US2] Implement `format_cmd::run` in `crates/drut-cli/src/format_cmd.rs`:
+      T007. (Landed as part of T007's single-pass `cli.rs` edit, per that task's
+      own note.)
+- [x] T027 [US2] Implement `format_cmd::run` in `crates/drut-cli/src/format_cmd.rs`:
       for each `MatchedFile`, call `voyager_core::format_bytes`, classify it as
       `Unchanged`/`Changed`/`Written`/`WriteFailed` per data-model.md §5 (a
       `WriteFailed` also covers a pre-write refusal, not only an OS-level I/O
@@ -380,33 +381,46 @@ Concretely:
       `recovered_encoding_files` from `encoding_fidelity` in **every** mode (not
       only `--write`), and derive the run's `ExitOutcome` per FR-020/data-model.md
       §5 — including `Fatal` whenever `unsafe_encoding_files` is non-empty
-      regardless of mode. Depends on T022, T026.
-- [ ] T028 [P] [US2] Implement default (stdout print) and `--write`
+      regardless of mode. Depends on T022, T026. Manually verified against the
+      `recovered.s`/`lossy.s` fixtures in every mode before writing automated
+      tests: `--write` on `recovered.s` writes the decoded byte + reports it
+      (exit 0); `--write` on `lossy.s` refuses, file byte-identical after (exit
+      2); `--check`/default on `lossy.s` both still exit 2 despite never
+      attempting a write.
+- [x] T028 [P] [US2] Implement default (stdout print) and `--write`
       (overwrite-in-place) and `--check` (per-file "would reformat" listing, no
       write) output handling in `crates/drut-cli/src/format_cmd.rs` /
       `crates/drut-cli/src/report/text.rs` (FR-016–FR-018). Depends on T027.
-- [ ] T029 [P] [US2] Implement `--diff` unified-diff rendering via the `similar`
+- [x] T029 [P] [US2] Implement `--diff` unified-diff rendering via the `similar`
       crate in `crates/drut-cli/src/report/text.rs` (or a new
       `crates/drut-cli/src/report/diff.rs`), one diff per changed file, writing
-      nothing (FR-019). Depends on T027.
-- [ ] T030 [US2] Implement the FR-024 visible summary line (e.g. "N file(s) had
+      nothing (FR-019). Depends on T027. (Landed directly in `format_cmd.rs` — no
+      separate `report/diff.rs` needed, one small `unified_diff()` helper.)
+- [x] T030 [US2] Implement the FR-024 visible summary line (e.g. "N file(s) had
       legacy-encoding bytes normalized to UTF-8") whenever
       `recovered_encoding_files` is non-empty, and the FR-025 per-file refusal
       report whenever `unsafe_encoding_files` is non-empty — both printed in every
       mode (default/`--write`/`--check`/`--diff`), not only `--diff`. Depends on
-      T027, T028, T029.
-- [ ] T031 [P] [US2] Add `crates/drut-cli/tests/format_flags.rs`: default output
+      T027, T028, T029. Both routed to stderr in every mode (including a mode-
+      specific rationale for `--write`/`--check`/`--diff`'s status lines too) so
+      default mode's stdout — the formatted content itself, meant to be pipeable
+      (`drut format x.s > x.s`-style) — never gets a notice line spliced into it.
+- [x] T031 [P] [US2] Add `crates/drut-cli/tests/format_flags.rs`: default output
       never writes; `--write` writes; `--check` reports without writing;
       `--diff` prints a diff without writing; `--casing` with no value or an
       unsupported value exits with a usage error before touching any file;
       `--write`/`--check`/`--diff` reject being combined. Depends on T026, T027,
-      T028, T029.
-- [ ] T032 [US2] Add the `format` portion of `crates/drut-cli/tests/exit_codes.rs`:
+      T028, T029. 9/9 passing. One assumption caught and fixed mid-test: `clap`'s
+      own usage-error exit code also happens to be `2` (same value as `Fatal`) —
+      documented as a coincidence, not a collision, in `contracts/cli-contract.md`;
+      the test now asserts "file untouched," not "code isn't 2."
+- [x] T032 [US2] Add the `format` portion of `crates/drut-cli/tests/exit_codes.rs`:
       clean / would-reformat (`--check`) / fatal, including
       `tests/fixtures/encoding_fallback/lossy.s` (T025) producing `Fatal` in
       **every** mode — default, `--check`, `--diff`, and `--write` alike — not only
-      when `--write` is used. Depends on T027, T030, T025.
-- [ ] T033 [US2] Extend `crates/drut-cli/tests/fixture_corpus_e2e.rs` with a
+      when `--write` is used. Depends on T027, T030, T025. 8 new tests (11 total in
+      the file), all passing.
+- [x] T033 [US2] Extend `crates/drut-cli/tests/fixture_corpus_e2e.rs` with a
       `format --write` run-twice idempotency check and a re-parse
       structural-equivalence check against the full external 161-file corpus
       through the built `drut` binary, gated behind the same `DRUT_CORPUS_PATH`
@@ -417,7 +431,15 @@ Concretely:
       equivalence are self-referential properties (output-vs-itself,
       tree-shape-vs-tree-shape), not "does this match a human-approved expected
       value," so it's safe to run unattended against the full external corpus the
-      same way T017 does. Depends on T027.
+      same way T017 does. Depends on T027. **Runs against a temporary copy of the
+      corpus, never `DRUT_CORPUS_PATH` itself** — `--write` is destructive, and
+      mutating an external, unrelated repository as a side effect of the test
+      suite would be exactly the kind of surprising action a test has no business
+      doing, opt-in or not. Verified this restraint directly, not just by
+      construction: the real corpus file's mtime was unchanged (dated months
+      before this run) after `--ignored` executed the test. Both e2e tests
+      re-run and passing: 161/161 clean pre- and post-format, second `--write`
+      pass a genuine no-op, ~32s total for both.
 
 **Checkpoint**: `drut format` is fully functional and independently testable; both
 user stories are now complete.
@@ -428,17 +450,36 @@ user stories are now complete.
 
 **Purpose**: Final gates that span both stories.
 
-- [ ] T034 [P] Run `cargo clippy -p voyager-core -p drut-cli` and resolve every
-      warning (CLAUDE.md's zero-warning gate).
-- [ ] T035 [P] Update root `README.md`'s Status section to describe `drut-cli`
+- [x] T034 [P] Run `cargo clippy -p voyager-core -p drut-cli` and resolve every
+      warning (CLAUDE.md's zero-warning gate). Ran workspace-wide with
+      `-D warnings` (warnings-as-errors, a stricter gate than plain `clippy`) —
+      zero warnings.
+- [x] T035 [P] Update root `README.md`'s Status section to describe `drut-cli`
       alongside `voyager-core`, mirroring how it currently documents the parser
-      crate's spec-kit artifacts.
-- [ ] T036 Walk through `quickstart.md`'s validation steps end-to-end against a
+      crate's spec-kit artifacts. Also updated the repository-layout section
+      (previously listed no `crates/` entries at all) and added a new
+      "Dependency auditing" section (T037).
+- [x] T036 Walk through `quickstart.md`'s validation steps end-to-end against a
       built `drut` binary and confirm each step's outcome matches its mapped
-      Success Criterion (SC-001–SC-008).
-- [ ] T037 [P] Document `cargo audit`/`cargo deny check advisories` as a
+      Success Criterion (SC-001–SC-008). **Found and fixed a real bug in the
+      process** (the actual point of this task, not just a formality): piping
+      `drut format ... --diff | head` — an ordinary way to use a CLI —
+      **panicked**, since `println!`/`print!` unconditionally `unwrap()` their
+      write result and a closed downstream pipe surfaces as a write error. Fixed
+      via a new `io_util.rs` (`write_stdout`/`write_stdout_line`, treating
+      `BrokenPipe` as a graceful exit 0, not a panic) used at every stdout write
+      site across `format_cmd.rs`, `report/text.rs`, `report/sarif.rs`; 1
+      regression test added (asserts the process never exits via Rust's panic
+      code, 101, on a closed pipe). Also caught and fixed two smaller
+      `quickstart.md` staleness issues: the Prerequisites section still said
+      "once `crates/drut-cli` exists" (it does now), and step 6 pointed
+      `--write` directly at `$CORPUS` with no warning that this is destructive —
+      added a caution to copy first, matching how T033's own automated test
+      already handles this (temp copy, `$CORPUS` itself never touched).
+- [x] T037 [P] Document `cargo audit`/`cargo deny check advisories` as a
       recommended CI step for `drut-cli` (research.md §6's standing
       recommendation), e.g. in `crates/drut-cli`'s own README or the root one.
+      Landed as a new "Dependency auditing" section in the root `README.md`.
 
 ---
 

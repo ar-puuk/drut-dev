@@ -7,6 +7,7 @@ pub mod check_cmd;
 pub mod cli;
 pub mod exit;
 pub mod format_cmd;
+pub mod io_util;
 pub mod report;
 pub mod traverse;
 

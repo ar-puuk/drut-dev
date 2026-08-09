@@ -14,6 +14,7 @@ use serde::Serialize;
 use voyager_core::{Diagnostic, DiagnosticKind};
 
 use crate::check_cmd::CheckReport;
+use crate::io_util::write_stdout_line;
 
 const ALL_KINDS: [DiagnosticKind; 7] = [
     DiagnosticKind::UnmatchedIf,
@@ -152,7 +153,7 @@ pub fn print_check_report(report: &CheckReport) {
     let log = build(report);
     let json = serde_json::to_string_pretty(&log)
         .expect("SARIF log serialization cannot fail for this data (no non-finite floats, no cycles)");
-    println!("{json}");
+    write_stdout_line(&json);
 }
 
 fn build(report: &CheckReport) -> SarifLog {

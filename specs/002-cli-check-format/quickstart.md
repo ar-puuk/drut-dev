@@ -8,8 +8,7 @@ types referenced below.
 ## Prerequisites
 
 - Rust stable toolchain (matches `voyager-core`'s existing requirement).
-- The workspace builds: `cargo build` from repo root (once `crates/drut-cli` exists
-  per this plan).
+- The workspace builds: `cargo build` from repo root.
 - A local checkout of the WF-TDM-Official-Releases corpus (161 `.s`/`.block`
   files), available the same way it already is for `voyager-core`'s own full-corpus
   validation (`001-voyager-script-parser/research.md` §3) — path referred to below
@@ -72,11 +71,17 @@ both `0` and `1`.
 
 This is proven exhaustively by `cargo test -p voyager-core --test format_corpus`
 (golden-file + idempotency + structural-equivalence checks over the full corpus,
-per FR-021). A hand-run spot check:
+per FR-021) and, through the CLI itself, by
+`cargo test -p drut-cli --test fixture_corpus_e2e -- --ignored` (T033 — which,
+notably, runs against a **temporary copy** of `$CORPUS`, never `$CORPUS` itself,
+for exactly the reason the next paragraph explains). A hand-run spot check:
+
+**⚠️ `--write` overwrites files in place — don't point it at your only copy of
+`$CORPUS`.** Copy it first (`Copy-Item -Recurse $CORPUS $SCRATCH`), then:
 
 ```powershell
-cargo run -p drut-cli --bin drut -- format $CORPUS --write
-cargo run -p drut-cli --bin drut -- format $CORPUS --check
+cargo run -p drut-cli --bin drut -- format $SCRATCH --write
+cargo run -p drut-cli --bin drut -- format $SCRATCH --check
 echo $LASTEXITCODE
 ```
 

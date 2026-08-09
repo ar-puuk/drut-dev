@@ -13,28 +13,45 @@ negatives preferred over false positives, vertical phase-gated delivery, and mor
 
 ## Status
 
-Pre-implementation. The first feature — a dependency-free tokenizer and structural
-parser (`voyager-core`) — is fully specified and task-planned but not yet built.
-See [`specs/001-voyager-script-parser/`](specs/001-voyager-script-parser/) for:
+Two features shipped, both with passing fixture-corpus test gates (constitution
+Principle V):
 
-- [`spec.md`](specs/001-voyager-script-parser/spec.md) — functional requirements,
-  user stories, success criteria
-- [`plan.md`](specs/001-voyager-script-parser/plan.md) — technical approach,
-  workspace/crate layout, constitution compliance check
-- [`data-model.md`](specs/001-voyager-script-parser/data-model.md) — token/
-  statement/block/diagnostic entity definitions
-- [`contracts/`](specs/001-voyager-script-parser/contracts/) — public API and
-  diagnostic-taxonomy contracts
-- [`tasks.md`](specs/001-voyager-script-parser/tasks.md) — dependency-ordered
-  implementation tasks, organized by user story
-- [`checklists/`](specs/001-voyager-script-parser/checklists/) — requirements-
-  quality checklists run against the spec before implementation
+- **`voyager-core`** (`crates/voyager-core`) — a dependency-free tokenizer and
+  structural parser, plus a whitespace/casing formatter built on top of the same
+  structure. See [`specs/001-voyager-script-parser/`](specs/001-voyager-script-parser/)
+  for the parser's spec/plan/data-model/contracts/tasks/checklists, and
+  [`specs/002-cli-check-format/`](specs/002-cli-check-format/)'s `research.md`/
+  `data-model.md` for the formatter additions (`format`/`format_bytes`,
+  `Block.closer`/`opener_pairs`) layered onto it afterward.
+- **`drut-cli`** (`crates/drut-cli`, binary `drut`) — a thin CLI adapter exposing
+  `check` and `format` as subcommands over `voyager-core`, per
+  [`specs/002-cli-check-format/`](specs/002-cli-check-format/). `check` is fully
+  wired (plain-text or SARIF 2.1.0 output); `format` supports default/`--write`/
+  `--check`/`--diff` disposition modes and opt-in `--casing=upper|lower`.
 
-Once `crates/voyager-core` exists, build/test it with:
+Build/test everything:
 
 ```powershell
-cargo build -p voyager-core
-cargo test -p voyager-core
+cargo build --workspace
+cargo test --workspace
+cargo clippy --workspace --all-targets
+```
+
+Try the CLI:
+
+```powershell
+cargo run -p drut-cli --bin drut -- check path\to\some.s
+cargo run -p drut-cli --bin drut -- format path\to\some.s --diff
+```
+
+Full-corpus validation (161 real `.s`/`.block` files) is gated behind a
+`DRUT_CORPUS_PATH` env var and `#[ignore]`'d by default, since that corpus is
+external and not committed (licensing still an open item — see
+`001-voyager-script-parser/research.md` §3):
+
+```powershell
+$env:DRUT_CORPUS_PATH = "path\to\WF-TDM-Official-Releases"
+cargo test -p drut-cli --test fixture_corpus_e2e -- --ignored
 ```
 
 ## Repository layout
@@ -42,10 +59,31 @@ cargo test -p voyager-core
 ```text
 .specify/          Spec-kit workflow tooling (templates, scripts, constitution)
 specs/             Per-feature spec-kit artifacts (spec/plan/tasks/contracts/...)
+crates/
+  voyager-core/    Tokenizer, structural parser, and formatter — zero runtime
+                   dependencies (constitution Principle I, FR-027)
+  drut-cli/        `drut` binary: check/format subcommands, thin adapter over
+                   voyager-core (traversal, I/O, output rendering only)
 _archive/          Local-only vendor documentation mirrors, gitignored — never
                    committed; kept for reference during grammar research only
                    (see constitution Principle II / Principle VIII)
 ```
+
+## Dependency auditing
+
+`voyager-core` has zero runtime dependencies by design (constitution Principle I,
+FR-027) — `cargo tree -p voyager-core` should never show an external crate.
+`drut-cli` is not bound by that rule (see `002-cli-check-format/spec.md`
+Assumptions) and depends on ordinary ecosystem crates (`clap`, `ignore`, `serde`,
+`serde_json`, `similar`) for traversal/argument-parsing/output-rendering concerns
+with no grammar/parsing content. Their versions were confirmed free of known
+RUSTSEC advisories as of 2026-08-09 (`002-cli-check-format/research.md` §6), but
+that's a point-in-time check, not a standing guarantee — run
+[`cargo audit`](https://github.com/rustsec/rustsec) (or `cargo deny check
+advisories`) periodically, and wire it into CI once one exists, so an advisory
+filed after that date against `drut-cli`'s dependencies (or their own transitive
+trees, which weren't inspectable at pin time since no `Cargo.lock` existed yet)
+surfaces automatically.
 
 ## Workflow
 

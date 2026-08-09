@@ -54,6 +54,12 @@ plan.md Assumptions carried from spec.md).
 `upper`/`lower`, exits with a usage error before any file is touched — this is a
 `clap`-level parse failure, not one of the three run-outcome exit codes below (spec
 Edge Cases: "the command exits with a usage error before touching any file").
+**Implementation note**: `clap`'s own usage-error exit code happens to also be `2`
+— the same numeric value the table below uses for `Fatal` — which is a coincidence
+of two independent conventions, not a designed distinction; the guarantee this
+contract actually makes is "no file touched," not "a numerically distinct code."
+A caller that must tell the two apart needs another signal (e.g. `clap`'s own
+usage message on stderr), not the bare exit code.
 
 **Encoding-fallback reporting is automatic, not flag-gated** (FR-024, FR-025 — see
 "Encoding-fallback behavior" below): every mode, including plain `drut format
