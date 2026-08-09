@@ -257,10 +257,21 @@ fn split_if_family_trailing(grp: &[Token]) -> Option<(Vec<Token>, Vec<Token>)> {
 /// for parenthesized conditions (`IF`/`ELSEIF`), where depth never returns
 /// to 0 until the closing paren, so no pairs are found and the condition
 /// tokens are preserved via `Statement.tokens` instead.
+///
+/// A pair's keyword may itself carry one or more bracketed subscripts before
+/// its `=` (e.g. `VOL[01]=mw[01]`, confirmed real: 300+ double-subscript
+/// occurrences in one fixture alone) — the same shape FR-023 fixed for
+/// top-level assignment targets, reusing [`assignment_equals_index`] here for
+/// the identical reason: a subscripted keyword wasn't being recognized as
+/// starting its own pair at all, silently absorbing it (and its `=value`)
+/// into whichever pair preceded it instead.
 fn extract_pairs(tokens: &[Token]) -> Vec<(String, Vec<Token>)> {
     let mut depth: i32 = 0;
-    let mut pair_starts: Vec<usize> = Vec::new();
-    for (i, tok) in tokens.iter().enumerate() {
+    // (keyword_start_idx, equals_idx) — `=` may sit after zero or more
+    // balanced `[...]` subscripts following the keyword.
+    let mut pair_starts: Vec<(usize, usize)> = Vec::new();
+    for i in 0..tokens.len() {
+        let tok = &tokens[i];
         if tok.kind == TokenKind::Punctuation {
             match tok.text.as_str() {
                 "(" | "[" | "{" => depth += 1,
@@ -268,19 +279,23 @@ fn extract_pairs(tokens: &[Token]) -> Vec<(String, Vec<Token>)> {
                 _ => {}
             }
         }
-        if depth == 0
-            && tok.kind == TokenKind::Word
-            && i + 1 < tokens.len()
-            && is_punct(&tokens[i + 1], "=")
-        {
-            pair_starts.push(i);
+        if depth == 0 && tok.kind == TokenKind::Word {
+            if let Some(local_eq) = assignment_equals_index(&tokens[i..]) {
+                pair_starts.push((i, i + local_eq));
+            }
         }
     }
     let mut pairs = Vec::with_capacity(pair_starts.len());
-    for (idx, &start) in pair_starts.iter().enumerate() {
-        let keyword = tokens[start].text.clone();
-        let value_begin = (start + 2).min(tokens.len());
-        let value_end = pair_starts.get(idx + 1).copied().unwrap_or(tokens.len());
+    for (idx, &(kw_start, eq_idx)) in pair_starts.iter().enumerate() {
+        let keyword: String = tokens[kw_start..eq_idx]
+            .iter()
+            .map(|t| t.text.as_str())
+            .collect();
+        let value_begin = (eq_idx + 1).min(tokens.len());
+        let value_end = pair_starts
+            .get(idx + 1)
+            .map(|p| p.0)
+            .unwrap_or(tokens.len());
         let value = tokens[value_begin..value_end.min(tokens.len()).max(value_begin)].to_vec();
         pairs.push((keyword, value));
     }
@@ -483,6 +498,37 @@ mod tests {
         assert_eq!(stmts.len(), 1);
         match &stmts[0].kind {
             StatementKind::Control { word, .. } => assert_eq!(word, "ARRAY"),
+            other => panic!("expected Control, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn subscripted_pair_keyword_is_its_own_pair_not_swallowed() {
+        // Real fixture shape (4pd_mainbody_distribution.block:780-781):
+        // `VOL[01]=mw[01], VOL[31]=mw[31]` inside a PATHLOAD statement's
+        // keyword list. Before this fix, "VOL" was never recognized as
+        // starting a pair (its own `[01]` subscript sat between it and `=`),
+        // so both VOL pairs were silently absorbed into the *preceding*
+        // pair's value instead of appearing in `pairs` at all.
+        let stmts =
+            statements_of("PATHLOAD PATH=x, EXCLUDEGROUP=1-2,7, VOL[01]=mw[01], VOL[31]=mw[31]\n");
+        assert_eq!(stmts.len(), 1);
+        match &stmts[0].kind {
+            StatementKind::Control { pairs, .. } => {
+                let keywords: Vec<&str> = pairs.iter().map(|(k, _)| k.as_str()).collect();
+                assert!(keywords.contains(&"VOL[01]"), "got {keywords:?}");
+                assert!(keywords.contains(&"VOL[31]"), "got {keywords:?}");
+                // EXCLUDEGROUP's value must stop before VOL[01], not swallow it.
+                let excludegroup = pairs
+                    .iter()
+                    .find(|(k, _)| k == "EXCLUDEGROUP")
+                    .expect("EXCLUDEGROUP pair");
+                let value_text: String = excludegroup.1.iter().map(|t| t.text.as_str()).collect();
+                assert!(
+                    !value_text.contains("VOL"),
+                    "EXCLUDEGROUP's value swallowed VOL: {value_text:?}"
+                );
+            }
             other => panic!("expected Control, got {other:?}"),
         }
     }

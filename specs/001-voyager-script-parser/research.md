@@ -87,9 +87,11 @@ Technical Context.
   remains the actual `tests/fixtures/` corpus SC-001/SC-002 are graded against). The
   same full-corpus pass also surfaced the subscript-assignment-target classification
   gap now tracked as FR-023's amendment (see spec.md; single-subscript targets alone
-  appear 6,000+ times in one file, `08_TripTablesByPeriod.s`) and the
-  `DistributeINTRASTEP` finding (see spec.md Assumptions) — this validation run is
-  what found both.
+  appear 6,000+ times in one file, `08_TripTablesByPeriod.s`), the identical shape
+  one level down in `Control.pairs` (`VOL[01]=mw[01]`, 300+ occurrences,
+  `4pd_mainbody_distribution.block:780-781`, folded into FR-003 under the same fix
+  once confirmed to be the same bug — see spec.md), and the `DistributeINTRASTEP`
+  finding (see spec.md Assumptions) — this validation run is what found all three.
 
 ## 4. RUN PGM nesting — structural vs. semantic scope
 

@@ -399,13 +399,16 @@ Windows-1252 fallback, rather than requiring every caller to solve this itself.
 
 ---
 
-## Phase 8: FR-023 fix — subscripted assignment targets
+## Phase 8: FR-023/FR-003 fix — subscripted assignment targets and pair keywords
 
 **Purpose**: A full-corpus validation run (research.md §3) found that
 `classify_statement` misclassified any assignment target carrying a bracketed
 subscript (`MW[1] = ...`, 6,000+ real occurrences in one file alone) as a `Control`
 statement instead of `Assignment` — SC-001-invisible (no diagnostic fires either
 way) but a real `StatementKind` defect a future formatter would consume directly.
+The same investigation found the identical shape one level down, inside
+`Control.pairs` itself (`VOL[01]=mw[01]`, 300+ real occurrences) — same fix, folded
+into this phase rather than deferred, once confirmed to be the same bug shape.
 
 - [X] T057 Amend FR-023 (spec.md) to state an assignment target MAY carry one or
   more trailing bracketed subscripts, and update data-model.md's `Assignment` entity
@@ -421,6 +424,22 @@ way) but a real `StatementKind` defect a future formatter would consume directly
   real `MW[1] = ...`/double-subscript shapes, plus a `fixture_corpus.rs` test
   asserting `StatementKind` directly (a zero-diagnostics check alone would not catch
   this class of bug) — depends on T058
+- [X] T060 Amend FR-003 (spec.md) to state a `Control.pairs` keyword MAY carry the
+  same trailing bracketed subscripts, update data-model.md's `Control` entity to
+  match, and resolve the "found, not fixed" Assumptions bullet to reflect this —
+  depends on T057 (same wording pattern)
+- [X] T061 Rewrite `extract_pairs` in `crates/voyager-core/src/statement.rs` to reuse
+  `assignment_equals_index` per depth-0 `Word` candidate instead of the old
+  "immediately followed by `=`" check, so a subscripted pair keyword starts its own
+  pair instead of being silently absorbed into the preceding pair's value — verified
+  empirically (not just by inspection) against the real
+  `4pd_mainbody_distribution.block:780-781` shape before and after the fix — depends
+  on T058, T060
+- [X] T062 [P] Add a `statement.rs` unit test and extend
+  `tests/fixtures/valid/subscripted_assignment_targets.s` (a `PATHLOAD`-style
+  statement using the real `VOL[01]=mw[01]`/`VOL[31]=mw[31]` shape) plus a
+  `fixture_corpus.rs` test asserting the pair keywords directly and that the
+  preceding pair's value no longer swallows them — depends on T061
 
 ---
 

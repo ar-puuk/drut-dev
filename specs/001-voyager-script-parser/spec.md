@@ -206,7 +206,15 @@ correct source position and, for `@variable@`, the variable name.
   carrying its line/column location in the source) before or as part of building
   higher-level structure.
 - **FR-003**: The parser MUST recognize a control statement as a control word followed
-  by zero or more space-separated `keyword=value` pairs.
+  by zero or more space-separated `keyword=value` pairs. A pair's keyword MAY itself
+  be immediately followed by one or more bracketed subscripts before its `=` (e.g.
+  `VOL[01]=mw[01]`) — the same subscript shape FR-023 recognizes for assignment
+  targets, and the same fix (confirmed against real fixtures: `VOL[...]=...`-style
+  double-subscript pair keywords alone appear 300+ times in one fixture,
+  `4pd_mainbody_distribution.block:780-781`). A subscripted keyword that was not
+  recognized as starting its own pair would otherwise be silently absorbed into
+  whichever pair preceded it — not merely mis-tagged, but structurally lost from
+  `Control.pairs`.
 - **FR-004**: The parser MUST recognize line comments beginning with `;` and running
   to the end of the physical line.
 - **FR-005**: The parser MUST recognize block comments delimited by `/*` and `*/`,
@@ -682,19 +690,17 @@ correct source position and, for `@variable@`, the variable name.
   Deferred rather than promoted to its own FR, on the same one-file evidentiary
   standard already applied to the `WORD=value keyword=value...` finding above; revisit
   if broader real-world usage is found.
-- **Subscripted `keyword=value` pair names inside a `Control` statement (found, not
-  fixed — narrower than FR-023's fix, tracked separately)**: the same full-corpus run
-  that found FR-023's subscripted-*assignment-target* gap also found a related but
-  distinct gap one level down: a subscripted *pair keyword* inside an ordinary
+- **Subscripted `keyword=value` pair names inside a `Control` statement (resolved,
+  2026-08-09 — folded into FR-003 under the same fix as FR-023)**: the same
+  full-corpus run that found FR-023's subscripted-*assignment-target* gap also found
+  a related gap one level down: a subscripted *pair keyword* inside an ordinary
   `Control` statement, e.g. `VOL[01]=mw[01]` within a `PATHLOAD`-style statement's
   keyword list (confirmed real: 300+ double-subscript pair-keyword occurrences alone,
-  e.g. in `4pd_mainbody_distribution.block`). This is a real usage, and vendor
-  reference documentation independently describes subscripted keywords like
-  `VOL[1]`/`VOL[2]` as a documented pattern for `FUNCTION V`. FR-023's fix only
-  covers the top-level `Assignment`-vs-`Control` statement-classification boundary;
-  it does not touch `Control.pairs`' own keyword-boundary detection, which has the
-  same subscript-blindness bug — a pair keyword immediately followed by `[...]=` is
-  not currently recognized as starting a new pair, so its value is silently absorbed
-  into whatever pair preceded it. Not fixed this pass — narrower in scope than the
-  FR-023 fix, and correctly out of the boundary that fix was scoped to. Flagged here
-  as a known, evidenced gap for a future FR/pass, not a hypothetical one.
+  e.g. `4pd_mainbody_distribution.block:780-781`). Verified empirically, not just by
+  inspection, that this was the identical failure shape and identical silent
+  consequence as FR-023's: with the pre-fix parser, that exact real line's
+  `EXCLUDEGROUP` pair's value silently absorbed both trailing `VOL[...]=...` pairs
+  in full, and neither `VOL` pair appeared in `Control.pairs` at all — no diagnostic
+  either way. Because the shape and fix were identical (both reuse the same
+  subscript-scanning logic), this was fixed under FR-003 in the same pass as FR-023,
+  not deferred as a separate cycle.

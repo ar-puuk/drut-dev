@@ -48,12 +48,18 @@ as genuinely underdetermined without more data. This checklist tests whether the
 
 ## Requirement Consistency
 
-- [ ] CHK006 - Does FR-023's amendment clearly scope itself to the top-level
+- [x] CHK006 - Does FR-023's amendment clearly scope itself to the top-level
   `Assignment`-vs-`Control` statement-classification boundary only, in a way a reader
   would understand *without* needing the separate Assumptions bullet on subscripted
   `Control.pairs` keywords (e.g. `VOL[1]=`) to learn that the two are different,
   unrelated-in-fix boundaries — or does reading FR-023 alone risk the reader assuming
   it also covers pair-keyword subscripts? [Consistency, Spec §FR-023 vs Assumptions]
+  — **Superseded 2026-08-09**: this item's premise (FR-023 and the `Control.pairs`
+  gap as "different, unrelated-in-fix boundaries") no longer holds — after confirming
+  the two were the identical bug shape with the identical fix, the pair-keyword gap
+  was folded into FR-003 under the same pass as FR-023, not left as a separate
+  unfixed gap. FR-023 and FR-003 now each state their own scope directly; no reader
+  needs to infer a boundary between "fixed" and "not fixed" that no longer exists.
 - [ ] CHK007 - Is FR-023's new subscript language consistent in terminology with the
   new Edge Cases bullet and data-model.md's `Assignment` entity description — same
   term ("bracketed subscript"), same scope (single and double), no drift between the
@@ -79,12 +85,17 @@ as genuinely underdetermined without more data. This checklist tests whether the
 
 ## Dependencies & Assumptions
 
-- [ ] CHK011 - Is the newly-added Assumptions bullet on subscripted `Control.pairs`
+- [x] CHK011 - Is the newly-added Assumptions bullet on subscripted `Control.pairs`
   keywords (e.g. `VOL[1]=`) explicit that it is a *separate, unfixed* gap rather than
   something FR-023's amendment already resolves — i.e. does a reader who only skims
   FR-023 and this bullet's first sentence come away with the correct boundary, or
   does the distinction require reading the bullet in full? [Clarity, Spec
   §Assumptions]
+  — **Superseded 2026-08-09**: same resolution as CHK006 — the gap was confirmed to
+  be the same bug shape (verified empirically against the real
+  `4pd_mainbody_distribution.block:780-781` line, before and after the fix) and
+  folded into FR-003 under the same pass, so the bullet this item asked about now
+  reads "resolved," not "separate, unfixed."
 - [ ] CHK012 - Does the `DistributeINTRASTEP` deferral bullet added alongside this
   amendment cite a comparable evidentiary standard (one file, narrow occurrence
   count) to the pre-existing `WORD=value keyword=value...` deferral it's explicitly

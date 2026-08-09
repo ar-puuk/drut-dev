@@ -306,3 +306,69 @@ fn subscripted_assignment_targets_are_classified_as_assignment() {
         "a subscripted target must never be classified with just the bare identifier as its target"
     );
 }
+
+/// Same root cause as the test above, one level down: a subscripted
+/// `Control.pairs` keyword (`VOL[01]=mw[01]`, real shape from
+/// 4pd_mainbody_distribution.block:780-781) must be its own pair, not
+/// silently absorbed into the value of whichever pair preceded it.
+#[test]
+fn subscripted_pair_keywords_are_not_swallowed_into_the_preceding_pair() {
+    let path = fixtures_dir("valid").join("subscripted_assignment_targets.s");
+    let bytes = read_fixture_bytes(&path);
+    let result = parse_bytes(&bytes);
+    assert!(
+        result.diagnostics.is_empty(),
+        "got {:#?}",
+        result.diagnostics
+    );
+
+    // Find the PATHLOAD statement nested inside RUN PGM=HIGHWAY / PROCESS PHASE=ILOOP.
+    let pathload = result
+        .nodes
+        .iter()
+        .filter_map(|n| match n {
+            voyager_core::Node::Block(b)
+                if matches!(b.kind, voyager_core::BlockKind::Run { .. }) =>
+            {
+                Some(b)
+            }
+            _ => None,
+        })
+        .flat_map(|run| &run.children)
+        .filter_map(|n| match n {
+            voyager_core::Node::Block(b)
+                if matches!(b.kind, voyager_core::BlockKind::Process { .. }) =>
+            {
+                Some(b)
+            }
+            _ => None,
+        })
+        .flat_map(|process| &process.children)
+        .find_map(|n| match n {
+            voyager_core::Node::Statement(s) => match &s.kind {
+                voyager_core::StatementKind::Control { word, pairs } if word == "PATHLOAD" => {
+                    Some(pairs)
+                }
+                _ => None,
+            },
+            _ => None,
+        })
+        .expect("expected a PATHLOAD statement inside RUN/PROCESS");
+
+    let keywords: Vec<&str> = pathload.iter().map(|(k, _)| k.as_str()).collect();
+    for expected in ["VOL[01]", "VOL[31]"] {
+        assert!(
+            keywords.contains(&expected),
+            "expected pair {expected:?}, got {keywords:?}"
+        );
+    }
+    let excludegroup = pathload
+        .iter()
+        .find(|(k, _)| k == "EXCLUDEGROUP")
+        .expect("EXCLUDEGROUP pair should exist");
+    let value_text: String = excludegroup.1.iter().map(|t| t.text.as_str()).collect();
+    assert!(
+        !value_text.contains("VOL"),
+        "EXCLUDEGROUP's value swallowed a VOL pair: {value_text:?}"
+    );
+}

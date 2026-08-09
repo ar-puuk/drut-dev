@@ -77,7 +77,9 @@ continuation.
 **`StatementKind` variants** (FR-003, FR-021, FR-022, FR-023):
 - `Control { word: String, pairs: Vec<(String, Vec<Token>)> }` — control word plus
   zero or more `keyword=value` pairs; `word` and each `keyword` are compared
-  case-insensitively (FR-011).
+  case-insensitively (FR-011). A `keyword` may itself include trailing bracketed
+  subscripts (`VOL[01]`), the same as `Assignment.target` (FR-003, FR-023) —
+  confirmed common in real fixtures.
 - `Assignment { target: String, value: Vec<Token> }` — a plain `identifier = value`
   statement with no control word (FR-023). `target` is the literal text of the
   identifier plus any trailing bracketed subscripts (`MW[1]`,
