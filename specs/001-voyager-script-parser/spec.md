@@ -228,7 +228,11 @@ correct source position and, for `@variable@`, the variable name.
   control word begins a body that runs across any number of physical lines — none of
   which need a trailing continuation character — until the next `}` closes it. This
   brace form is available after any control word, not a specific one, and a single
-  statement uses one continuation mechanism or the other, never both.
+  statement uses one continuation mechanism or the other, never both. A `{`-opened
+  body does not nest: the next `}` encountered always closes it, even if another `{`
+  appears somewhere inside first — unlike block-comment nesting (FR-005), vendor
+  reference documentation describes brace-delimited bodies as ending at the first
+  closing brace found, with no equivalent nesting behavior.
 - **FR-007**: The parser MUST recognize and structurally match `IF` / `ELSEIF` /
   `ELSE` / `ENDIF` blocks, including nested occurrences. The parser MUST also
   recognize a self-closing short-`IF` form: an `IF (...)` statement followed
@@ -249,10 +253,13 @@ correct source position and, for `@variable@`, the variable name.
   statement (FR-022) — a plain `RUN` is well-formed with no explicit `ENDRUN`
   anywhere. The disabled form, `!RUN`, does not get this same treatment: a `!RUN`
   block always requires its own explicit `ENDRUN` and is diagnosable (FR-016) if left
-  open, even though the `RUN` it disables would not be. Confirmed against vendor
-  reference documentation; the fixture corpus's own zero-unbalanced-pairs finding is
-  consistent with, but doesn't by itself confirm, this optional-closer rule (see
-  Assumptions).
+  open, even though the `RUN` it disables would not be. The implicit closer must be a
+  sibling statement at the same nesting depth as the open `RUN` — a `RUN`/`!RUN` or
+  shell-escape statement that instead appears one level deeper (e.g. inside an `IF`
+  nested within the open `RUN`) does not close the outer block. Confirmed against
+  vendor reference documentation; the fixture corpus's own zero-unbalanced-pairs
+  finding is consistent with, but doesn't by itself confirm, this optional-closer rule
+  (see Assumptions).
 - **FR-010**: The parser MUST tokenize `@variable@` substitution syntax as its own
   token type, recording the variable name and its position, without evaluating or
   substituting a value for it. This applies whether `@variable@` appears bare in a
@@ -346,10 +353,12 @@ correct source position and, for `@variable@`, the variable name.
   `ENDPROCESS`. Any opener spelling may be closed by any closer spelling. As with
   `RUN`/`ENDRUN` (FR-009), an explicit closer is optional: a `PROCESS`/`PHASE=`
   block is also considered closed by whichever comes first of the next
-  `PROCESS`/`PHASE=` statement. Confirmed against vendor reference documentation;
-  the fixture corpus's 35-distinct-file, zero-unbalanced-pairs finding reflects real
-  authors consistently writing an explicit closer as a matter of style, not evidence
-  that the grammar requires one (see Assumptions).
+  `PROCESS`/`PHASE=` statement, applying the same same-nesting-depth rule as `RUN`
+  (FR-009): a `PROCESS`/`PHASE=` opener one level deeper does not close an outer one.
+  Confirmed against vendor reference documentation; the fixture corpus's
+  35-distinct-file, zero-unbalanced-pairs finding reflects real authors consistently
+  writing an explicit closer as a matter of style, not evidence that the grammar
+  requires one (see Assumptions).
 - **FR-029**: The parser MUST recognize and structurally match `JLOOP ... ENDJLOOP`
   blocks as a loop-block type distinct from `LOOP`/`ENDLOOP` (FR-008), opened by
   `JLOOP` followed by space-separated `keyword=value` pairs (confirmed against real
@@ -515,7 +524,17 @@ correct source position and, for `@variable@`, the variable name.
   explicit that both block kinds accept an implicit close (by the next same-family
   opener, or, for `RUN`, a shell-escape statement) with no explicit closer at all;
   FR-009 and FR-028 now specify this. The disabled `!RUN` form is documented as the
-  one exception — it keeps the strict, explicit-closer-required rule.
+  one exception — it keeps the strict, explicit-closer-required rule. **Nesting depth
+  of the implicit closer (conservative default, unconfirmed by either source)**:
+  FR-009/FR-028 require the implicit closer to be a sibling at the same nesting depth
+  as the open block. Neither the vendor documentation nor the fixture corpus actually
+  settles this either way — every documented example of implicit closing shows two
+  sibling statements back to back (e.g. `PHASE=LINKREAD ... PHASE=ILOOP` with no
+  `ENDPHASE` between them), never a deeper, nested opener closing a shallower one; and
+  the real corpus (189 `.s`/`.block` files checked) has zero implicit closes of any
+  kind to learn from — every `RUN`/`ENDRUN` and `PHASE=`/`ENDPHASE` pair in it is
+  explicit. Same-depth-only is the structurally simplest reading and the one adopted
+  here; revisit if a fixture ever contradicts it.
 - **Short-`IF` (resolved via documentation, not fixtures)**: vendor reference
   documentation describes a self-closing single-line `IF` form (FR-007) that the
   fixture corpus has not been confirmed to contain either way. Until a fixture
@@ -525,6 +544,24 @@ correct source position and, for `@variable@`, the variable name.
   reference documentation is explicit that `/* ... */` blocks nest (FR-005); the
   fixture corpus hasn't been confirmed to contain a nested block comment either way,
   same caveat as short-`IF` above.
+- **`JLoop` nesting inside `If`/`Loop` (fixtures and vendor documentation disagree;
+  fixtures followed)**: vendor reference documentation states that a `JLOOP` block
+  can't sit inside, or be crossed by, an `IF` chain, a `LOOP`, or another `JLOOP` —
+  i.e. it rules out nesting `JLoop` inside `If`/`Loop` entirely, not just inside
+  itself. The real fixture corpus directly contradicts this: 20 clean, unambiguous
+  instances across multiple independent files show `JLOOP` opened directly inside an
+  `If` (12 instances) or `Loop` (8 instances) block, each properly closed by
+  `ENDJLOOP` before its enclosing block closes (e.g. `if (i=1) / JLOOP ... ENDJLOOP /
+  endif`) — hand-
+  verified in four separate files, not a scripted-check artifact. This spec follows
+  the fixture evidence (data-model.md's `JLoop` entry already reflects it: nests
+  inside `If`, `Loop`, `Run`, or `Process`, not inside another `JLoop`), per
+  constitution Principle IV's fixture-corpus-as-oracle stance. One plausible
+  explanation for the disagreement, not just "fixtures win by policy": the doc
+  restriction may reflect an older Voyager release's behavior no longer enforced at
+  the 6.5 baseline this project targets, consistent with this spec's general
+  version-scoping stance of noting — rather than assuming away — discrepancies found
+  against newer or older documentation.
 - **Continuation character "proper context" (accepted limitation, out of scope)**:
   vendor reference documentation notes that a trailing continuation character (FR-006)
   is only a *real* continuation when it's "in proper context" for the statement being
@@ -552,10 +589,18 @@ correct source position and, for `@variable@`, the variable name.
   enclosing block at all (e.g. `ScriptStartTime = currenttime()` appearing before any
   `RUN PGM=.../ENDRUN` in dozens of `.s` files), and nested inside a `RUN PGM=.../
   ENDRUN` block (e.g. `EndTime_IP = currenttime()` inside `RUN PGM=MATRIX ...
-  ENDRUN`). No "PAR"/"COMP"-style wrapper construct was found in the corpus. A full
-  enumeration of the recognized control-word set (to sharpen FR-003's boundary with
-  FR-023) was not finalized as part of this pass — see project notes for the raw
-  census.
+  ENDRUN`). No "PAR"/"COMP"-style wrapper construct was found in the corpus. **No
+  closed, enumerable control-word list exists to finalize (confirmed via
+  documentation)**: vendor reference documentation defines a control statement only
+  generically, as opening with a recognized control word, without ever pairing that
+  definition with a fixed vocabulary — control words are documented per-program, and
+  the "trigger
+  keyword" mechanism (a program-specific keyword standing in for a statement's usual
+  control word — see the deferred `WORD=value keyword=value...` finding below) means
+  the set isn't even closed in principle. FR-003/FR-023's existing structural rule
+  (a statement is `Assignment` whenever its first token isn't a recognized control
+  word) is therefore the correct and complete boundary — no fixed list is missing,
+  and none should be added.
 - **`@variable@` inside quoted strings (confirmed)**: Real fixtures inspected in
   `WF-TDM-Official-Releases` confirm `@variable@` substitution inside quoted string
   literals (e.g. `FILEI MATI[01] = '@ParentDir@@ScenarioDir@...\PA_AllPurp.mtx'`) is

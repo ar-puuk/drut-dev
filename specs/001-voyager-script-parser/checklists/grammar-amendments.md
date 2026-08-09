@@ -19,22 +19,38 @@ it does not test whether any code correctly implements them.
 
 ## Requirement Completeness
 
-- [ ] CHK001 - Is the nesting depth at which an implicit closer (the next `RUN`/
+- [x] CHK001 - Is the nesting depth at which an implicit closer (the next `RUN`/
   `!RUN` statement, or a shell-escape statement) must appear relative to the open
   `RUN` block specified — e.g. does a shell-escape or `RUN` nested one level deeper
   (inside an `IF` within the open `RUN`) count as closing the outer `RUN`, or only
   one at the same nesting depth? [Gap, Spec §FR-009]
-- [ ] CHK002 - Is the same same-depth-vs-any-depth question answered for
+  — **Resolved 2026-08-09**: FR-009 now states the implicit closer must be a sibling
+  at the same nesting depth. Neither vendor documentation nor the fixture corpus
+  (189 files, zero implicit closes observed at all) settles this either way — it's an
+  explicitly-flagged conservative default (see Assumptions), not a confirmed rule.
+- [x] CHK002 - Is the same same-depth-vs-any-depth question answered for
   `PROCESS`/`PHASE=`'s implicit closer? [Gap, Spec §FR-028]
-- [ ] CHK003 - Does the spec state whether `{...}`-delimited statement bodies
+  — **Resolved 2026-08-09**: FR-028 now cross-references FR-009's same-depth rule.
+  Same conservative-default caveat applies.
+- [x] CHK003 - Does the spec state whether `{...}`-delimited statement bodies
   (FR-006) can nest — a `{` appearing before the matching `}` of an already-open
   brace body — the way block comments are explicitly required to nest (FR-005), or
   whether the first `}` always closes it regardless of any `{` in between? [Gap,
   Consistency, Spec §FR-005 vs §FR-006]
-- [ ] CHK004 - Does `JLOOP`'s nesting-restriction rule (FR-029: "may nest inside
+  — **Resolved 2026-08-09**: FR-006 now states braces don't nest — confirmed via
+  vendor documentation's "Control blocks" section ("all data up to the next `{}`
+  character"), contrasted explicitly with FR-005's documented comment-nesting
+  behavior.
+- [x] CHK004 - Does `JLOOP`'s nesting-restriction rule (FR-029: "may nest inside
   `If`/`Loop` … not inside another `JLoop`") state whether it may also nest directly
   inside `Run`/`Process`, or only inside `If`/`Loop`, given every real `JLOOP` is
   necessarily inside some program box already? [Gap, Spec §FR-029]
+  — **Resolved 2026-08-09**: new Assumptions bullet confirms (fixture-verified, 20
+  instances) `JLoop` nests inside `If`, `Loop`, `Run`, or `Process`, not inside
+  another `JLoop` — matching data-model.md's existing `JLoop` entry, which FR-029
+  itself doesn't restate. Also surfaced a real doc-vs-fixture disagreement on this
+  same point (vendor docs say `JLOOP` can't nest in `If`/`Loop` at all) — see the new
+  Assumptions bullet for both sides.
 - [ ] CHK005 - Does `LINKLOOP`'s nesting-restriction rule (FR-033) address whether it
   may nest inside a `JLoop`, or `JLoop` inside a `LinkLoop` — the one block-kind pair
   neither FR-029 nor FR-033 mentions relative to each other? [Gap, Spec §FR-029,
@@ -85,11 +101,13 @@ it does not test whether any code correctly implements them.
 
 ## Requirement Consistency
 
-- [ ] CHK014 - Do FR-009 (`RUN`/`ENDRUN` implicit closing) and FR-028
+- [x] CHK014 - Do FR-009 (`RUN`/`ENDRUN` implicit closing) and FR-028
   (`PROCESS`/`PHASE`/`ENDPHASE` implicit closing) apply the same nesting-depth
   reasoning to their respective implicit closers, or could a reader reasonably
   implement them differently since neither FR states the rule explicitly (see
   CHK001/CHK002)? [Consistency, Spec §FR-009, §FR-028]
+  — **Resolved 2026-08-09**: FR-028 now explicitly cross-references FR-009's rule
+  rather than restating it independently, so they can't drift apart. See CHK001/CHK002.
 - [ ] CHK015 - Is the `Run`/`Process` implicit-closing model (data-model.md § Block)
   consistent with the Block entity's own definition in spec.md's Key Entities
   ("a structural grouping formed by opening and closing statements") now that two of

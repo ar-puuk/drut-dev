@@ -45,16 +45,17 @@ each is resolved by editing spec.md, plan.md, or a Phase 1 design doc.
   matching a keyword *name* (e.g. `PGM`) case-insensitively and matching a keyword's
   *value* (e.g. `PGM=MATRIX` vs `PGM=matrix`) — or is it ambiguous whether values are
   also intended to be case-folded? [Clarity, Ambiguity, Spec §FR-011]
-- [ ] CHK008 - Is the boundary between a `Control` statement (FR-003) and an
+- [x] CHK008 - Is the boundary between a `Control` statement (FR-003) and an
   `Assignment` statement (FR-023) precisely defined — e.g. is there a fixed/closed set
   of recognized control words, or is the distinguishing rule purely "one keyword=value
   pair with no separate leading word," and if so is that rule stated anywhere?
   [Clarity, Ambiguity, Spec §FR-003, §FR-023]
-  — **Partially resolved 2026-08-08**: FR-023 now states the disambiguation rule
-  ("`Assignment` whenever the first token is not a recognized control word"). Still
-  open: spec.md has no fixed/closed control-word list for FR-003 to point to. A raw
-  corpus census (161 real files) was done and reported to the user, but the list was
-  explicitly not finalized into spec.md this pass — remains a follow-up.
+  — **Resolved 2026-08-09**: FR-023's disambiguation rule ("`Assignment` whenever the
+  first token is not a recognized control word") is now confirmed to be the complete
+  boundary, not a stand-in for a missing list — vendor documentation defines "control
+  word" generically, per-program, with no closed global vocabulary to enumerate in
+  principle (the "trigger keyword" mechanism means the set isn't even fixed). See the
+  spec.md Assumptions bullet formalizing this.
 - [ ] CHK009 - Does FR-009 specify whether `PGM=` is a mandatory part of recognizing a
   `RUN` block opener, or would a bare `RUN` (no `PGM=`) also need to open a block per
   the requirements as written? [Clarity, Ambiguity, Spec §FR-009]
@@ -212,12 +213,14 @@ each is resolved by editing spec.md, plan.md, or a Phase 1 design doc.
   `WF-TDM-Official-Releases`. U3 (`@variable@` in quoted strings) and U2 (continuation
   scope) are now reflected in FR-010/FR-006 and new Assumptions bullets. U1's
   follow-up — a raw control-word census — was reported to the user but not finalized
-  into FR-003.
-- **New, not-yet-tracked findings from that census** (reported to the user, no
-  checklist item yet): three block-pair types not covered by FR-007–FR-009
-  (`PHASE`/`ENDPHASE`, `JLOOP`/`ENDJLOOP`, `DistributeMULTISTEP`/
-  `EndDistributeMULTISTEP`); a hybrid `WORD=value keyword=value...` statement shape
-  (e.g. `COMBINE=EQUI ENHANCE=2,...`) fitting neither FR-003 nor FR-023 cleanly; and a
-  brace-delimited `FUNCTION { ... }` block using `{`/`}` rather than paired control
-  words, unaddressed by any block-matching rule. These are real gaps in FR-007–FR-009's
-  block-matching scope, not just FR-003's word list — worth a dedicated pass.
+  into FR-003. CHK008 was fully resolved 2026-08-09 (see item above): there is no
+  list to finalize — vendor documentation confirms none exists.
+- **Historical note on the census above (superseded)**: this originally flagged three
+  block-pair types not covered by FR-007–FR-009 (`PHASE`/`ENDPHASE`, `JLOOP`/
+  `ENDJLOOP`, `DistributeMULTISTEP`/`EndDistributeMULTISTEP`), a hybrid `WORD=value
+  keyword=value...` statement shape, and a brace-delimited `FUNCTION { ... }` block as
+  real gaps needing a dedicated pass. All three are now addressed: the block-pair
+  types became FR-028–030/033, `FUNCTION { ... }` became the general `{...}`
+  continuation mechanism (FR-006), and the hybrid `WORD=value keyword=value...` shape
+  remains the one deliberately deferred, narrow-evidence finding (see spec.md
+  Assumptions).
