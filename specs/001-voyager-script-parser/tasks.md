@@ -48,16 +48,16 @@ crates/voyager-core/
 
 **Purpose**: Workspace and crate scaffolding — nothing grammar-specific yet.
 
-- [ ] T001 Create workspace manifest `Cargo.toml` at repo root with
+- [X] T001 Create workspace manifest `Cargo.toml` at repo root with
   `members = ["crates/voyager-core"]`, leaving room for future `cli/`, `lsp/`, `mcp/`,
   `formatter/` members per plan.md Project Structure
-- [ ] T002 Initialize `crates/voyager-core/Cargo.toml` (name = `voyager-core`, edition
+- [X] T002 Initialize `crates/voyager-core/Cargo.toml` (name = `voyager-core`, edition
   2021, **no runtime dependencies** per FR-027) and an empty `crates/voyager-core/
   src/lib.rs` that compiles
-- [ ] T003 [P] Add `rustfmt.toml` and a `clippy.toml` (or documented `cargo clippy`
+- [X] T003 [P] Add `rustfmt.toml` and a `clippy.toml` (or documented `cargo clippy`
   invocation) at repo root so formatting/lint conventions are fixed before any grammar
   code lands
-- [ ] T004 [P] Create `crates/voyager-core/tests/fixtures/valid/` and
+- [X] T004 [P] Create `crates/voyager-core/tests/fixtures/valid/` and
   `crates/voyager-core/tests/fixtures/broken/` with a `README.md` in each recording the
   sourcing/licensing status from research.md §3 (no real third-party script content
   until rights are confirmed)
@@ -73,36 +73,36 @@ US2: diagnostics, US3: token detail) builds on.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T005 [P] Define `Span`/`Position` (line/column source locations) in
+- [X] T005 [P] Define `Span`/`Position` (line/column source locations) in
   `crates/voyager-core/src/span.rs` per data-model.md § Span
-- [ ] T006 [P] Define `Diagnostic` and `DiagnosticKind` (all six categories from
+- [X] T006 [P] Define `Diagnostic` and `DiagnosticKind` (all six categories from
   contracts/diagnostics.md: `UnmatchedIf`, `UnmatchedLoop`, `UnclosedBlockComment`,
   `InvalidContinuation`, `UnmatchedRun`, `MisplacedBreak`) in
   `crates/voyager-core/src/diagnostic.rs` per data-model.md § Diagnostic (FR-017) —
   the *kinds* are unchanged from before this pass; only their triggering conditions
   (implemented in Phase 4) changed
-- [ ] T007 [P] Define `Token` and `TokenKind` (`Word`, `LineComment`, `BlockComment`,
+- [X] T007 [P] Define `Token` and `TokenKind` (`Word`, `LineComment`, `BlockComment`,
   `ContinuationMarker`, `VariableRef`, `Punctuation`) in
   `crates/voyager-core/src/token.rs` per data-model.md § Token (FR-002, FR-010) — the
   `BlockComment` variant must be able to represent nesting (FR-005), and `Punctuation`
   must cover `{`/`}` (FR-006)
-- [ ] T008 Implement the char-level lexer in `crates/voyager-core/src/lexer.rs`:
+- [X] T008 Implement the char-level lexer in `crates/voyager-core/src/lexer.rs`:
   line-comment recognition (FR-004), block-comment recognition including
   multi-line **and nested** spans (FR-005 — a `/*` while one is already open starts
   its own inner comment; the outer one isn't done until every inner one closes),
   continuation-character detection based on the last non-comment character
   including skipping fully blank lines before the resuming line (FR-006), and
   `@variable@` tokenization (FR-010) — depends on T005, T007
-- [ ] T009 Wire the public `tokenize(source: &str) -> Vec<Token>` entry point in
+- [X] T009 Wire the public `tokenize(source: &str) -> Vec<Token>` entry point in
   `crates/voyager-core/src/lib.rs` per contracts/public-api.md — depends on T007, T008
   (not parallelizable with them: it calls into both)
-- [ ] T010 [P] Create `crates/voyager-core/src/grammar_notes.rs` with the module
+- [X] T010 [P] Create `crates/voyager-core/src/grammar_notes.rs` with the module
   scaffold and initial entries (Voyager 6.5 baseline, original wording) for the
   tokenizer-level rules being established this phase: comments including nesting
   (FR-004, FR-005), continuation including blank-line skipping (FR-006),
   case-insensitivity (FR-011) — FR-024, constitution Principle II. Pure documentation
   with no compile-time dependency on T008, so it stays `[P]` unlike T009.
-- [ ] T011 Create the fixture-corpus test harness scaffold in
+- [X] T011 Create the fixture-corpus test harness scaffold in
   `crates/voyager-core/tests/fixture_corpus.rs`: walks `tests/fixtures/valid/**` and
   `tests/fixtures/broken/**`, compiles and runs cleanly against the (currently empty)
   fixture directories from T004 — no real assertions yet, those land per-story below
@@ -123,68 +123,68 @@ exercise it.
 IF/LOOP/RUN blocks, comments, `@variable@` references) directly to `parse()` and
 confirm a complete structure with an empty diagnostics list (spec.md User Story 1).
 
-- [ ] T012 [P] [US1] Define `Statement` and `StatementKind` (`Control`, `Assignment`,
+- [X] T012 [P] [US1] Define `Statement` and `StatementKind` (`Control`, `Assignment`,
   `Label`, `ShellEscape`) in `crates/voyager-core/src/statement.rs` per data-model.md §
   Statement (FR-003, FR-021, FR-022, FR-023) — `ShellEscape` stores arbitrary command
   text (parenthesized or not), not specifically a parenthesized command (FR-022
   generalized)
-- [ ] T013 [P] [US1] Define `Block` and `BlockKind` — `If` (incl. the self-closing
+- [X] T013 [P] [US1] Define `Block` and `BlockKind` — `If` (incl. the self-closing
   short-`IF` shape, FR-007), `Loop`, `Run` (with a `disabled` flag for `!RUN`,
   FR-009), `Process` (the `PROCESS`/`PHASE` block, FR-028), `JLoop` (FR-029),
   `LinkLoop` (FR-033), `DistributeMultistep` (FR-030) — in
   `crates/voyager-core/src/block.rs` per data-model.md § Block
-- [ ] T014 [US1] Implement the statement-building pass in
+- [X] T014 [US1] Implement the statement-building pass in
   `crates/voyager-core/src/statement.rs`: join continuation-joined tokens into one
   `Statement` via either the trailing-operator mechanism or the `{...}`-delimited
   mechanism (FR-006), classify each as `Control`/`Assignment`/`Label`/`ShellEscape`,
   matching control words/keywords case-insensitively (FR-003, FR-006, FR-011,
   FR-021–FR-023) — depends on T012, T008
-- [ ] T015 [US1] Implement the core block-matching pass (`If`-chain incl. short-`IF`,
+- [X] T015 [US1] Implement the core block-matching pass (`If`-chain incl. short-`IF`,
   `Loop`, `Run` incl. implicit closing and the `!RUN`/`ENDRUN`-required exception) in
   `crates/voyager-core/src/block.rs`, with zero-or-more top-level blocks (no
   mandatory wrapper) per FR-020 — depends on T013, T014
-- [ ] T016 [P] [US1] Implement `Process`/`PHASE` block matching in
+- [X] T016 [P] [US1] Implement `Process`/`PHASE` block matching in
   `crates/voyager-core/src/block.rs`: recognize `PROCESS PHASE=...` and the bare
   `PHASE=...` trigger-keyword shortcut as equivalent openers, `ENDPROCESS`/`ENDPHASE`
   as equivalent closers, and implicit closing by the next `PROCESS`/`PHASE=`
   statement (FR-028) — depends on T015
-- [ ] T017 [P] [US1] Implement `JLOOP`/`ENDJLOOP` block matching in
+- [X] T017 [P] [US1] Implement `JLOOP`/`ENDJLOOP` block matching in
   `crates/voyager-core/src/block.rs`, including the no-nested-`JLOOP` restriction
   (FR-029) — depends on T015
-- [ ] T018 [P] [US1] Implement `LINKLOOP`/`ENDLINKLOOP` block matching in
+- [X] T018 [P] [US1] Implement `LINKLOOP`/`ENDLINKLOOP` block matching in
   `crates/voyager-core/src/block.rs`, including the no-nested-`LINKLOOP` restriction
   (FR-033) — depends on T015
-- [ ] T019 [P] [US1] Implement `DistributeMULTISTEP`/`EndDistributeMULTISTEP` block
+- [X] T019 [P] [US1] Implement `DistributeMULTISTEP`/`EndDistributeMULTISTEP` block
   matching in `crates/voyager-core/src/block.rs` (FR-030; sequential, non-nesting,
   no special nesting-restriction logic needed beyond ordinary matching) — depends on
   T015
-- [ ] T020 [US1] Wire the public `parse(source: &str) -> ParseResult` entry point in
+- [X] T020 [US1] Wire the public `parse(source: &str) -> ParseResult` entry point in
   `crates/voyager-core/src/lib.rs`, composing lexer → statement-building → block-
   matching (all seven `BlockKind` variants) per contracts/public-api.md and
   data-model.md § ParseResult — depends on T014, T015, T016, T017, T018, T019
-- [ ] T021 [P] [US1] Unit test case-insensitive control-word/keyword matching (`IF`,
+- [X] T021 [P] [US1] Unit test case-insensitive control-word/keyword matching (`IF`,
   `If`, `if`, plus the newer multi-word/synonym pairs — `PROCESS`/`PHASE`,
   `ENDPROCESS`/`ENDPHASE`, `RUN`/`!RUN` — per FR-011) in
   `crates/voyager-core/src/statement.rs`'s test module
-- [ ] T022 [P] [US1] Unit test that a statement spanning multiple physical lines via
+- [X] T022 [P] [US1] Unit test that a statement spanning multiple physical lines via
   trailing continuation characters (`,` `+` `-` `/` `*` `^` `&` `|` `=`) produces one
   logical `Statement`, not several (FR-006), including one case where a blank line
   sits between the continuation-ending line and the resuming line, in
   `crates/voyager-core/src/statement.rs`'s test module
-- [ ] T023 [P] [US1] Unit test that a `Control` statement continued with `{...}`
+- [X] T023 [P] [US1] Unit test that a `Control` statement continued with `{...}`
   (rather than trailing-operator characters) produces one logical `Statement`
   spanning to the closing `}`, with no continuation character required on any
   interior line (FR-006) in `crates/voyager-core/src/statement.rs`'s test module
-- [ ] T024 [P] [US1] Unit test that an `IF (...)` statement followed on the same
+- [X] T024 [P] [US1] Unit test that an `IF (...)` statement followed on the same
   line by exactly one further statement produces a complete `If` block with no
   `ENDIF` expected (short-`IF`, FR-007), and that a statement trailing `ELSEIF`/
   `ELSE`/`ENDIF` on the same line is parsed as its own separate statement, not
   folded into the block, in `crates/voyager-core/src/block.rs`'s test module
-- [ ] T025 [P] [US1] Add grammar-note entries for block/statement rules (FR-003,
+- [X] T025 [P] [US1] Add grammar-note entries for block/statement rules (FR-003,
   FR-007 incl. short-`IF`, FR-008, FR-009 incl. implicit closing and `!RUN`, FR-020,
   FR-021, FR-022 generalized, FR-023, FR-028, FR-029, FR-030, FR-033) to
   `crates/voyager-core/src/grammar_notes.rs` — FR-024
-- [ ] T026 [US1] Author initial hand-written "valid" fixtures in
+- [X] T026 [US1] Author initial hand-written "valid" fixtures in
   `crates/voyager-core/tests/fixtures/valid/` — structural-shape fixtures per
   research.md §3, not verbatim third-party script content — covering:
   - nested `IF`/`LOOP`/`RUN` blocks, mixed-case control words, and multi-line
@@ -212,7 +212,7 @@ confirm a complete structure with an empty diagnostics list (spec.md User Story 
   - a `BREAK` nested only inside a bare `IF` (no enclosing `LOOP`/`RUN`/`PROCESS`)
     and a `BREAK` nested inside a `PROCESS`/`PHASE` stack — both must produce zero
     diagnostics under the narrowed FR-026
-- [ ] T027 [US1] Wire "valid" fixture-corpus assertions into
+- [X] T027 [US1] Wire "valid" fixture-corpus assertions into
   `crates/voyager-core/tests/fixture_corpus.rs`: every fixture under `tests/fixtures/
   valid/` parses via `parse()` with an empty diagnostics list (SC-001) — depends on
   T020, T026
@@ -232,22 +232,22 @@ naming the problem and its location — never a panic, never a silent wrong answ
 category) to `parse()` and confirm each produces a diagnostic correctly naming that
 category, with no panic (spec.md User Story 2).
 
-- [ ] T028 [P] [US2] Implement the unclosed-block-comment diagnostic (`/*` with no
+- [X] T028 [P] [US2] Implement the unclosed-block-comment diagnostic (`/*` with no
   matching `*/` before end of input, correctly anchored at whichever `/*` — outer or
   an inner nested one — never found its match) in
   `crates/voyager-core/src/lexer.rs` (FR-014)
-- [ ] T029 [P] [US2] Implement the invalid/missing-continuation diagnostic (a
+- [X] T029 [P] [US2] Implement the invalid/missing-continuation diagnostic (a
   continuation character with no following line, or an invalid following line — not
   counting fully blank lines in between as invalid) in
   `crates/voyager-core/src/lexer.rs` (FR-015)
-- [ ] T030 [US2] Implement the unmatched `IF`/`ENDIF` diagnostic, including the
+- [X] T030 [US2] Implement the unmatched `IF`/`ENDIF` diagnostic, including the
   dangling-closer case (an `ENDIF`/`ELSEIF`/`ELSE` with no open `IF` — including an
   `ENDIF` that follows an already-self-closed short-`IF`), in
   `crates/voyager-core/src/block.rs` (FR-012) — depends on T015
-- [ ] T031 [US2] Implement the unmatched `LOOP`/`ENDLOOP` diagnostic, including the
+- [X] T031 [US2] Implement the unmatched `LOOP`/`ENDLOOP` diagnostic, including the
   dangling-closer case, in `crates/voyager-core/src/block.rs` (FR-013) — depends on
   T015
-- [ ] T032 [US2] Implement the unmatched `RUN`/`ENDRUN` diagnostic in
+- [X] T032 [US2] Implement the unmatched `RUN`/`ENDRUN` diagnostic in
   `crates/voyager-core/src/block.rs` (FR-016): fires only when a non-`disabled` `RUN`
   has neither an explicit `ENDRUN` nor an implicit closer (next `RUN`/`!RUN` or a
   shell-escape statement); a `disabled` (`!RUN`) block is diagnosed on a missing
@@ -255,22 +255,22 @@ category, with no panic (spec.md User Story 2).
   `ENDRUN` with no open `RUN`/`!RUN`) still applies — depends on T015, T016 (needs
   `Process`/`PHASE` matching in place so a `PHASE=` statement isn't mistaken for a
   `RUN`-closing event)
-- [ ] T033 [US2] Implement the misplaced-`BREAK` diagnostic in
+- [X] T033 [US2] Implement the misplaced-`BREAK` diagnostic in
   `crates/voyager-core/src/block.rs` (FR-026): fires only when `BREAK` has no
   enclosing block of *any* `BlockKind` (`If`, `Loop`, `Run`, `Process`, `JLoop`,
   `LinkLoop`) — not "outside `LOOP`" specifically — depends on T015, T016, T017, T018
-- [ ] T034 [US2] Ensure `parse()` continues past each recorded defect and keeps
+- [X] T034 [US2] Ensure `parse()` continues past each recorded defect and keeps
   reporting on the remainder of the script rather than aborting, across
   `crates/voyager-core/src/lexer.rs` and `crates/voyager-core/src/block.rs` (FR-018) —
   depends on T028–T033
-- [ ] T035 [US2] Audit `crates/voyager-core/src/lib.rs`, `lexer.rs`, `statement.rs`,
+- [X] T035 [US2] Audit `crates/voyager-core/src/lib.rs`, `lexer.rs`, `statement.rs`,
   and `block.rs` to eliminate any `unwrap`/`panic!`/unhandled `Result::Err` reachable
   from the public API on malformed input (plan.md Constraints) — depends on T028–T033
-- [ ] T036 [P] [US2] Add grammar-note entries for all six diagnostic rules (FR-012
+- [X] T036 [P] [US2] Add grammar-note entries for all six diagnostic rules (FR-012
   incl. short-`IF` dangling closers, FR-013, FR-014 incl. nesting, FR-015 incl.
   blank-line handling, FR-016 incl. implicit closing and `!RUN`, FR-026 narrowed) to
   `crates/voyager-core/src/grammar_notes.rs` — FR-024
-- [ ] T037 [US2] Author one deliberately-broken fixture per diagnostic category (six
+- [X] T037 [US2] Author one deliberately-broken fixture per diagnostic category (six
   total) in `crates/voyager-core/tests/fixtures/broken/` (FR-025), including:
   - an `IF` with no `ENDIF` and, separately, a stray `ENDIF` after a short-`IF` has
     already self-closed (both are `UnmatchedIf`);
@@ -281,11 +281,11 @@ category, with no panic (spec.md User Story 2).
     (`MisplacedBreak`) — distinct from the *valid* bare-`IF`-only and
     `PROCESS`/`PHASE`-nested `BREAK` fixtures already covered under US1 (T026),
     which must NOT trigger this diagnostic
-- [ ] T038 [US2] Wire "broken" fixture-corpus assertions into
+- [X] T038 [US2] Wire "broken" fixture-corpus assertions into
   `crates/voyager-core/tests/fixture_corpus.rs`: every fixture under `tests/fixtures/
   broken/` produces a diagnostic matching its injected defect category, with no panic
   (SC-002, SC-003) — depends on T028–T033, T037
-- [ ] T039 [US2] Author a fixture with at least two independent, simultaneous defects
+- [X] T039 [US2] Author a fixture with at least two independent, simultaneous defects
   (e.g. an unclosed block comment *and* an unmatched `IF` in the same file) in
   `crates/voyager-core/tests/fixtures/broken/`, and wire an assertion into
   `crates/voyager-core/tests/fixture_corpus.rs` that a single `parse()` call returns
@@ -308,21 +308,21 @@ tokens, for future editor-facing features.
 comment, and a continuation-split `@variable@` reference to `tokenize()` and confirm
 each is its own correctly-positioned token (spec.md User Story 3).
 
-- [ ] T040 [P] [US3] Unit test that a line comment following real statement content is
+- [X] T040 [P] [US3] Unit test that a line comment following real statement content is
   tokenized separately and does not affect continuation detection (FR-004, FR-006) in
   `crates/voyager-core/src/lexer.rs`'s test module
-- [ ] T041 [P] [US3] Unit test that a multi-line `/* ... */` block comment tokenizes
+- [X] T041 [P] [US3] Unit test that a multi-line `/* ... */` block comment tokenizes
   as a single token spanning its start and end positions, and that a nested `/* ...
   /* ... */ ... */` produces an inner `BlockComment` token whose span sits fully
   inside the outer one (FR-005) in `crates/voyager-core/src/lexer.rs`'s test module
-- [ ] T042 [P] [US3] Unit test that `@variable@` tokenizes with its captured name and
+- [X] T042 [P] [US3] Unit test that `@variable@` tokenizes with its captured name and
   position, with no evaluation/substitution (FR-010) in
   `crates/voyager-core/src/token.rs`'s test module
-- [ ] T043 [US3] Author a fixture combining a trailing line comment, a multi-line
+- [X] T043 [US3] Author a fixture combining a trailing line comment, a multi-line
   (and, separately, a nested) block comment, and a continuation-split `@variable@`
   reference in `crates/voyager-core/tests/fixtures/valid/` (reused for SC-001
   coverage too)
-- [ ] T044 [US3] Wire token-detail assertions into `crates/voyager-core/tests/
+- [X] T044 [US3] Wire token-detail assertions into `crates/voyager-core/tests/
   fixture_corpus.rs` per quickstart.md Scenario 3 — depends on T009 (foundational
   `tokenize()`), T040–T043
 
@@ -335,22 +335,22 @@ fixture-corpus test gate.
 
 **Purpose**: Quality gates and follow-up items that span all three stories.
 
-- [ ] T045 [P] Write rustdoc for the public API (`tokenize`, `parse`) in
+- [X] T045 [P] Write rustdoc for the public API (`tokenize`, `parse`) in
   `crates/voyager-core/src/lib.rs` restating the no-panic, determinism, and
   case-insensitivity guarantees from contracts/public-api.md
-- [ ] T046 [P] Add an example binary at `crates/voyager-core/examples/parse_file.rs`
+- [X] T046 [P] Add an example binary at `crates/voyager-core/examples/parse_file.rs`
   that reads a path via `std::fs`, calls `parse()`, and prints the resulting nodes/
   diagnostics — the library itself still performs no I/O (quickstart.md manual
   spot-check)
-- [ ] T047 [P] Run a clean `cargo clippy -p voyager-core` pass (zero warnings) across
+- [X] T047 [P] Run a clean `cargo clippy -p voyager-core` pass (zero warnings) across
   all `src/` files
-- [ ] T048 Run `cargo test -p voyager-core` end-to-end and record results against every
+- [X] T048 Run `cargo test -p voyager-core` end-to-end and record results against every
   quickstart.md scenario and the Definition of Done (constitution Principle V gate
   before any later phase begins)
 - [ ] T049 Confirm or resolve the fixture-corpus sourcing/licensing open item
   (research.md §3) before treating `tests/fixtures/` as the final corpus — replace any
   hand-written placeholder fixtures with the real, rights-cleared corpus once available
-- [ ] T050 [P] Audit `crates/voyager-core/src/grammar_notes.rs` for completeness
+- [X] T050 [P] Audit `crates/voyager-core/src/grammar_notes.rs` for completeness
   against the full current FR list (FR-003 through FR-033, including every rule
   amended or added by the 2026-08-08 documentation verification pass) — confirm every
   entry is original wording, not copied from vendor documentation (constitution

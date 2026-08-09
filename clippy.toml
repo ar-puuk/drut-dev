@@ -1,0 +1,3 @@
+# No project-specific clippy config yet; defaults apply.
+# Lint invocation: `cargo clippy -p voyager-core` must be zero-warning before merge
+# (see CLAUDE.md).

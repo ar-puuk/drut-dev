@@ -1,0 +1,49 @@
+//! Structured parsing problems (data-model.md § Diagnostic; FR-017;
+//! contracts/diagnostics.md).
+
+use crate::span::Span;
+
+/// One of the six structural defect categories this phase recognizes
+/// (contracts/diagnostics.md). Consumers must not assume this set is closed
+/// at six — new structural-defect kinds may be added later within the same
+/// scope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DiagnosticKind {
+    /// FR-012: an `IF` with no matching `ENDIF`, or a dangling `ENDIF`/
+    /// `ELSEIF`/`ELSE` with no open `IF`.
+    UnmatchedIf,
+    /// FR-013: a `LOOP` with no matching `ENDLOOP`, or a dangling `ENDLOOP`.
+    UnmatchedLoop,
+    /// FR-014: a block comment with no matching `*/` before end-of-input.
+    UnclosedBlockComment,
+    /// FR-015: a continuation character with no valid following line.
+    InvalidContinuation,
+    /// FR-016: a non-disabled `RUN` with no `ENDRUN` and no implicit closer,
+    /// a disabled `!RUN` missing its required explicit `ENDRUN`, or a
+    /// dangling `ENDRUN`.
+    UnmatchedRun,
+    /// FR-026: a `BREAK` with no enclosing block of any kind.
+    MisplacedBreak,
+}
+
+/// A structured record of a parsing problem (FR-017). Every field is always
+/// populated — there is no "message-only" diagnostic.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Diagnostic {
+    pub kind: DiagnosticKind,
+    /// Anchored at the offending statement/token (FR-012–FR-016, FR-026).
+    pub span: Span,
+    /// Original wording, composed once per kind (constitution Principle II,
+    /// FR-024) — never copied from vendor documentation.
+    pub message: String,
+}
+
+impl Diagnostic {
+    pub fn new(kind: DiagnosticKind, span: Span, message: impl Into<String>) -> Self {
+        Diagnostic {
+            kind,
+            span,
+            message: message.into(),
+        }
+    }
+}

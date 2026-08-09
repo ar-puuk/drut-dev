@@ -1,0 +1,13 @@
+[package]
+name = "voyager-core"
+version = "0.1.0"
+edition = "2021"
+description = "Tokenizer and structural parser for Cube Voyager control-statement scripts"
+license = "MIT OR Apache-2.0"
+
+# FR-027: zero runtime dependencies. `cargo tree -p voyager-core` must never
+# show an external crate here. Do not add one to fix a parsing problem — hand-
+# write it instead (see CLAUDE.md / constitution Principle I).
+[dependencies]
+
+[dev-dependencies]

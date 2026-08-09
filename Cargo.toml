@@ -1,0 +1,7 @@
+[workspace]
+resolver = "2"
+members = ["crates/voyager-core"]
+
+# Future members: cli/, lsp/, mcp/, formatter/ — added in later phases, all
+# depending on crates/voyager-core per constitution Principle I (single source
+# of truth for grammar/parsing logic).
