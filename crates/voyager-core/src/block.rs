@@ -28,6 +28,29 @@ pub struct Block {
     /// Nested statements/blocks in source order. Empty (and meaningless) for
     /// `BlockKind::If`, whose real content lives in each `IfBranch`.
     pub children: Vec<Node>,
+    /// The explicit closing statement's own span (`ENDIF`/`ENDLOOP`/
+    /// `ENDRUN`/`ENDPROCESS`/`ENDPHASE`/`ENDJLOOP`/`ENDLINKLOOP`/
+    /// `EndDistributeMULTISTEP`) — `None` when this block closed implicitly
+    /// (`Run`/`Process`, FR-009/FR-028) or is genuinely unmatched, in which
+    /// case `span.end` falls back to the last child's own span rather than a
+    /// real closer. Distinguishing these two cases isn't reconstructible from
+    /// `span` alone, which is why this field exists — needed by the
+    /// `002-cli-check-format` formatter (closer/opener alignment, FR-012) so
+    /// it never re-derives block-matching logic outside this crate
+    /// (constitution Principle I).
+    pub closer: Option<Span>,
+    /// The opening statement's own `keyword=value` pair-keyword-name token
+    /// spans, if any (e.g. `PGM` in `RUN PGM=MATRIX ZONES=5` yields one
+    /// entry per keyword, not per whole pair) — **not** its condition/value
+    /// content. Always empty for `If` in practice (a condition's own `=`
+    /// comparisons sit inside parentheses, at nonzero bracket depth, so
+    /// they're never mistaken for a keyword=value pair). Exists for the same
+    /// reason `closer` does: the opening `Statement` itself is discarded
+    /// once matched into this `Block`, so anything a later consumer needs
+    /// from it (here: `002-cli-check-format`'s casing rewrite, which must
+    /// reach `RUN`/`LOOP`/`PROCESS`/etc.'s own pairs, not just non-block-
+    /// forming statements) has to be captured at match time instead.
+    pub opener_pairs: Vec<Span>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -148,6 +171,16 @@ enum BodyContext {
 
 fn end_span_or(children: &[Node], fallback: Span) -> Span {
     children.last().map(|n| n.span()).unwrap_or(fallback)
+}
+
+/// This statement's own `keyword=value` pair-keyword-name spans (see
+/// `Block::opener_pairs`'s doc comment for why this is captured here rather
+/// than reconstructed later, once the `Statement` itself is gone).
+fn opener_pair_spans(stmt: &Statement) -> Vec<Span> {
+    crate::statement::pair_keyword_boundaries(&stmt.tokens)
+        .into_iter()
+        .map(|(kw_start, _)| stmt.tokens[kw_start].span)
+        .collect()
 }
 
 fn pair_value_text(stmt: &Statement, keyword: &str) -> Option<String> {
@@ -354,6 +387,7 @@ fn parse_if_chain(
     diagnostics: &mut Vec<Diagnostic>,
 ) -> (Block, usize) {
     let opener_span = statements[i].span;
+    let opener_pairs = opener_pair_spans(&statements[i]);
 
     // Short-`IF` (FR-007): statement.rs already split the trailing statement
     // off as its own `Statement` whenever one shares the IF's own physical
@@ -373,6 +407,10 @@ fn parse_if_chain(
                 kind: BlockKind::If { branches },
                 span: branch_span,
                 children: vec![],
+                // A short-IF is a single self-closing branch — there's
+                // never an ENDIF to close it.
+                closer: None,
+                opener_pairs: opener_pairs.clone(),
             },
             i + 2,
         );
@@ -405,6 +443,8 @@ fn parse_if_chain(
                     kind: BlockKind::If { branches },
                     span: opener_span.merge(end),
                     children: vec![],
+                    closer: None,
+                    opener_pairs: opener_pairs.clone(),
                 },
                 idx,
             );
@@ -429,6 +469,8 @@ fn parse_if_chain(
                         kind: BlockKind::If { branches },
                         span: opener_span.merge(end_span),
                         children: vec![],
+                        closer: Some(end_span),
+                        opener_pairs: opener_pairs.clone(),
                     },
                     idx,
                 );
@@ -447,6 +489,8 @@ fn parse_if_chain(
                         kind: BlockKind::If { branches },
                         span: opener_span.merge(end),
                         children: vec![],
+                        closer: None,
+                        opener_pairs: opener_pairs.clone(),
                     },
                     idx,
                 );
@@ -461,6 +505,7 @@ fn parse_run(
     diagnostics: &mut Vec<Diagnostic>,
 ) -> (Block, usize) {
     let opener_span = statements[i].span;
+    let opener_pairs = opener_pair_spans(&statements[i]);
     let disabled = role_of(&statements[i]) == Role::BangRun;
     let pgm = pair_value_text(&statements[i], "PGM");
     let context = if disabled {
@@ -478,6 +523,8 @@ fn parse_run(
                 kind: BlockKind::Run { pgm, disabled },
                 span: opener_span.merge(end_span),
                 children,
+                closer: Some(end_span),
+                opener_pairs: opener_pairs.clone(),
             },
             idx,
         );
@@ -494,6 +541,8 @@ fn parse_run(
                     kind: BlockKind::Run { pgm, disabled },
                     span: opener_span.merge(end),
                     children,
+                    closer: None,
+                    opener_pairs: opener_pairs.clone(),
                 },
                 idx,
             );
@@ -511,6 +560,8 @@ fn parse_run(
             kind: BlockKind::Run { pgm, disabled },
             span: opener_span.merge(end),
             children,
+            closer: None,
+            opener_pairs: opener_pairs.clone(),
         },
         idx,
     )
@@ -522,6 +573,7 @@ fn parse_process(
     diagnostics: &mut Vec<Diagnostic>,
 ) -> (Block, usize) {
     let opener_span = statements[i].span;
+    let opener_pairs = opener_pair_spans(&statements[i]);
     let name = pair_value_text(&statements[i], "PHASE");
     let (children, mut idx) = parse_sequence(
         statements,
@@ -539,6 +591,8 @@ fn parse_process(
                 kind: BlockKind::Process { name },
                 span: opener_span.merge(end_span),
                 children,
+                closer: Some(end_span),
+                opener_pairs: opener_pairs.clone(),
             },
             idx,
         );
@@ -553,6 +607,8 @@ fn parse_process(
             kind: BlockKind::Process { name },
             span: opener_span.merge(end),
             children,
+            closer: None,
+            opener_pairs: opener_pairs.clone(),
         },
         idx,
     )
@@ -567,6 +623,7 @@ fn parse_simple_block(
     unmatched_diag: Option<(DiagnosticKind, &str)>,
 ) -> (Block, usize) {
     let opener_span = statements[i].span;
+    let opener_pairs = opener_pair_spans(&statements[i]);
     let kind = kind_ctor(&statements[i]);
     let (children, mut idx) =
         parse_sequence(statements, i + 1, BodyContext::Generic, true, diagnostics);
@@ -579,6 +636,8 @@ fn parse_simple_block(
                 kind,
                 span: opener_span.merge(end_span),
                 children,
+                closer: Some(end_span),
+                opener_pairs: opener_pairs.clone(),
             },
             idx,
         );
@@ -593,6 +652,8 @@ fn parse_simple_block(
             kind,
             span: opener_span.merge(end),
             children,
+            closer: None,
+            opener_pairs: opener_pairs.clone(),
         },
         idx,
     )
@@ -753,5 +814,71 @@ mod tests {
         let (nodes, diags) = parse_nodes("X = 1\nY = 2\n");
         assert_eq!(diags.len(), 0);
         assert_eq!(nodes.len(), 2);
+    }
+
+    #[test]
+    fn closer_span_is_none_for_implicit_run_close() {
+        let (nodes, diags) = parse_nodes("RUN PGM=MATRIX\nX = 1\nRUN PGM=HIGHWAY\nENDRUN\n");
+        assert_eq!(diags.len(), 0);
+        let Node::Block(first) = &nodes[0] else {
+            panic!("expected a block")
+        };
+        assert_eq!(first.closer, None, "implicitly-closed RUN must not report a closer span");
+    }
+
+    #[test]
+    fn closer_span_is_some_and_correct_for_explicit_endrun() {
+        let (nodes, _diags) = parse_nodes("RUN PGM=MATRIX\nX = 1\nENDRUN\n");
+        let Node::Block(block) = &nodes[0] else {
+            panic!("expected a block")
+        };
+        let closer = block.closer.expect("explicit ENDRUN must be captured");
+        assert_eq!(closer.start.line, 3);
+    }
+
+    #[test]
+    fn closer_span_is_none_for_genuinely_unmatched_block() {
+        let (nodes, _diags) = parse_nodes("LOOP i=1,5\nX = 1\n");
+        let Node::Block(block) = &nodes[0] else {
+            panic!("expected a block")
+        };
+        assert_eq!(block.closer, None);
+    }
+
+    #[test]
+    fn opener_pairs_captures_run_pgm_keyword_span() {
+        let (nodes, _diags) = parse_nodes("RUN PGM=MATRIX ZONES=5\nX = 1\nENDRUN\n");
+        let Node::Block(block) = &nodes[0] else {
+            panic!("expected a block")
+        };
+        assert_eq!(block.opener_pairs.len(), 2, "PGM and ZONES should both be captured");
+        // PGM starts right after "RUN " (line 1, column 5).
+        assert_eq!(block.opener_pairs[0].start.line, 1);
+        assert_eq!(block.opener_pairs[0].start.column, 5);
+    }
+
+    #[test]
+    fn opener_pairs_is_empty_for_if_condition() {
+        // The condition's own "=" sits inside parentheses (nonzero bracket
+        // depth), so it must never be mistaken for a keyword=value pair.
+        let (nodes, _diags) = parse_nodes("IF (X=1)\nY = 2\nENDIF\n");
+        let Node::Block(block) = &nodes[0] else {
+            panic!("expected a block")
+        };
+        assert!(block.opener_pairs.is_empty());
+    }
+
+    #[test]
+    fn opener_pairs_captures_phase_shortcut_redundantly_with_control_word() {
+        // "PHASE=ILOOP" makes PHASE itself both the control word and (per
+        // pair_keyword_boundaries' independent scan) a "pair start" at the
+        // same span — redundant, not wrong; a casing rewrite applying the
+        // same case twice is idempotent.
+        let (nodes, _diags) = parse_nodes("PHASE=ILOOP\nX = 1\nENDPHASE\n");
+        let Node::Block(block) = &nodes[0] else {
+            panic!("expected a block")
+        };
+        assert_eq!(block.opener_pairs.len(), 1);
+        assert_eq!(block.opener_pairs[0].start.column, 1);
     }
 }

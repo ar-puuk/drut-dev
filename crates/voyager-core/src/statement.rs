@@ -265,10 +265,16 @@ fn split_if_family_trailing(grp: &[Token]) -> Option<(Vec<Token>, Vec<Token>)> {
 /// the identical reason: a subscripted keyword wasn't being recognized as
 /// starting its own pair at all, silently absorbing it (and its `=value`)
 /// into whichever pair preceded it instead.
-fn extract_pairs(tokens: &[Token]) -> Vec<(String, Vec<Token>)> {
+/// (keyword_start_idx, equals_idx) pairs, in source order — `=` may sit
+/// after zero or more balanced `[...]` subscripts following the keyword.
+/// Factored out of [`extract_pairs`] so other modules within this crate
+/// (`format.rs`'s casing rewrite, `block.rs`'s opener-pair span capture) can
+/// locate a pair's keyword *token* — which `extract_pairs`'s own `String`-
+/// collapsed return value discards — without re-deriving this scan
+/// independently (constitution Principle I applies within the crate too:
+/// one implementation of "where do pairs start", not two that could drift).
+pub(crate) fn pair_keyword_boundaries(tokens: &[Token]) -> Vec<(usize, usize)> {
     let mut depth: i32 = 0;
-    // (keyword_start_idx, equals_idx) — `=` may sit after zero or more
-    // balanced `[...]` subscripts following the keyword.
     let mut pair_starts: Vec<(usize, usize)> = Vec::new();
     for i in 0..tokens.len() {
         let tok = &tokens[i];
@@ -285,6 +291,11 @@ fn extract_pairs(tokens: &[Token]) -> Vec<(String, Vec<Token>)> {
             }
         }
     }
+    pair_starts
+}
+
+fn extract_pairs(tokens: &[Token]) -> Vec<(String, Vec<Token>)> {
+    let pair_starts = pair_keyword_boundaries(tokens);
     let mut pairs = Vec::with_capacity(pair_starts.len());
     for (idx, &(kw_start, eq_idx)) in pair_starts.iter().enumerate() {
         let keyword: String = tokens[kw_start..eq_idx]
