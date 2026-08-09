@@ -1,25 +1,23 @@
 <!--
 Sync Impact Report
 ===================
-Version change: [TEMPLATE] → 1.0.0 (initial ratification)
-Modified principles: n/a (first concrete adoption; all 8 principles are new)
-Added sections:
-  - Core Principles I–VIII (Single Source of Truth; No Verbatim Vendor Documentation
-    Redistribution; Formatter Idempotence & Behavior Preservation; False Negatives Over
-    False Positives; Vertical Phase-Gated Delivery; LSP-Standard Mechanisms Over
-    Editor-Proprietary APIs; Naming Honesty; Public/Private Boundary)
-  - Technology & Architecture Constraints
-  - Development Workflow & Quality Gates
-  - Governance
-Removed sections: none (template placeholders only)
-Templates requiring follow-up:
-  - .specify/templates/plan-template.md — ⚠ pending manual check that its Constitution
-    Check gate references these 8 principles (not yet verified in this run; out of scope
-    for this command per the Scope Guard).
-  - .specify/templates/spec-template.md, tasks-template.md, checklist-template.md — ⚠ no
-    direct constitution references found to update; no action taken (out of scope).
-Deferred/TODO items: none — RATIFICATION_DATE set to the date of this adoption since no
-  prior constitution existed.
+Version change: 1.0.0 → 1.1.0
+Modified principles:
+  - II. No Verbatim Redistribution of Vendor Documentation — resolved the
+    prior-art-extension clause's open condition ("only after confirming the right to
+    reference that source at all") with a concrete, dated record: Bill Hereth
+    (@bhereth) granted permission on 2026-08-08 4:06 PM MT for Phase 3 to reference
+    his language-citilabscubevoyager extension's structure, scoped to
+    structure/behavior reference with credit — not file redistribution or verbatim
+    copying. Binding conditions added (no committing his files, port structure/
+    wording only, README credit required).
+Added sections: none
+Removed sections: none
+Modified sections:
+  - Development Workflow & Quality Gates — extended the existing vendor-doc review
+    gate to explicitly cover the bhereth-extension-reference case.
+Templates requiring follow-up: none
+Deferred/TODO items: none
 -->
 
 # Drut Constitution
@@ -45,6 +43,28 @@ never verbatim text, keyword lists, or grammar files, and only after confirming 
 right to reference that source at all.
 Rationale: Protects the project legally and ethically from copyright and licensing
 exposure while still allowing the tool to be technically accurate.
+
+**Bhereth extension reference (resolved 2026-08-08, 4:06 PM MT)**: Bill Hereth
+(GitHub: @bhereth) granted permission for Phase 3 (LSP server + editor extension) to
+reference the structure of his VS Code extension,
+[`language-citilabscubevoyager`](https://github.com/WFRCAnalytics/Resources/tree/master/7-Other/VSCode-Extensions/bhereth.language-citilabscubevoyager).
+That permission covers structure/behavior reference with credit — it is NOT a license
+to redistribute his files or copy his keyword lists, `.tmLanguage` grammar text, or
+any other file verbatim; his `LICENSE.txt` is blank and grants no redistribution
+rights independent of this verbal permission. Binding conditions for any Phase 3
+contribution that draws on his extension:
+1. His files are never committed to this repository, in whole or in part, in any
+   form — reference stays local-only, exactly as `_archive/`'s general policy
+   already requires for everything else in it.
+2. Anything ported — language IDs, bracket-matching configuration, comment
+   delimiters, TextMate scope-naming conventions, or similar structural elements —
+   MUST be written in Drut's own structure and wording, the same verbatim-copying
+   bar this principle already holds vendor documentation to.
+3. Credit — his name, GitHub handle, and a link to the original extension folder —
+   is recorded in `README.md`'s Credits section.
+
+See also Development Workflow & Quality Gates below, which extends the existing
+vendor-documentation review gate to cover this case explicitly.
 
 ### III. Formatter Idempotence & Behavior Preservation
 The formatter MUST be idempotent (`format(format(x)) == format(x)`) and strictly
@@ -116,7 +136,12 @@ is not considered mergeable/complete, and the next phase MUST NOT start, until t
 current phase's fixture-corpus tests pass cleanly (Principle V). Any contribution that
 introduces keyword lists, grammar rules, or help/hover text MUST be traceable to
 original wording — reviewers MUST reject contributions that cannot state their source
-in the contributor's own words (Principle II).
+in the contributor's own words (Principle II). That same gate extends to Bill
+Hereth's `language-citilabscubevoyager` extension once Phase 3 work begins:
+reviewers MUST reject any contribution that commits his files (in whole or in part),
+copies his keyword lists, grammar/`.tmLanguage` text, or other source content
+verbatim, or omits the required `README.md` credit — not only contributions that
+resemble vendor documentation.
 
 ## Governance
 
@@ -144,4 +169,4 @@ again before merge. Downstream templates and commands (plan, tasks, checklist, e
 read this constitution at runtime; they are not modified by constitution amendments
 and must be checked separately for consistency when principles change materially.
 
-**Version**: 1.0.0 | **Ratified**: 2026-08-08 | **Last Amended**: 2026-08-08
+**Version**: 1.1.0 | **Ratified**: 2026-08-08 | **Last Amended**: 2026-08-09

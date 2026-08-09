@@ -85,6 +85,20 @@ filed after that date against `drut-cli`'s dependencies (or their own transitive
 trees, which weren't inspectable at pin time since no `Cargo.lock` existed yet)
 surfaces automatically.
 
+## Credits
+
+Phase 3 (LSP server + editor extension) references the structure of Bill Hereth's VS
+Code extension, [`language-citilabscubevoyager`](https://github.com/WFRCAnalytics/Resources/tree/master/7-Other/VSCode-Extensions/bhereth.language-citilabscubevoyager)
+(GitHub: [@bhereth](https://github.com/bhereth)) — permission granted 2026-08-08 4:06
+PM MT, for structure/behavior reference with credit, not a license to redistribute
+his files or copy his keyword lists/grammar text verbatim (see constitution
+[Principle II](.specify/memory/constitution.md#ii-no-verbatim-redistribution-of-vendor-documentation)
+for the full binding conditions). His extension's files are never committed to this
+repository; his `LICENSE.txt` grants no redistribution rights independent of that
+permission, so anything ported from it — language IDs, bracket-matching
+configuration, comment delimiters, TextMate scope-naming conventions — is rewritten
+in Drut's own structure and wording.
+
 ## Workflow
 
 This project follows the [spec-kit](https://github.com/github/spec-kit) discipline:
