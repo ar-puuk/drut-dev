@@ -44,6 +44,10 @@ pub enum Command {
         #[arg(long, value_enum)]
         casing: Option<CasingArg>,
     },
+    /// Speak the Language Server Protocol over stdio (003-lsp-vscode-extension
+    /// FR-001) — no flags; launchable by an LSP client with no configuration
+    /// beyond pointing it at this binary.
+    Server,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]

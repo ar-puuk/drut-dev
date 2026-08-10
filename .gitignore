@@ -3,3 +3,9 @@ _archive/*
 # Rust build artifacts
 /target/
 Cargo.lock
+
+# editors/vscode/ (Node.js/TypeScript extension) build artifacts
+editors/vscode/node_modules/
+editors/vscode/out/
+editors/vscode/*.vsix
+editors/vscode/.vscode-test/
