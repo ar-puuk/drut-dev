@@ -214,7 +214,14 @@ correct source position and, for `@variable@`, the variable name.
   `4pd_mainbody_distribution.block:780-781`). A subscripted keyword that was not
   recognized as starting its own pair would otherwise be silently absorbed into
   whichever pair preceded it — not merely mis-tagged, but structurally lost from
-  `Control.pairs`.
+  `Control.pairs`. Pair-boundary scanning MUST also track open quoted-string state
+  (`'...'`/`"..."`, the same naive, non-escape-aware per-character toggle FR-004/
+  FR-005 already use) and MUST NOT treat a `word = value`-shaped substring *inside*
+  an open quote as a pair boundary — otherwise a quoted value containing what looks
+  like its own `keyword=value` shape (e.g. a `PRINT`-generated script literal
+  embedding `ScenarioDir = r"..."`) truncates the real pair's value at the opening
+  quote and fabricates a bogus extra pair from the string's own content (amended
+  2026-08-10 — see Assumptions below).
 - **FR-004**: The parser MUST recognize line comments beginning with `;` and running
   to the end of the physical line — **except** a `;` that occurs inside an open
   quoted string literal (`'...'` or `"..."`, tracked by a naive, non-escape-aware
@@ -764,3 +771,46 @@ correct source position and, for `@variable@`, the variable name.
   — which is a new grammar question in its own right, not a tail-end addition to
   a comment-scanning bugfix. Revisit if real evidence of this shape ever surfaces,
   the same deferral standard already applied to the two precedents named above.
+- **`pair_keyword_boundaries` quote-unawareness inside a `Control` statement's
+  keyword-list scan (resolved, 2026-08-10, discovered as a side-finding during
+  `003-lsp-vscode-extension`'s `PairKeyword` corpus census, not a `003` defect, a
+  pre-existing gap in this crate)**: unlike the lexer's own `;`/`/*` comment-start
+  scan (FR-004/FR-005, fixed 2026-08-09 immediately above), `statement.rs`'s
+  `pair_keyword_boundaries` — which walks a `Control` statement's own token list
+  looking for `word '=' ...`-shaped pair boundaries — tracked bracket depth for
+  subscripted keywords but had no notion of "inside a quoted string" at all. This
+  meant a `word = value` shape occurring *inside* an already-open quoted string
+  value was misread as the start of a second, genuine pair. Confirmed real, not
+  hypothetical: `WF-TDM-Official-Releases/2_ModelScripts/0_InputProcessing/
+  a_Setup/0_FolderSetup.s:27`, `PRINT LIST='\nScenarioDir       = r"@ScenarioDir@\"',`
+  — a `PRINT` statement writing out a Python script literal whose own text embeds
+  `ScenarioDir = r"..."` (real Python syntax, not a second Voyager pair). Verified
+  empirically with a minimal repro of this exact shape: with the pre-fix parser,
+  `LIST`'s own value was silently truncated at the opening quote (`pairs[0] ==
+  ("LIST", "'")`), and a bogus second pair was fabricated from the string's own
+  content (`pairs[1] == ("\nScenarioDir", "r \" ... \" ' ,")`) — a silent structural
+  corruption of `Control.pairs`, not a rejected-input false positive, and (per
+  `format.rs`'s dependence on `pair_keyword_boundaries` via `extract_pairs`) a risk
+  to formatter casing-rewrite output on any real script containing a similarly-
+  shaped quoted value. Spec-silent before this amendment — FR-003 said nothing
+  about quoted-string context inside a keyword-list scan either way — but with no
+  plausible alternative reading: a string literal's own embedded text obviously
+  isn't meant to start a second keyword=value pair in the *outer* statement.
+  Treated as a direct fix (same precedent as the `;`/`/*`-in-quotes bug immediately
+  above, and as FR-023/FR-003's subscripted-pair-keyword fix before that) rather
+  than a fresh `/speckit-clarify` cycle. **Fix**: track the same naive, non-escape-
+  aware open/close toggle per quote character (`'`, `"` independently, mutually
+  exclusive with each other) that the lexer already uses, applied here to
+  `pair_keyword_boundaries`'s token walk — while either quote is open, bracket-
+  depth tracking and pair-boundary detection both stand down, exactly as `;`/`/*`
+  recognition already stands down inside an open quote. `assignment_equals_index`'s
+  other call site (`statement.rs`, whole-group Control-vs-Assignment
+  classification) was confirmed **not** affected by this same defect class, since
+  it only ever examines position 0 of a freshly-started statement group, which by
+  construction is never inside an already-open quote. **Revalidated**: full `cargo
+  test --workspace` suite passing (including two new regression tests: the real
+  `0_FolderSetup.s` shape, and an independent-per-quote-character check mirroring
+  the lexer's own `'`-inside-`"..."` case), `cargo clippy --workspace --all-targets
+  -- -D warnings` clean, and a full, read-only 161-file `WF-TDM-Official-Releases`
+  pass — **161/161 clean, zero diagnostics, zero panics**, confirming the fix
+  introduces no new false positives elsewhere in any real file.

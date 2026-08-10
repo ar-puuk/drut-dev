@@ -273,19 +273,38 @@ fn split_if_family_trailing(grp: &[Token]) -> Option<(Vec<Token>, Vec<Token>)> {
 /// collapsed return value discards — without re-deriving this scan
 /// independently (constitution Principle I applies within the crate too:
 /// one implementation of "where do pairs start", not two that could drift).
+/// **Quote-awareness (amended 2026-08-10, FR-003)**: a `'`/`"` token toggles a
+/// naive, non-escape-aware open/close state per quote character — the same
+/// technique `lexer.rs` already uses for `;`/`/*` comment-start recognition
+/// (FR-004/FR-005) — so that a `word = value`-shaped substring *inside* an
+/// open quoted string (e.g. a `PRINT`-generated script literal containing
+/// `ScenarioDir = r"..."`) is never mistaken for a second, genuine
+/// `keyword=value` pair boundary. Without this, `assignment_equals_index`
+/// would happily match that inner `=` too, silently truncating the real
+/// pair's own value at the opening quote and fabricating a bogus extra pair
+/// from the string's own content — see spec.md's Assumptions for the
+/// discovery, evidence, and full rationale.
 pub(crate) fn pair_keyword_boundaries(tokens: &[Token]) -> Vec<(usize, usize)> {
     let mut depth: i32 = 0;
+    let mut in_single_quote = false;
+    let mut in_double_quote = false;
     let mut pair_starts: Vec<(usize, usize)> = Vec::new();
     for i in 0..tokens.len() {
         let tok = &tokens[i];
         if tok.kind == TokenKind::Punctuation {
             match tok.text.as_str() {
-                "(" | "[" | "{" => depth += 1,
-                ")" | "]" | "}" => depth -= 1,
+                "'" if !in_double_quote => in_single_quote = !in_single_quote,
+                "\"" if !in_single_quote => in_double_quote = !in_double_quote,
+                "(" | "[" | "{" if !in_single_quote && !in_double_quote => depth += 1,
+                ")" | "]" | "}" if !in_single_quote && !in_double_quote => depth -= 1,
                 _ => {}
             }
         }
-        if depth == 0 && tok.kind == TokenKind::Word {
+        if depth == 0
+            && !in_single_quote
+            && !in_double_quote
+            && tok.kind == TokenKind::Word
+        {
             if let Some(local_eq) = assignment_equals_index(&tokens[i..]) {
                 pair_starts.push((i, i + local_eq));
             }
@@ -539,6 +558,50 @@ mod tests {
                     !value_text.contains("VOL"),
                     "EXCLUDEGROUP's value swallowed VOL: {value_text:?}"
                 );
+            }
+            other => panic!("expected Control, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn quoted_string_content_shaped_like_a_pair_is_not_a_second_pair() {
+        // Real fixture shape (0_FolderSetup.s:27, WF-TDM-Official-Releases):
+        // a PRINT statement writing out a Python script literal whose own
+        // text contains `ScenarioDir = r"..."` — real Python syntax, not a
+        // second Voyager keyword=value pair. Before this fix,
+        // `pair_keyword_boundaries` had no quote-awareness (unlike
+        // `lexer.rs`'s own `;`/`/*`-in-quotes handling, FR-004/FR-005), so
+        // the `=` inside the quoted string was misread as starting a bogus
+        // second pair, truncating LIST's own value at the opening quote.
+        let stmts = statements_of("PRINT LIST='ScenarioDir = r\"x\"'\n");
+        assert_eq!(stmts.len(), 1);
+        match &stmts[0].kind {
+            StatementKind::Control { word, pairs } => {
+                assert_eq!(word, "PRINT");
+                assert_eq!(pairs.len(), 1, "expected exactly one pair, got {pairs:?}");
+                assert_eq!(pairs[0].0, "LIST");
+                let value_text: String = pairs[0].1.iter().map(|t| t.text.as_str()).collect();
+                assert!(
+                    value_text.contains("ScenarioDir"),
+                    "LIST's value must include the full quoted string, got {value_text:?}"
+                );
+            }
+            other => panic!("expected Control, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn quoted_string_with_unmatched_single_quote_inside_double_quotes_is_not_a_boundary() {
+        // A `'` inside an open `"..."` (or vice versa) must not toggle the
+        // *other* quote's state — mirrors lexer.rs's own independent-per-
+        // quote-character tracking (FR-004/FR-005's `in_single_quote`/
+        // `in_double_quote` design, reused here for pair boundaries).
+        let stmts = statements_of("PRINT LIST=\"it's = fine\"\n");
+        assert_eq!(stmts.len(), 1);
+        match &stmts[0].kind {
+            StatementKind::Control { pairs, .. } => {
+                assert_eq!(pairs.len(), 1, "expected exactly one pair, got {pairs:?}");
+                assert_eq!(pairs[0].0, "LIST");
             }
             other => panic!("expected Control, got {other:?}"),
         }
