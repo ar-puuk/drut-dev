@@ -12,8 +12,8 @@ quickstart.md (all present)
 
 **Tests**: Included — a formatter behavioral reversal touching real corpus
 output requires real coverage: `voyager-core`'s own unit tests for every
-new/changed case, the residue-resolution regression, and
-human-reviewed golden-fixture regeneration as this feature's own
+new/changed case, the residue-resolution regression, the `007`-interaction
+case, and human-reviewed golden-fixture regeneration as this feature's own
 Definition of Done (constitution Principle III's existing gate).
 
 **Organization**: One primary user story (the policy change itself, US1)
@@ -32,7 +32,14 @@ prototype during planning (research.md §1/§3), not estimated**:
   `voyager-core` lib tests, all of `format_sequence.rs`, all of
   `drut-lsp`/`drut-cli`/`drut-mcp`) passes unchanged.
 - **Exactly 7 of 9 `real_corpus/` golden fixtures drift**; zero
-  hand-written `valid/` fixtures are affected. Full file list below (T007).
+  hand-written `valid/` fixtures are affected. Full file list below (T008).
+- **T006 (added after the initial task-generation pass, before
+  implementation started)**: the one `007`/`008` interaction point not
+  obviously covered by either feature's own tests in isolation — a
+  genuinely diagnosed block whose own opener sits at non-zero
+  indentation. Verified via the same prototype: opener corrected to 0,
+  every child (both legitimate body content and any swallowed trailing
+  content) left completely untouched, `UnmatchedProcess` still reported.
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -103,12 +110,28 @@ still correctly indented relative to that new base.
       children gets both the opener *and* its children corrected together
       in one pass; an already-column-0 file stays byte-identical
       (`changed: false`, idempotence). Depends on T002.
-- [ ] T006 [P] [US1] Amend `specs/002-cli-check-format/spec.md`'s FR-012
+- [ ] T006 [US1] Add a new unit test to `crates/voyager-core/src/format.rs`'s
+      own `#[cfg(test)] mod tests`,
+      `diagnosed_block_opener_is_normalized_but_children_stay_untouched`
+      — the explicit `007`/`008` interaction case confirmed live during
+      planning, not left to be inferred from the two features' own
+      isolated test suites. Input: a genuinely unclosed `PROCESS` whose
+      own opener sits at non-zero indentation, with both its legitimate
+      body content (`FILEI`) and a swallowed trailing `RUN` block also at
+      non-zero indentation —
+      `"    PROCESS PHASE=INPUT\n        FILEI = ni.1\n\n    RUN PGM=HWYASSIGN\n        FILEI NETI = 'net.net'\n    ENDRUN\n"`.
+      Asserts: `changed: true`; exactly one diagnostic,
+      `DiagnosticKind::UnmatchedProcess`; the output's `PROCESS` line has
+      zero leading spaces (corrected); every other line — `FILEI = ni.1`,
+      `RUN PGM=HWYASSIGN`, `FILEI NETI = ...`, `ENDRUN` — is byte-for-byte
+      identical to the input (untouched, `007`'s skip still applies to
+      the diagnosed block's children). Depends on T002.
+- [ ] T007 [P] [US1] Amend `specs/002-cli-check-format/spec.md`'s FR-012
       bullet and `specs/002-cli-check-format/contracts/formatting-api.md`,
       using `contracts/top-level-indentation.md`'s exact replacement text
-      verbatim. Independent of T002-T005 — documentation only, different
+      verbatim. Independent of T002-T006 — documentation only, different
       files.
-- [ ] T007 [US1] Regenerate and individually human-review the 7 affected
+- [ ] T008 [US1] Regenerate and individually human-review the 7 affected
       golden fixtures (quickstart.md step 4):
       ```powershell
       $env:UPDATE_GOLDEN = "1"
@@ -131,8 +154,9 @@ still correctly indented relative to that new base.
       Definition of Done, not a mechanical regenerate-and-commit step.
       Depends on T002 (the golden output must reflect the real fix).
 
-**Checkpoint**: Top-level normalization fully implemented, unit-tested,
-and every affected golden fixture regenerated and reviewed.
+**Checkpoint**: Top-level normalization fully implemented, unit-tested
+(including the explicit `007` interaction), and every affected golden
+fixture regenerated and reviewed.
 
 ---
 
@@ -150,7 +174,7 @@ pass corrects everything.
 
 ### Implementation for User Story 2
 
-- [ ] T008 [US2] Add a new test to
+- [ ] T009 [US2] Add a new test to
       `crates/voyager-core/tests/format_sequence.rs`,
       `process_run_residue_with_stale_run_indentation_resolves_in_one_pass`:
       unlike the existing `process_run_residue_is_fixed_after_endprocess_
@@ -174,12 +198,12 @@ absent, indentation) is proven to self-resolve in one pass.
 **Purpose**: Whole-workspace and full-corpus re-proof, once the policy
 change and its golden-fixture regeneration are both done.
 
-- [ ] T009 `cargo test --release --workspace` and
+- [ ] T010 `cargo test --release --workspace` and
       `cargo clippy --workspace --all-targets -- -D warnings`, both
       clean — confirms zero regressions anywhere (research.md §2 already
       confirmed zero adapter code changes are needed; this re-proves
       nothing else broke).
-- [ ] T010 [P] Full 161-file corpus revalidation across all three adapter
+- [ ] T011 [P] Full 161-file corpus revalidation across all three adapter
       surfaces (quickstart.md step 5), each reported individually:
       ```powershell
       $env:DRUT_CORPUS_PATH = "path\to\WF-TDM-Official-Releases"
@@ -212,20 +236,20 @@ reality; full corpus re-proven clean.
 ### Within User Story 1
 
 - T002 (implementation) before T003 (doc comments describing the
-  post-T002 state), T004 (rewritten test), T005 (new tests), T007 (golden
-  regeneration, needs the real fixed output).
-- T006 (spec/contract doc amendment) is independent of T002-T005/T007 —
+  post-T002 state), T004 (rewritten test), T005/T006 (new tests), T008
+  (golden regeneration, needs the real fixed output).
+- T007 (spec/contract doc amendment) is independent of T002-T006/T008 —
   different files, no code dependency — but logically describes the same
   change, so keep it in the same review pass.
 
 ### Parallel Opportunities
 
-- T004, T005, T006 can all proceed in parallel once T002 lands (three
-  different files/concerns: rewritten test, new tests — same file as T004
-  but additive, not conflicting — and spec/contract docs).
-- T010's three corpus-validation commands are independent of each other
-  (different crates) and of T009 (different scope) — genuinely parallel,
-  though T009 is listed first as the cheaper, faster gate.
+- T004, T005, T006, T007 can all proceed in parallel once T002 lands
+  (T004/T005/T006 share `format.rs` but are additive, non-conflicting
+  edits; T007 is a different file entirely).
+- T011's three corpus-validation commands are independent of each other
+  (different crates) and of T010 (different scope) — genuinely parallel,
+  though T010 is listed first as the cheaper, faster gate.
 
 ---
 
@@ -234,7 +258,8 @@ reality; full corpus re-proven clean.
 ```bash
 Task: "T004: rewrite top_level_baseline_is_left_untouched"
 Task: "T005: add new format.rs unit test cases"
-Task: "T006: amend spec.md FR-012 + formatting-api.md"
+Task: "T006: add the diagnosed-opener/untouched-children interaction test"
+Task: "T007: amend spec.md FR-012 + formatting-api.md"
 ```
 
 ---
@@ -244,9 +269,10 @@ Task: "T006: amend spec.md FR-012 + formatting-api.md"
 ### Single Pass (both stories are small and directly coupled)
 
 1. Setup → baseline confirmed clean.
-2. User Story 1 → the policy change, its tests, its doc amendment, and
-   its human-reviewed golden-fixture regeneration (T007 is the one step
-   in this whole feature that cannot be rushed or automated away).
+2. User Story 1 → the policy change, its tests (including the explicit
+   `007` interaction, T006), its doc amendment, and its human-reviewed
+   golden-fixture regeneration (T008 is the one step in this whole
+   feature that cannot be rushed or automated away).
 3. User Story 2 → the stale-indentation residue proof.
 4. Polish → whole-workspace and full-corpus re-proof, reported explicitly.
 
@@ -254,9 +280,14 @@ Task: "T006: amend spec.md FR-012 + formatting-api.md"
 
 ## Notes
 
-- T007's human-review step is this feature's real bottleneck and its
+- T008's human-review step is this feature's real bottleneck and its
   actual Definition of Done for FR-006/SC-003 — not a formality. Report
   each of the 7 files' diff review individually before considering this
   feature done, matching the original `T023b` discipline those golden
   files were first created under.
+- T006 was added after this file's initial generation, in response to an
+  explicit review question about the one `007`/`008` interaction point
+  neither feature's own isolated tests obviously covered — already
+  verified against the real prototype before being written into this
+  file, not a placeholder.
 - Commit after each task or logical group.
