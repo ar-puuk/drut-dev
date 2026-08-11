@@ -62,6 +62,70 @@ fn did_open_publishes_diagnostics_for_a_broken_document() {
 }
 
 #[test]
+fn formatting_after_a_diagnosed_block_is_closed_no_longer_leaves_residue() {
+    // 007-formatter-diagnosed-block-indent-fix, exercised through the real
+    // LSP protocol -- textDocument/didOpen, textDocument/formatting,
+    // textDocument/didChange, textDocument/formatting again -- not just
+    // voyager-core::format directly and not just drut-cli. The exact
+    // PROCESS/RUN sequence that surfaced the bug during manual VS Code
+    // verification.
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+
+    let step1 = "PROCESS PHASE=INPUT\n    FILEI = ni.1\n    LOOP DAY = 1, 5\n        PRINT LIST='Day = ', DAY\n    ENDLOOP\n\nRUN PGM=HWYASSIGN\n    FILEI NETI = 'net.net'\nENDRUN\n";
+    did_open(&client, "file:///residue.s", step1);
+
+    send_request(
+        &client,
+        2,
+        "textDocument/formatting",
+        json!({
+            "textDocument": {"uri": "file:///residue.s"},
+            "options": {"tabSize": 4, "insertSpaces": true}
+        }),
+    );
+    let response = recv_response(&client);
+    let edits = response.response_result.expect("formatting must succeed");
+    assert_eq!(
+        edits,
+        json!([]),
+        "pass 1 (PROCESS still unclosed) must leave RUN untouched via the real LSP path too, got {edits:?}"
+    );
+
+    // Simulate the user typing ENDPROCESS by hand -- full-sync didChange,
+    // matching this server's declared TextDocumentSyncKind::FULL.
+    let step2 = step1.replacen("    ENDLOOP\n\n", "    ENDLOOP\nENDPROCESS\n\n", 1);
+    send_notification(
+        &client,
+        "textDocument/didChange",
+        json!({
+            "textDocument": {"uri": "file:///residue.s", "version": 2},
+            "contentChanges": [{"text": step2}]
+        }),
+    );
+    recv_notification(&client, "textDocument/publishDiagnostics"); // the didChange's own diagnostics push
+
+    send_request(
+        &client,
+        3,
+        "textDocument/formatting",
+        json!({
+            "textDocument": {"uri": "file:///residue.s"},
+            "options": {"tabSize": 4, "insertSpaces": true}
+        }),
+    );
+    let response = recv_response(&client);
+    let edits = response.response_result.expect("formatting must succeed");
+    assert_eq!(
+        edits,
+        json!([]),
+        "pass 2 (PROCESS now closed) must report the file already correctly formatted via the real LSP path -- RUN must not be stuck at a stale nested indent, got {edits:?}"
+    );
+
+    shutdown(&client);
+}
+
+#[test]
 fn did_open_publishes_unmatched_process_for_a_genuinely_unclosed_phase() {
     // 006-unmatched-process-diagnostic FR-007: proves drut-lsp's real
     // publishDiagnostics path surfaces the new kind end to end, not just
