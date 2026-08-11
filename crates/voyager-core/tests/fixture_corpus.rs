@@ -62,6 +62,7 @@ fn parse_diagnostic_kind(name: &str) -> Option<DiagnosticKind> {
         "UnclosedBlockComment" => Some(DiagnosticKind::UnclosedBlockComment),
         "InvalidContinuation" => Some(DiagnosticKind::InvalidContinuation),
         "UnmatchedRun" => Some(DiagnosticKind::UnmatchedRun),
+        "UnmatchedProcess" => Some(DiagnosticKind::UnmatchedProcess),
         "MisplacedBreak" => Some(DiagnosticKind::MisplacedBreak),
         "InvalidEncoding" => Some(DiagnosticKind::InvalidEncoding),
         _ => None,
@@ -140,6 +141,7 @@ fn every_diagnostic_category_has_at_least_one_broken_fixture() {
         DiagnosticKind::UnclosedBlockComment,
         DiagnosticKind::InvalidContinuation,
         DiagnosticKind::UnmatchedRun,
+        DiagnosticKind::UnmatchedProcess,
         DiagnosticKind::MisplacedBreak,
         DiagnosticKind::InvalidEncoding,
     ] {

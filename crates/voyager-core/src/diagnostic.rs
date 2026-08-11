@@ -21,6 +21,12 @@ pub enum DiagnosticKind {
     /// a disabled `!RUN` missing its required explicit `ENDRUN`, or a
     /// dangling `ENDRUN`.
     UnmatchedRun,
+    /// 006-unmatched-process-diagnostic FR-002: a `PROCESS`/`PHASE=` with no
+    /// matching `ENDPROCESS`/`ENDPHASE` and no following `PROCESS`/`PHASE=`
+    /// statement (the legitimate implicit-close pattern) before either
+    /// end-of-input or the enclosing block's own closer forces an early
+    /// stop — mirrors `UnmatchedRun`'s firing condition exactly.
+    UnmatchedProcess,
     /// FR-026: a `BREAK` with no enclosing block of any kind.
     MisplacedBreak,
     /// FR-034: a raw input byte (`tokenize_bytes`/`parse_bytes` only) that is

@@ -13,7 +13,7 @@ pub struct DiagnosticsInput {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct DiagnosticDto {
-    /// One of the six reachable `DiagnosticKind` names, plus
+    /// One of the seven reachable `DiagnosticKind` names, plus
     /// `InvalidEncoding` when reachable via a `path` input (FR-003).
     pub category: String,
     pub message: String,
@@ -31,6 +31,7 @@ fn category_name(kind: voyager_core::DiagnosticKind) -> &'static str {
         UnclosedBlockComment => "UnclosedBlockComment",
         InvalidContinuation => "InvalidContinuation",
         UnmatchedRun => "UnmatchedRun",
+        UnmatchedProcess => "UnmatchedProcess",
         MisplacedBreak => "MisplacedBreak",
         InvalidEncoding => "InvalidEncoding",
     }
@@ -77,6 +78,16 @@ mod tests {
         let result = diagnose(&text_input("IF (a=b)\n; no ENDIF\n")).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].category, "UnmatchedIf");
+    }
+
+    #[test]
+    fn unmatched_process_is_reported() {
+        // 006-unmatched-process-diagnostic FR-007: proves drut-mcp's own
+        // diagnose() tool surfaces the new kind end to end, not just that
+        // voyager-core::parse itself reports it.
+        let result = diagnose(&text_input("PROCESS PHASE=INPUT\nFILEI=ni.1\n")).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].category, "UnmatchedProcess");
     }
 
     #[test]

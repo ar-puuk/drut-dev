@@ -62,6 +62,22 @@ fn did_open_publishes_diagnostics_for_a_broken_document() {
 }
 
 #[test]
+fn did_open_publishes_unmatched_process_for_a_genuinely_unclosed_phase() {
+    // 006-unmatched-process-diagnostic FR-007: proves drut-lsp's real
+    // publishDiagnostics path surfaces the new kind end to end, not just
+    // that voyager-core::parse itself reports it.
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+
+    let note = did_open(&client, "file:///unclosed_phase.s", "PROCESS PHASE=INPUT\nFILEI=ni.1\n");
+    let diagnostics = note.params["diagnostics"].as_array().unwrap();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0]["code"], json!("UnmatchedProcess"));
+
+    shutdown(&client);
+}
+
+#[test]
 fn did_open_on_valid_document_publishes_zero_diagnostics() {
     let (client, _handle) = spawn_server();
     initialize(&client);
