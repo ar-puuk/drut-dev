@@ -12,19 +12,25 @@ Each item's status is tracked here so this doesn't have to be re-derived from
 scratch next time. "Not started" doesn't mean unexamined — some of these have
 already been researched or partially unblocked; see the note per item.
 
-1. **Format-on-save** — *not started*. The LSP-side prerequisite,
-   `textDocument/formatting`, already exists (`crates/drut-lsp/src/formatting.rs`,
-   added during 003's manual verification pass) — what's left here is purely the
-   client-side decision of whether/how to default `editor.formatOnSave` on for
-   this language, e.g. auto-injecting a language-scoped setting the same way
-   `extension.ts`'s `ensureVariableColorCustomization` already does for semantic
-   token colors.
-2. **Format-on-paste** — *not started*. Real new work, not a settings toggle —
-   VS Code's `editor.formatOnPaste` is served by `textDocument/rangeFormatting`
-   (`DocumentRangeFormattingEditProvider`), which `drut-lsp` doesn't implement
-   yet (only whole-document `textDocument/formatting`); needs a new LSP
-   capability, not a client-side paste hook (corrected 2026-08-10 — an earlier
-   version of this line named the wrong VS Code mechanism).
+1. **Format-on-save** — *implemented, manual VS Code verification pending*
+   (`005-format-on-save-paste`, 2026-08-11). `extension.ts`'s
+   `ensureFormatOnSaveEnabled` auto-enables `editor.formatOnSave` for
+   `.s`/`.block` files on first activation, one-time and removal-respecting
+   (same pattern as `ensureVariableColorCustomization`, verified via the
+   extracted `shouldInjectFormatOnSave` predicate's own unit tests). Code
+   complete and automated-tested; the real-VS-Code smoke test
+   (`specs/005-format-on-save-paste/quickstart.md` step 5) still needs a
+   human to actually run it.
+2. **Format-on-paste** — *implemented, manual VS Code verification pending*
+   (`005-format-on-save-paste`, 2026-08-11). `drut-lsp` now serves
+   `textDocument/rangeFormatting` (`crates/drut-lsp/src/range_formatting.rs`)
+   — whole-document format internally, line-diffed, filtered to the
+   requested range; verified against real block-boundary fixtures (a paste
+   that opens or closes a block, shifting indentation outside its own
+   range), not just simple cases. Ships opt-in — see README's "Editor
+   behavior" section for the setting. Code complete and automated-tested;
+   the real-VS-Code smoke test (quickstart.md step 6) still needs a human
+   to actually run it.
 3. **TOML-based configuration** — *not started*. Let users control settings via
    a TOML file (preferred over `settings.json`).
 4. **README/docs overhaul** — *not started*. Features, install steps, usage,

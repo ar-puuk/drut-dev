@@ -40,7 +40,18 @@ pub fn handle(
 | `params.text_document.uri` has no open document in `state` | `None` (FR-009 — matches `formatting.rs`'s existing `unopened_document_returns_none` behavior exactly, not a new convention) |
 | Document is open; `voyager_core::format` reports `changed: false` for the whole document | `Some(vec![])` — an empty edit list, same "already formatted, nothing to do" convention `formatting.rs` already uses (not `None`, which would mean "no formatter opinion exists at all") |
 | Document is open; `changed: true`, but no changed line falls within `params.range` | `Some(vec![])` — a real, structurally-correct empty result: the requested range itself needed no correction, even though the document as a whole did (data-model.md §1's `filter_to_range` returning empty) |
-| Document is open; `changed: true`, and at least one changed line falls within `params.range` | `Some(edits)` — one `TextEdit` per changed line within range, each `range` covering that single line (start of line to start of next line, or end-of-document for the last line) and `new_text` set to `LineEdit.new_content` plus its line terminator |
+| Document is open; `changed: true`, and at least one changed line falls within `params.range` | `Some(edits)` — one `TextEdit` per changed line within range, each `range` covering only that line's *content* (column 1 through one past its last char — never the line terminator itself) and `new_text` set to `LineEdit.new_content` with no terminator appended |
+
+**Implementation-time correction (line-terminator safety)**: an earlier
+version of this row described the edit range as "start of line to start of
+next line" with `new_text` carrying an appended terminator — rejected
+before implementing against it: that would require hardcoding a `\n`,
+silently converting a CRLF-line-ended document to LF on any touched line,
+directly contradicting `format.rs`'s own documented guarantee that
+line-ending style is "copied through unchanged." Excluding the terminator
+byte(s) from both the range and the replacement text sidesteps the
+question entirely — those bytes are simply never touched, correct
+regardless of which line-ending convention the document actually uses.
 
 ## Algorithm (research.md §2)
 
@@ -56,9 +67,11 @@ pub fn handle(
 4. `let in_range = filter_to_range(line_edits, params.range);`
    (data-model.md §1).
 5. Translate each surviving `LineEdit` into an `lsp_types::TextEdit`
-   spanning exactly that one line (via `position.rs`'s existing
-   `to_lsp_position`/`to_lsp_range` helpers — no new position-translation
-   logic).
+   spanning exactly that one line's *content* (column 1 through one past
+   its last char, excluding the line terminator — see the Handler
+   contract table's note above), via `position.rs`'s existing
+   `to_lsp_range` helper — no new position-translation logic, and no
+   hand-rolled UTF-16 counting in this module.
 
 No step above performs any parsing, block-matching, or indentation
 decision itself — every judgment about *what* the correct formatted output

@@ -10,6 +10,7 @@ pub mod document_store;
 pub mod formatting;
 pub mod hover;
 pub mod position;
+pub mod range_formatting;
 pub mod semantic_tokens;
 pub mod spellcheck;
 
@@ -45,6 +46,10 @@ fn server_capabilities() -> lsp_types::ServerCapabilities {
         // Added 2026-08-10 (see formatting.rs's own module docs) --
         // whole-document formatting only, no range/on-type variants.
         document_formatting_provider: Some(lsp_types::OneOf::Left(true)),
+        // Added 2026-08-11 (see range_formatting.rs's own module docs) --
+        // serves VS Code's editor.formatOnPaste
+        // (specs/005-format-on-save-paste).
+        document_range_formatting_provider: Some(lsp_types::OneOf::Left(true)),
         completion_provider: Some(lsp_types::CompletionOptions {
             trigger_characters: Some(vec![" ".to_string(), "=".to_string()]),
             ..Default::default()
@@ -155,7 +160,7 @@ fn handle_notification(connection: &Connection, note: ServerNotification, state:
 }
 
 fn handle_request(connection: &Connection, req: ServerRequest, state: &mut ServerState) {
-    use lsp_types::request::{Completion, Formatting, HoverRequest, SemanticTokensFullRequest};
+    use lsp_types::request::{Completion, Formatting, HoverRequest, RangeFormatting, SemanticTokensFullRequest};
 
     let id = req.id.clone();
     let method = req.method.clone();
@@ -179,6 +184,12 @@ fn handle_request(connection: &Connection, req: ServerRequest, state: &mut Serve
             Ok(params) => send_ok(connection, id, &formatting::handle(state, &params)),
             Err(e) => send_err(connection, id, e.to_string()),
         },
+        RangeFormatting::METHOD => {
+            match serde_json::from_value::<lsp_types::DocumentRangeFormattingParams>(req.params) {
+                Ok(params) => send_ok(connection, id, &range_formatting::handle(state, &params)),
+                Err(e) => send_err(connection, id, e.to_string()),
+            }
+        }
         other => send_err(connection, id, format!("unhandled method: {other}")),
     }
 }

@@ -112,6 +112,33 @@ npm test           # grammar tokenization spot-checks (vscode-textmate, no VS Co
 npx @vscode/vsce package   # produces a .vsix — see Publishing below
 ```
 
+## Editor behavior: format-on-save and format-on-paste
+
+`005-format-on-save-paste` adds two automatic-reformatting behaviors on top
+of the extension's existing "Format Document" command:
+
+- **Format-on-save** is auto-enabled the first time the extension activates
+  in a workspace (workspace-scoped, one-time, and never silently
+  re-enabled if you turn it back off — see
+  [`specs/005-format-on-save-paste/`](specs/005-format-on-save-paste/) for
+  the full mechanism). No action needed to use it; saving a `.s`/`.block`
+  file reformats it automatically, the same result "Format Document" would
+  already produce.
+- **Format-on-paste** stays off by default — turn it on yourself by adding
+  the following to your workspace's `.vscode/settings.json`:
+
+  ```json
+  {
+    "[drut-voyager]": {
+      "editor.formatOnPaste": true
+    }
+  }
+  ```
+
+  Once enabled, pasting Cube Voyager script text into a `.s`/`.block` file
+  reindents it to match its new surrounding structure immediately after
+  the paste.
+
 ## Repository layout
 
 ```text

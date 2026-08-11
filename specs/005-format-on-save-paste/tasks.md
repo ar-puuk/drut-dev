@@ -64,7 +64,7 @@ No new crate, no new npm package (plan.md Structure Decision):
 **Purpose**: Confirm a clean baseline before any change, so Polish's final
 re-run has a true "did this feature regress anything" comparison.
 
-- [ ] T001 Confirm baseline: `cargo build --workspace` and
+- [X] T001 Confirm baseline: `cargo build --workspace` and
       `cargo clippy --workspace --all-targets -- -D warnings` both clean;
       `cd editors\vscode; npm install; npm run compile; npm test` all
       clean.
@@ -91,7 +91,7 @@ Scenarios).
 
 ### Tests for User Story 1
 
-- [ ] T002 [P] [US1] Unit tests for the injection-decision predicate in a
+- [X] T002 [P] [US1] Unit tests for the injection-decision predicate in a
       new `editors/vscode/test/formatOnSave.test.ts` (ts-node-run, mirrors
       `test/grammar.test.ts`'s existing convention): `shouldInjectFormatOnSave`
       returns `true` when not yet injected and no existing language-scoped
@@ -104,9 +104,7 @@ Scenarios).
 
 ### Implementation for User Story 1
 
-- [ ] T003 [US1] In `editors/vscode/src/extension.ts`, add the exported
-      pure predicate `shouldInjectFormatOnSave(alreadyInjected: boolean,
-      existingWorkspaceLanguageValue: unknown): boolean` and
+- [X] T003 [US1] In `editors/vscode/src/extension.ts`, add
       `ensureFormatOnSaveEnabled(context: vscode.ExtensionContext): Promise<void>`
       (contracts/extension-settings.md) — uses
       `vscode.workspace.getConfiguration(undefined, { languageId: "drut-voyager" })`
@@ -115,9 +113,16 @@ Scenarios).
       to detect an existing override, and the `drutFormatOnSaveInjected`
       `workspaceState` key, mirroring `ensureVariableColorCustomization`'s
       existing `try`/`catch`-wrapped, never-fails-activation shape.
-      Depends on T002 (test written first, expected to fail until this
-      task lands).
-- [ ] T004 [US1] Wire `void ensureFormatOnSaveEnabled(context);` into
+      **Implementation-time correction**: the pure predicate
+      `shouldInjectFormatOnSave` was extracted into its own new module,
+      `editors/vscode/src/formatOnSaveDecision.ts`, rather than living
+      directly in `extension.ts` as originally described — `extension.ts`
+      imports the real `vscode` module at file scope, which only resolves
+      inside a running extension host, so T002's standalone-`ts-node`
+      test would have crashed on import if the predicate stayed there.
+      `ensureFormatOnSaveEnabled` imports and calls the extracted function
+      as its single source of truth for the decision.
+- [X] T004 [US1] Wire `void ensureFormatOnSaveEnabled(context);` into
       `activate()` in `editors/vscode/src/extension.ts`, alongside the
       existing `ensureVariableColorCustomization(context)` call. Depends
       on T003.
@@ -154,7 +159,7 @@ paste (spec.md US2 Acceptance Scenarios).
 code-plus-`#[cfg(test)]` convention — see `formatting.rs`, `hover.rs`,
 `position.rs` — rather than a separate contract-test file.)
 
-- [ ] T006 [US2] Implement `diff_lines`/`filter_to_range`/`handle` in a new
+- [X] T006 [US2] Implement `diff_lines`/`filter_to_range`/`handle` in a new
       `crates/drut-lsp/src/range_formatting.rs` (data-model.md §1,
       contracts/range-formatting-api.md), plus its own
       `#[cfg(test)] mod tests` covering all seven cases
@@ -177,7 +182,7 @@ code-plus-`#[cfg(test)]` convention — see `formatting.rs`, `hover.rs`,
       **not satisfied** by only the first five tests passing — the two
       block-boundary cases are this task's own explicit acceptance bar,
       not optional extras.
-- [ ] T007 [US2] In `crates/drut-lsp/src/lib.rs`: add
+- [X] T007 [US2] In `crates/drut-lsp/src/lib.rs`: add
       `pub mod range_formatting;`, add
       `document_range_formatting_provider: Some(lsp_types::OneOf::Left(true)),`
       to `server_capabilities()` alongside the existing
@@ -185,7 +190,7 @@ code-plus-`#[cfg(test)]` convention — see `formatting.rs`, `hover.rs`,
       `RangeFormatting::METHOD` arm to `handle_request`'s `match`,
       structurally identical to the existing `Formatting::METHOD` arm
       (contracts/range-formatting-api.md). Depends on T006.
-- [ ] T008 [P] [US2] Add the `editor.formatOnPaste` opt-in instructions to
+- [X] T008 [P] [US2] Add the `editor.formatOnPaste` opt-in instructions to
       `README.md` per contracts/extension-settings.md — the
       `"[drut-voyager]": { "editor.formatOnPaste": true }` snippet plus one
       sentence explaining pasted script text is reformatted to match its
@@ -234,20 +239,20 @@ doesn't fight a user's explicit choice.
 **Purpose**: Whole-workspace regression checks and documentation, once all
 three stories are complete.
 
-- [ ] T011 `cargo test --workspace` and
+- [X] T011 `cargo test --workspace` and
       `cargo clippy --workspace --all-targets -- -D warnings`, both clean —
       confirms this feature introduces zero regressions anywhere in the
       workspace, including the `lib.rs` dispatch-`match` change (T007).
-- [ ] T012 [P] Full-corpus diagnostic regression check (quickstart.md
+- [X] T012 [P] Full-corpus diagnostic regression check (quickstart.md
       step 4): `$env:DRUT_CORPUS_PATH = "..."`;
       `cargo test -p drut-lsp --test diagnostics_corpus -- --ignored` —
       still 161/161 clean, confirming the `lib.rs` `match` addition (T007)
       disturbed nothing already routed through it.
-- [ ] T013 [P] `cd editors\vscode; npm run compile; npm test` — confirms
+- [X] T013 [P] `cd editors\vscode; npm run compile; npm test` — confirms
       T002's new predicate tests pass alongside the existing grammar
       tests, and the extension still compiles cleanly with T003/T004's
       additions.
-- [ ] T014 [P] Update `ROADMAP.md`'s format-on-save and format-on-paste
+- [X] T014 [P] Update `ROADMAP.md`'s format-on-save and format-on-paste
       status lines from "not started" to reflect completion, per this
       feature's own shipped state.
 
