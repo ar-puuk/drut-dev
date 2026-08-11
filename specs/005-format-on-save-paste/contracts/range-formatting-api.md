@@ -74,9 +74,66 @@ I; Constitution Check row I).
   `formatting.rs`'s `already_formatted_document_returns_no_edits`.
 - `unopened_document_returns_none` — direct analog of `formatting.rs`'s
   identically-named test.
-- `change_outside_requested_range_is_not_returned` — new: a document with
-  two separate misindented lines, `range` covering only one of them;
-  asserts the edit list contains exactly one entry, for the in-range line.
-- `change_at_exact_range_boundary_is_included` — new: asserts the
-  inclusive-boundary behavior (data-model.md §1) at `range.start.line`/
-  `range.end.line` exactly, not just clearly-inside/clearly-outside cases.
+- `change_outside_requested_range_is_not_returned` — a document with two
+  *unrelated*, independently-misindented lines, `range` covering only one
+  of them; asserts the edit list contains exactly one entry, for the
+  in-range line. Deliberately the cheap, unrelated-lines baseline — see
+  the next two cases for the causally-connected (block-boundary) shape,
+  which this case alone does not exercise.
+- `change_at_exact_range_boundary_is_included` — asserts the inclusive-
+  boundary behavior (data-model.md §1) at `range.start.line`/`range.end.line`
+  exactly, not just clearly-inside/clearly-outside cases.
+- `paste_that_opens_a_block_only_returns_the_in_range_edit` — the
+  block-boundary case research.md §2's "Edge case resolution" describes,
+  verified directly against `voyager_core::format` rather than hand-derived
+  (research.md §2's own worked example). Input (7 lines, pasting a lone
+  `IF (c=3)` opener — no closer within the paste — between two body
+  statements of an already-open block, `range` = line 3 only):
+  ```text
+  IF (a=1)
+      IF (b=2)
+          PRINT LIST=1
+  IF (c=3)
+          PRINT LIST=2
+      ENDIF
+  ENDIF
+  ```
+  Whole-document reformat (what `voyager_core::format` actually produces)
+  changes **four** lines — 3 (the pasted opener, 0→8 spaces), and three
+  lines strictly outside the range: 4 (8→12 spaces), 5 (4→8 spaces), 6
+  (0→4 spaces) — plus reports one `UnmatchedIf` diagnostic (on line 0's
+  `a=1`, now permanently unclosed: opening a block without its own closer
+  inside the pasted range necessarily "steals" a pre-existing closer
+  further down to close the *new* block first, innermost-first, leaving
+  the outermost opener unmatched — see research.md §2's own note on why
+  this is a general structural property, not specific to this example).
+  Asserts the range-formatting response contains **exactly one** edit —
+  line 3 only — even though the whole-document pass needed four.
+- `paste_that_closes_a_block_only_returns_the_in_range_edit` — the mirror
+  case: pasting a lone `ENDIF` (no opener within the paste) between the
+  same two body statements, closing the inner block early instead of
+  opening a new one. Input (`range` = line 3 only):
+  ```text
+  IF (a=1)
+      IF (b=2)
+          PRINT LIST=1
+  ENDIF
+          PRINT LIST=2
+      ENDIF
+  ENDIF
+  ```
+  Whole-document reformat changes **three** lines — 3 (the pasted closer,
+  0→4 spaces), and two lines strictly outside the range: 4 (8→4 spaces),
+  5 (4→0 spaces) — plus one `UnmatchedIf` diagnostic (on the now-stray
+  final `ENDIF`, line 6, which needs no reindent itself but has nothing
+  left open to close). Asserts the range-formatting response contains
+  **exactly one** edit — line 3 only.
+
+These two cases are the same underlying phenomenon viewed from opposite
+ends (research.md §2): a single unbalanced paste into an otherwise-valid
+document always "steals" a pre-existing opener or closer elsewhere,
+producing exactly one transient `UnmatchedIf`-shaped diagnostic alongside
+the reindentation ripple — confirmed here empirically, not assumed, and
+true in both directions. Both fixtures preserve line count end to end (7
+lines in, 7 lines out) — the concrete case research.md §2's line-count-
+preservation guarantee is tied to explicitly.

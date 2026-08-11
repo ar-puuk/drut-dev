@@ -98,6 +98,40 @@ which has no such range restriction. This is a deliberate, LSP-convention-
 matching choice (range-formatting requests are conventionally answered
 within their requested range only), not an oversight.
 
+**Verified against the real formatter, both directions** (not just
+asserted): a paste that *opens* a block without closing it inside the
+range, and a paste that *closes* a block opened before the range, were
+each run through `voyager_core::format` directly
+(`contracts/range-formatting-api.md`'s
+`paste_that_opens_a_block_only_returns_the_in_range_edit`/
+`paste_that_closes_a_block_only_returns_the_in_range_edit` fixtures). Both
+confirm two things concretely, not just in principle:
+
+1. **The line-count-preservation guarantee this whole strategy rests on
+   (§2 above) holds even in this exact scenario** — both fixtures go in at
+   7 lines and come out at 7 lines, despite the reindentation ripple
+   spanning 3–4 lines and despite a genuine `UnmatchedIf` diagnostic being
+   present. The guarantee was previously only asserted for arbitrary input
+   in general; this ties it to the specific shape most likely to stress
+   it (a paste that changes block nesting), rather than leaving that tie
+   implicit.
+2. **"Opens a block" and "closes a block" are the same phenomenon from
+   opposite ends, not two independent cases to design for separately.** A
+   single unbalanced paste into an otherwise-valid document always
+   "steals" a pre-existing opener or closer elsewhere in the document to
+   rebalance against — which is *why* a real, structurally-valid case that
+   shifts indentation outside the requested range always coincides with
+   exactly one transient `UnmatchedIf`/`UnmatchedLoop`-shaped diagnostic:
+   there is no way to construct a fully diagnostic-free document where an
+   in-progress partial paste both (a) genuinely changes nesting depth for
+   content strictly outside the pasted range and (b) leaves the whole
+   document still perfectly balanced — the two are mutually exclusive by
+   construction. This directly connects to spec.md's *other* Edge Case
+   (formatting inside an already-diagnosed document) — they are not
+   unrelated scenarios; the block-boundary case is a specific, common way
+   to arrive at the diagnosed-document case, discovered while verifying
+   this one.
+
 **Alternatives considered**:
 - Returning the *entire* whole-document diff regardless of the requested
   range: rejected — technically simpler, but a range-formatting response

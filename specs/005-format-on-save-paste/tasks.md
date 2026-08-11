@@ -157,13 +157,26 @@ code-plus-`#[cfg(test)]` convention — see `formatting.rs`, `hover.rs`,
 - [ ] T006 [US2] Implement `diff_lines`/`filter_to_range`/`handle` in a new
       `crates/drut-lsp/src/range_formatting.rs` (data-model.md §1,
       contracts/range-formatting-api.md), plus its own
-      `#[cfg(test)] mod tests` covering all five cases
-      contracts/range-formatting-api.md's Tests section specifies:
+      `#[cfg(test)] mod tests` covering all seven cases
+      contracts/range-formatting-api.md's Tests section specifies —
+      **explicitly including the two block-boundary cases, not just the
+      five simpler ones**:
       `misindented_line_within_range_is_corrected`,
       `already_formatted_document_returns_empty_edit_list`,
       `unopened_document_returns_none`,
-      `change_outside_requested_range_is_not_returned`,
-      `change_at_exact_range_boundary_is_included`.
+      `change_outside_requested_range_is_not_returned` (unrelated-lines
+      baseline only — insufficient alone, see the next two),
+      `change_at_exact_range_boundary_is_included`,
+      **`paste_that_opens_a_block_only_returns_the_in_range_edit`** and
+      **`paste_that_closes_a_block_only_returns_the_in_range_edit`**
+      (contracts/range-formatting-api.md's two verified block-boundary
+      fixtures — a paste that opens or closes a block, changing
+      indentation depth for lines strictly outside the requested range;
+      both confirmed to produce a real multi-line reindentation ripple
+      outside range, of which the response must return none). T006 is
+      **not satisfied** by only the first five tests passing — the two
+      block-boundary cases are this task's own explicit acceptance bar,
+      not optional extras.
 - [ ] T007 [US2] In `crates/drut-lsp/src/lib.rs`: add
       `pub mod range_formatting;`, add
       `document_range_formatting_provider: Some(lsp_types::OneOf::Left(true)),`

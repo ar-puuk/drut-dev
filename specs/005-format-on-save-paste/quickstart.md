@@ -31,10 +31,15 @@ cargo test -p drut-lsp range_formatting::
 ```
 
 Expected: all green — including
-`change_outside_requested_range_is_not_returned` and
-`change_at_exact_range_boundary_is_included`
-(`contracts/range-formatting-api.md`'s two range-boundary-specific cases,
-proving FR-003's "only the portion within the range" scope precisely).
+`paste_that_opens_a_block_only_returns_the_in_range_edit` and
+`paste_that_closes_a_block_only_returns_the_in_range_edit`
+(`contracts/range-formatting-api.md`'s two block-boundary cases, each
+verified against the real formatter to produce a multi-line reindentation
+ripple outside the requested range, of which the response must return
+none — the strongest proof of FR-003's "only the portion within the
+range" scope this suite has, stronger than the simpler
+`change_outside_requested_range_is_not_returned`/
+`change_at_exact_range_boundary_is_included` cases alone).
 
 ## 3. Existing whole-document `formatting` module — validates no regression
 
