@@ -547,15 +547,66 @@ mod tests {
     }
 
     #[test]
-    fn top_level_baseline_is_left_untouched() {
+    fn top_level_baseline_is_always_normalized_to_zero() {
+        // Reversed 2026-08-11 (008-top-level-indentation-normalization):
+        // was top_level_baseline_is_left_untouched, asserting RUN kept its
+        // original 8-space baseline. Now RUN's own line is corrected to
+        // column 0, and its body is re-anchored to *that* corrected base.
         let src = "        RUN PGM=MATRIX\n        X = 1\n        ENDRUN\n";
         let out = format(src, FormatOptions::default()).text;
-        // Top-level RUN keeps its original 8-space baseline; its body still
-        // gets exactly +4 relative to *that* baseline, and ENDRUN aligns to
-        // the same baseline as its opener.
+        assert_eq!(out, "RUN PGM=MATRIX\n    X = 1\nENDRUN\n");
+    }
+
+    #[test]
+    fn bare_top_level_statement_is_normalized_to_zero() {
+        // Previously had zero code path touching it at all -- plan_indentation
+        // only ever iterated Node::Block entries (research.md §1). Now every
+        // top-level node, statement or block alike, is force-planned.
+        let src = "    X = 1\n";
+        let out = format(src, FormatOptions::default()).text;
+        assert_eq!(out, "X = 1\n");
+    }
+
+    #[test]
+    fn top_level_block_with_stale_children_corrects_both_together() {
+        // spec.md Acceptance Scenario 2: a block opener already corrected
+        // to column 0, but its children still carrying indentation
+        // relative to the block's *old*, non-zero position -- both the
+        // opener and its children must resolve correctly in one pass.
+        let src = "RUN PGM=HWYASSIGN\n        FILEI NETI = 'net.net'\n    ENDRUN\n";
+        let out = format(src, FormatOptions::default()).text;
+        assert_eq!(out, "RUN PGM=HWYASSIGN\n    FILEI NETI = 'net.net'\nENDRUN\n");
+    }
+
+    #[test]
+    fn already_column_zero_top_level_is_idempotent() {
+        // spec.md Acceptance Scenario 3.
+        let src = "RUN PGM=MATRIX\n    X = 1\nENDRUN\n";
+        let result = format(src, FormatOptions::default());
+        assert!(!result.changed);
+        assert_eq!(result.text, src);
+    }
+
+    #[test]
+    fn diagnosed_block_opener_is_normalized_but_children_stay_untouched() {
+        // The explicit 007/008 interaction point, verified against a real
+        // prototype before this task was written (tasks.md T006): a
+        // genuinely unmatched PROCESS whose own opener sits at non-zero
+        // indentation, with both its legitimate body content (FILEI) and
+        // a swallowed trailing RUN block also at non-zero indentation.
+        let src = "    PROCESS PHASE=INPUT\n        FILEI = ni.1\n\n    RUN PGM=HWYASSIGN\n        FILEI NETI = 'net.net'\n    ENDRUN\n";
+        let result = format(src, FormatOptions::default());
+
+        assert!(result.changed);
+        assert_eq!(result.diagnostics.len(), 1);
+        assert_eq!(result.diagnostics[0].kind, DiagnosticKind::UnmatchedProcess);
+
+        let expected = "PROCESS PHASE=INPUT\n        FILEI = ni.1\n\n    RUN PGM=HWYASSIGN\n        FILEI NETI = 'net.net'\n    ENDRUN\n";
         assert_eq!(
-            out,
-            "        RUN PGM=MATRIX\n            X = 1\n        ENDRUN\n"
+            result.text, expected,
+            "PROCESS's own opener must be corrected to column 0, but every child \
+             (both the legitimate FILEI body content and the swallowed RUN block) \
+             must stay byte-for-byte untouched"
         );
     }
 
