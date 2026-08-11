@@ -1,7 +1,7 @@
 
 ;System
     ;In case TP+ crashes during batch, this will halt process & help identify error.
-    *(ECHO model crashed > 02_Assign_AM_MD_PM_EV.txt)
+*(ECHO model crashed > 02_Assign_AM_MD_PM_EV.txt)
 
 
 ;get start time

@@ -425,4 +425,4 @@ ENDRUN
 
 
 ;System cleanup
-    *(DEL 1_InputSetup.txt)
+*(DEL 1_InputSetup.txt)

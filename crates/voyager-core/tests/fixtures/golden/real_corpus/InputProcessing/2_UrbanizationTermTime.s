@@ -1,7 +1,7 @@
 
 ;System
     ;In case TP+ crashes during batch, this will halt process & help identify error.
-    *(ECHO model crashed > 2_UrbanizationTermTime.txt)
+*(ECHO model crashed > 2_UrbanizationTermTime.txt)
 
 
 
@@ -578,4 +578,4 @@ ENDRUN
 
 
 ;System cleanup
-    *(DEL 2_UrbanizationTermTime.txt)
+*(DEL 2_UrbanizationTermTime.txt)
