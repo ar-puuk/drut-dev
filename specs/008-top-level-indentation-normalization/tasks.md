@@ -64,7 +64,7 @@ prototype during planning (research.md §1/§3), not estimated**:
 
 ## Phase 1: Setup
 
-- [ ] T001 Confirm baseline: `cargo build --workspace` and
+- [X] T001 Confirm baseline: `cargo build --workspace` and
       `cargo clippy --workspace --all-targets -- -D warnings` both clean,
       on this fresh branch before any change.
 
@@ -84,25 +84,25 @@ still correctly indented relative to that new base.
 
 ### Implementation for User Story 1
 
-- [ ] T002 [US1] Implement the change in `plan_indentation`
+- [X] T002 [US1] Implement the change in `plan_indentation`
       (`crates/voyager-core/src/format.rs`), per research.md §1's exact
       diff: `plan.insert(node.span().start.line, 0);` before the existing
       `if let Node::Block(block) = node { plan_block(...) }` check. No
       other function changes.
-- [ ] T003 [US1] Update `plan_block`'s and `diagnosed_block_openers`'s own
+- [X] T003 [US1] Update `plan_block`'s and `diagnosed_block_openers`'s own
       doc comments (`crates/voyager-core/src/format.rs`) to state the
       narrowed `007` rationale (research.md §1, contracts/
       top-level-indentation.md): the skip never protected a diagnosed
       block's opener line (this feature's new rule now owns that,
       independently); it only ever protects the block's *children*.
       Depends on T002 (describes the post-T002 state accurately).
-- [ ] T004 [P] [US1] Rewrite the one broken pre-existing test,
+- [X] T004 [P] [US1] Rewrite the one broken pre-existing test,
       `top_level_baseline_is_left_untouched` →
       `top_level_baseline_is_always_normalized_to_zero`
       (`crates/voyager-core/src/format.rs`), asserting the new expected
       output for the same input (`"        RUN PGM=MATRIX\n        X = 1\n        ENDRUN\n"`
       → `"RUN PGM=MATRIX\n    X = 1\nENDRUN\n"`). Depends on T002.
-- [ ] T005 [US1] Add new unit tests to `crates/voyager-core/src/format.rs`'s
+- [X] T005 [US1] Add new unit tests to `crates/voyager-core/src/format.rs`'s
       own `#[cfg(test)] mod tests`, covering spec.md Acceptance Scenarios
       1-3: a bare top-level statement (no enclosing block at all) gets
       normalized to column 0 (the previously-entirely-untouched case,
@@ -110,7 +110,7 @@ still correctly indented relative to that new base.
       children gets both the opener *and* its children corrected together
       in one pass; an already-column-0 file stays byte-identical
       (`changed: false`, idempotence). Depends on T002.
-- [ ] T006 [US1] Add a new unit test to `crates/voyager-core/src/format.rs`'s
+- [X] T006 [US1] Add a new unit test to `crates/voyager-core/src/format.rs`'s
       own `#[cfg(test)] mod tests`,
       `diagnosed_block_opener_is_normalized_but_children_stay_untouched`
       — the explicit `007`/`008` interaction case confirmed live during
@@ -126,12 +126,12 @@ still correctly indented relative to that new base.
       `RUN PGM=HWYASSIGN`, `FILEI NETI = ...`, `ENDRUN` — is byte-for-byte
       identical to the input (untouched, `007`'s skip still applies to
       the diagnosed block's children). Depends on T002.
-- [ ] T007 [P] [US1] Amend `specs/002-cli-check-format/spec.md`'s FR-012
+- [X] T007 [P] [US1] Amend `specs/002-cli-check-format/spec.md`'s FR-012
       bullet and `specs/002-cli-check-format/contracts/formatting-api.md`,
       using `contracts/top-level-indentation.md`'s exact replacement text
       verbatim. Independent of T002-T006 — documentation only, different
       files.
-- [ ] T008 [US1] Regenerate and individually human-review the 7 affected
+- [X] T008 [US1] Regenerate and individually human-review the 7 affected
       golden fixtures (quickstart.md step 4):
       ```powershell
       $env:UPDATE_GOLDEN = "1"
@@ -174,7 +174,7 @@ pass corrects everything.
 
 ### Implementation for User Story 2
 
-- [ ] T009 [US2] Add a new test to
+- [X] T009 [US2] Add a new test to
       `crates/voyager-core/tests/format_sequence.rs`,
       `process_run_residue_with_stale_run_indentation_resolves_in_one_pass`:
       unlike the existing `process_run_residue_is_fixed_after_endprocess_
@@ -198,12 +198,12 @@ absent, indentation) is proven to self-resolve in one pass.
 **Purpose**: Whole-workspace and full-corpus re-proof, once the policy
 change and its golden-fixture regeneration are both done.
 
-- [ ] T010 `cargo test --release --workspace` and
+- [X] T010 `cargo test --release --workspace` and
       `cargo clippy --workspace --all-targets -- -D warnings`, both
       clean — confirms zero regressions anywhere (research.md §2 already
       confirmed zero adapter code changes are needed; this re-proves
       nothing else broke).
-- [ ] T011 [P] Full 161-file corpus revalidation across all three adapter
+- [X] T011 [P] Full 161-file corpus revalidation across all three adapter
       surfaces (quickstart.md step 5), each reported individually:
       ```powershell
       $env:DRUT_CORPUS_PATH = "path\to\WF-TDM-Official-Releases"
