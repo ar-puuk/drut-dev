@@ -20,8 +20,11 @@ already been researched or partially unblocked; see the note per item.
    `extension.ts`'s `ensureVariableColorCustomization` already does for semantic
    token colors.
 2. **Format-on-paste** — *not started*. Real new work, not a settings toggle —
-   VS Code has no `formatOnSave`-equivalent hook for paste; needs a
-   `DocumentPasteEditProvider`/`onWillPasteTextDocumentEvent` addition.
+   VS Code's `editor.formatOnPaste` is served by `textDocument/rangeFormatting`
+   (`DocumentRangeFormattingEditProvider`), which `drut-lsp` doesn't implement
+   yet (only whole-document `textDocument/formatting`); needs a new LSP
+   capability, not a client-side paste hook (corrected 2026-08-10 — an earlier
+   version of this line named the wrong VS Code mechanism).
 3. **TOML-based configuration** — *not started*. Let users control settings via
    a TOML file (preferred over `settings.json`).
 4. **README/docs overhaul** — *not started*. Features, install steps, usage,
