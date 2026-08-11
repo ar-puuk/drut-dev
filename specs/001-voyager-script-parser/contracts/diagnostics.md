@@ -13,6 +13,7 @@ FR-024) and stays anchored at the span described here.
 | `UnclosedBlockComment` | The `/*` that opened the comment | A block comment has no matching `*/` before end-of-input — for nested block comments (FR-005), this is whichever `/*`, inner or outer, never found its own match | FR-014 |
 | `InvalidContinuation` | The continuation character (or the line that follows it) | A statement's last non-comment character is a continuation character but there is no following line, or the following line is not a valid continuation — blank lines in between don't count as breaking it (FR-006) | FR-015 |
 | `UnmatchedRun` | The `RUN`/`!RUN` (or dangling `ENDRUN`) statement's location | A non-`disabled` `RUN PGM=...` has no matching `ENDRUN` **and** no implicit closer (the next `RUN`/`!RUN`, or a shell-escape statement) before end-of-input; a `disabled` (`!RUN`) block gets no implicit-closer exception and is diagnosed on a missing `ENDRUN` alone, the same as `IF`/`LOOP`; **or** an `ENDRUN` appears with no corresponding open `RUN`/`!RUN` | FR-016 |
+| `UnmatchedProcess` | The `PROCESS`/`PHASE=` statement's own location | A `PROCESS`/`PHASE=` block has no matching `ENDPROCESS`/`ENDPHASE` **and** no implicit closer (a following `PROCESS`/`PHASE=` statement) before end-of-input or before the enclosing block's own closer forces an early stop — mirrors `UnmatchedRun`'s firing condition exactly, minus the `disabled`-variant case (`PROCESS` has no `!RUN`-equivalent disabled form) | `006-unmatched-process-diagnostic` FR-002 |
 | `MisplacedBreak` | The `BREAK` statement's location | A `BREAK` statement appears with no enclosing block of any kind — not nested inside an `IF`, `LOOP`, `RUN`, `PROCESS`/`PHASE`, `JLOOP`, or `LINKLOOP` | FR-026 |
 | `InvalidEncoding` | The decoded character's position (only reachable via `tokenize_bytes`/`parse_bytes`, FR-034) | A raw input byte is not valid UTF-8 and has no defined Windows-1252 interpretation either, so it was replaced with the Unicode replacement character. A byte that *does* resolve under either encoding produces no diagnostic — this only fires for the narrower, genuinely-undecodable case | FR-034 |
 
@@ -39,13 +40,22 @@ a raw byte offset, specifically so it doesn't introduce a second, inconsistent
 position scheme (see data-model.md § Span and spec.md Assumptions on `Span`'s
 `char`-vs-UTF-16 question).
 
-**Note on block kinds without a diagnostic category**: `Process`/`PHASE` (FR-028),
-`JLoop` (FR-029), `LinkLoop` (FR-033), and `DistributeMultistep` (FR-030) are matched
-structurally when well-formed, the same as the diagnosed kinds above, but none of them
-has its own `DiagnosticKind` — an unmatched opener of one of these kinds is accepted
-silently (its span just runs to end-of-input) rather than producing a diagnostic.
-FR-025 only requires fixture coverage for the diagnosed kinds in the table; extending
-diagnostic coverage to these four is explicitly left to a later phase.
+**Note on block kinds without a diagnostic category**: `JLoop` (FR-029), `LinkLoop`
+(FR-033), and `DistributeMultistep` (FR-030) are matched structurally when
+well-formed, the same as the diagnosed kinds above, but none of them has its own
+`DiagnosticKind` — an unmatched opener of one of these kinds is accepted silently
+(its span just runs to end-of-input) rather than producing a diagnostic. FR-025 only
+requires fixture coverage for the diagnosed kinds in the table; extending diagnostic
+coverage to these three is explicitly left to a later phase — not ruled out, just not
+yet evidenced. `Process`/`PHASE` (FR-028) was originally grouped with these three
+under this same note, until `006-unmatched-process-diagnostic` resolved it: a real
+161-file corpus investigation found every real `Process` block already explicitly
+closed (zero implicit-close and zero genuinely-unmatched cases), which both motivated
+adding `UnmatchedProcess` and proved it could ship with zero false-positive risk
+against the golden corpus before any code existed. That investigation-first pattern —
+real corpus evidence before adding a new diagnostic category, not a rule added on
+suspicion alone — is the template for whenever `JLoop`/`LinkLoop`/`DistributeMultistep`
+are revisited, not a commitment that they will be.
 
 ## Required fields (every diagnostic, every kind)
 
