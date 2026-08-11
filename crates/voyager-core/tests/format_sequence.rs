@@ -80,6 +80,30 @@ fn run_if_residue_is_fixed_after_endrun_is_added() {
     );
 }
 
+/// Unlike `process_run_residue_is_fixed_after_endprocess_is_added` above
+/// (whose `RUN` was already correctly positioned once revealed at top
+/// level, because `007`'s own no-speculative-write behavior never touched
+/// it), this covers the harder shape `007` alone never corrected: `RUN`
+/// left at *stale*, non-zero indentation after `ENDPROCESS` is added —
+/// the shape `008-top-level-indentation-normalization`'s unconditional
+/// top-level rule fixes directly, in the same single pass.
+#[test]
+fn process_run_residue_with_stale_run_indentation_resolves_in_one_pass() {
+    let step2 = "PROCESS PHASE=INPUT\n    FILEI = ni.1\n    LOOP DAY = 1, 5\n        PRINT LIST='Day = ', DAY\n    ENDLOOP\nENDPROCESS\n\n    RUN PGM=HWYASSIGN\n        FILEI NETI = 'net.net'\n    ENDRUN\n";
+    let pass2 = format(step2, FormatOptions::default());
+
+    let expected = "PROCESS PHASE=INPUT\n    FILEI = ni.1\n    LOOP DAY = 1, 5\n        PRINT LIST='Day = ', DAY\n    ENDLOOP\nENDPROCESS\n\nRUN PGM=HWYASSIGN\n    FILEI NETI = 'net.net'\nENDRUN\n";
+    assert!(
+        pass2.changed,
+        "a RUN block left at stale non-zero indentation after ENDPROCESS is added must be corrected, not left as residue: {:?}",
+        pass2.text
+    );
+    assert_eq!(
+        pass2.text, expected,
+        "stale RUN/FILEI NETI/ENDRUN indentation must fully resolve in the single pass that reveals RUN as top-level"
+    );
+}
+
 /// Confirms the fix doesn't overcorrect: a still-broken file (no closer
 /// ever added) is left exactly as the author wrote it for the diagnosed
 /// block's own children — not reindented in some *other*, new way either.
