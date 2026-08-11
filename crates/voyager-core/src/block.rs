@@ -598,9 +598,32 @@ fn parse_process(
         );
     }
 
-    // Implicit close (next PROCESS/PHASE=, not consumed) or genuinely
-    // unmatched — either way, no diagnostic category exists for `Process`
-    // (contracts/diagnostics.md), so both cases just resolve the span.
+    if idx < statements.len() && role_of(&statements[idx]) == Role::Process {
+        // Implicit close (next PROCESS/PHASE=, not consumed) — legitimate,
+        // silent structural pattern, no diagnostic
+        // (006-unmatched-process-diagnostic FR-004).
+        let end = end_span_or(&children, opener_span);
+        return (
+            Block {
+                kind: BlockKind::Process { name },
+                span: opener_span.merge(end),
+                children,
+                closer: None,
+                opener_pairs: opener_pairs.clone(),
+            },
+            idx,
+        );
+    }
+
+    // Genuinely unmatched: either true end-of-input, or the enclosing
+    // block's own closer forced an early stop (006-unmatched-process-
+    // diagnostic FR-002) — mirrors UnmatchedRun's own firing condition
+    // exactly (parse_run above).
+    diagnostics.push(Diagnostic::new(
+        DiagnosticKind::UnmatchedProcess,
+        opener_span,
+        "this PROCESS/PHASE= has no matching ENDPROCESS/ENDPHASE and no following PROCESS/PHASE= statement before the end of the file",
+    ));
     let end = end_span_or(&children, opener_span);
     (
         Block {
@@ -757,6 +780,27 @@ mod tests {
         let (nodes, diags) = parse_nodes("PHASE=ILOOP\nX = 1\nENDPHASE\n");
         assert_eq!(diags.len(), 0);
         assert_eq!(nodes.len(), 1);
+    }
+
+    #[test]
+    fn process_unmatched_no_implicit_or_explicit_closer() {
+        // 006-unmatched-process-diagnostic FR-002, spec.md Acceptance
+        // Scenario 1 -- direct analog of
+        // run_unmatched_no_implicit_or_explicit_closer above.
+        let (_nodes, diags) = parse_nodes("PROCESS PHASE=INPUT\nFILEI=ni.1\n");
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].kind, DiagnosticKind::UnmatchedProcess);
+    }
+
+    #[test]
+    fn process_nested_inside_if_is_diagnosed_when_endif_closes_first() {
+        // 006-unmatched-process-diagnostic FR-002, spec.md Acceptance
+        // Scenario 4 -- the enclosing IF's own ENDIF forces an early stop
+        // before the PROCESS gets any closer of its own; this falls out of
+        // parse_sequence's existing generic-closer-stop behavior with no
+        // special-casing needed (research.md §3).
+        let (_nodes, diags) = parse_nodes("IF (a=b)\nPROCESS PHASE=INPUT\nFILEI=ni.1\nENDIF\n");
+        assert!(diags.iter().any(|d| d.kind == DiagnosticKind::UnmatchedProcess));
     }
 
     #[test]
