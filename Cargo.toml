@@ -1,10 +1,12 @@
 [workspace]
 resolver = "2"
-members = ["crates/voyager-core", "crates/drut-cli", "crates/drut-lsp"]
+members = ["crates/voyager-core", "crates/drut-cli", "crates/drut-lsp", "crates/drut-mcp"]
 
-# Future members: mcp/, formatter/ — added in later phases, all depending
-# on crates/voyager-core per constitution Principle I (single source of truth
+# Future members: formatter/ — added in a later phase, depending on
+# crates/voyager-core per constitution Principle I (single source of truth
 # for grammar/parsing logic). drut-cli (the `drut` binary) now lives at
 # crates/drut-cli, per 002-cli-check-format/plan.md's Structure Decision.
 # drut-lsp (the LSP server library, wired into `drut server`) now lives at
 # crates/drut-lsp, per 003-lsp-vscode-extension/plan.md's Structure Decision.
+# drut-mcp (the MCP server library, wired into `drut mcp`) now lives at
+# crates/drut-mcp, per 004-mcp-server/plan.md's Structure Decision.

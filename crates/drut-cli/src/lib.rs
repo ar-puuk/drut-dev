@@ -8,6 +8,7 @@ pub mod cli;
 pub mod exit;
 pub mod format_cmd;
 pub mod io_util;
+pub mod mcp_cmd;
 pub mod report;
 pub mod server_cmd;
 pub mod traverse;
@@ -30,6 +31,7 @@ pub fn run() -> i32 {
             casing,
         } => format_cmd::run(&path, write, check, diff, casing),
         Command::Server => return server_cmd::run(),
+        Command::Mcp => return mcp_cmd::run(),
     };
     outcome.code()
 }

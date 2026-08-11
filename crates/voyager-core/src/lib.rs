@@ -8,6 +8,7 @@
 //! the binding contract behind [`tokenize`] and [`parse`].
 
 pub mod block;
+pub mod block_resolution;
 pub mod decode;
 pub mod diagnostic;
 pub mod format;
@@ -19,6 +20,7 @@ pub mod statement;
 pub mod token;
 
 pub use block::{Block, BlockKind};
+pub use block_resolution::{block_at, BlockInfo, BlockKindName};
 pub use diagnostic::{Diagnostic, DiagnosticKind};
 pub use format::{format, format_bytes, CasingConvention, EncodingFidelity, FormatOptions, FormatResult};
 pub use keywords::{completion_candidates, did_you_mean, CompletionContext, KeywordEntry, KeywordRole};

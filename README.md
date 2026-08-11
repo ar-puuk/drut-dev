@@ -13,7 +13,7 @@ negatives preferred over false positives, vertical phase-gated delivery, and mor
 
 ## Status
 
-Three features shipped, all with passing fixture-corpus test gates (constitution
+Four features shipped, all with passing fixture-corpus test gates (constitution
 Principle V):
 
 - **`voyager-core`** (`crates/voyager-core`) — a dependency-free tokenizer and
@@ -57,6 +57,20 @@ Principle V):
   `vscode-languageclient` wrapper spawning `drut server`, with graceful
   degradation (highlighting-only) when the binary is missing and a one-restart
   crash-recovery policy when the server process dies mid-session.
+- **`drut-mcp`** (`crates/drut-mcp`) — a thin Model Context Protocol adapter over
+  `voyager-core`, the fourth thin adapter the constitution names: four read-only
+  tools (`diagnose`, `format`, `query_structure`, `lookup_keyword`), exposed via
+  `drut mcp` over stdio. `query_structure` shares its block-kind/matched-
+  counterpart derivation with `drut-lsp`'s hover capability through a single,
+  common `voyager-core::block_at` entry point (extracted from `drut-lsp` for
+  this feature, `specs/004-mcp-server/research.md` §5) — genuinely one
+  implementation behind two adapters, not two independently-maintained copies.
+  `tokio`/`rmcp` (this project's first async runtime dependency — every
+  actively-maintained Rust MCP SDK is async-only) are scoped entirely to this
+  one crate; `voyager-core`, `drut-cli`'s other subcommands, and `drut-lsp`
+  remain fully synchronous. See
+  [`specs/004-mcp-server/`](specs/004-mcp-server/) for the full spec/plan/
+  data-model/contracts/tasks.
 
 Build/test everything:
 
@@ -72,6 +86,7 @@ Try the CLI:
 cargo run -p drut-cli --bin drut -- check path\to\some.s
 cargo run -p drut-cli --bin drut -- format path\to\some.s --diff
 cargo run -p drut-cli --bin drut -- server   # speaks LSP over stdio; launched by an editor, not run interactively
+cargo run -p drut-cli --bin drut -- mcp      # speaks MCP over stdio; launched by an MCP client, not run interactively
 ```
 
 Full-corpus validation (161 real `.s`/`.block` files) is gated behind a
@@ -83,6 +98,8 @@ external and not committed (licensing still an open item — see
 $env:DRUT_CORPUS_PATH = "path\to\WF-TDM-Official-Releases"
 cargo test -p drut-cli --test fixture_corpus_e2e -- --ignored
 cargo test -p drut-lsp --test diagnostics_corpus -- --ignored
+cargo test -p drut-mcp --test diagnostics_corpus -- --ignored
+cargo test -p drut-cli --test structural_query_parity -- --ignored   # drut-mcp vs. drut-lsp parity; lives here since drut-mcp can't depend on drut-lsp (FR-011)
 ```
 
 Build/test the VS Code extension:
@@ -110,6 +127,9 @@ crates/
   drut-lsp/        LSP server library (diagnostics/hover/completion/
                    spell-check/semantic tokens), thin adapter over
                    voyager-core — wired into `drut server`, not its own binary
+  drut-mcp/        MCP server library (diagnose/format/query_structure/
+                   lookup_keyword — all read-only), thin adapter over
+                   voyager-core — wired into `drut mcp`, not its own binary
 editors/
   vscode/          VS Code/Open VSX extension: static TextMate grammar +
                    language-configuration.json (no server dependency) plus a
@@ -140,23 +160,34 @@ never a fork or rebrand of any third-party extension (FR-027).
 
 `voyager-core` has zero runtime dependencies by design (constitution Principle I,
 FR-027) — `cargo tree -p voyager-core` should never show an external crate.
-`drut-cli` and `drut-lsp` are not bound by that rule (see `002-cli-check-format/
-spec.md` Assumptions) and depend on ordinary ecosystem crates — `drut-cli` on
-`clap`, `ignore`, `serde`, `serde_json`, `similar`, `lsp-server` for traversal/
-argument-parsing/output-rendering/stdio-transport concerns; `drut-lsp` on
-`lsp-server`/`lsp-types` for the JSON-RPC protocol layer — with no grammar/parsing
-content in either. Their versions were confirmed free of known RUSTSEC advisories
-as of 2026-08-09 (`002-cli-check-format/research.md` §6 for the original set;
-`003-lsp-vscode-extension/research.md` §11 for `lsp-server`/`lsp-types`), but
-that's a point-in-time check, not a standing guarantee — run
-[`cargo audit`](https://github.com/rustsec/rustsec) (or `cargo deny check
-advisories`) periodically, and wire it into CI once one exists, so an advisory
-filed after that date surfaces automatically. `editors/vscode`'s npm dependencies
-(`vscode-languageclient` and its own transitive tree, plus the `vscode-textmate`/
-`vscode-oniguruma`/`ts-node` devDependencies used by the grammar test) were
-confirmed free of known vulnerabilities via `npm audit` as of 2026-08-10 (0
-found) — again a point-in-time check, not a standing guarantee; re-run
-periodically and wire into CI once one exists.
+`drut-cli`, `drut-lsp`, and `drut-mcp` are not bound by that rule (see
+`002-cli-check-format/spec.md` Assumptions) and depend on ordinary ecosystem
+crates — `drut-cli` on `clap`, `ignore`, `serde`, `serde_json`, `similar`,
+`lsp-server` for traversal/argument-parsing/output-rendering/stdio-transport
+concerns; `drut-lsp` on `lsp-server`/`lsp-types` for the JSON-RPC protocol layer;
+`drut-mcp` on `rmcp` (the official Model Context Protocol SDK, pinned `~3.1`),
+`tokio` (this project's first async runtime — every actively-maintained Rust MCP
+SDK requires one, `specs/004-mcp-server/research.md` §1/§2 — scoped entirely to
+this one crate, verified via `cargo tree`), and `schemars` — with no
+grammar/parsing content in any of them. Their versions were confirmed free of
+known RUSTSEC advisories as of 2026-08-09 (`002-cli-check-format/research.md` §6
+for the original set; `003-lsp-vscode-extension/research.md` §11 for
+`lsp-server`/`lsp-types`) and 2026-08-10 for `rmcp`/`tokio`/`schemars`
+(`004-mcp-server/research.md` §4 — one real advisory found and confirmed
+inapplicable, `RUSTSEC-2026-0189`, a DNS-rebinding issue in `rmcp`'s Streamable
+HTTP server transport: already patched at the pinned version, and structurally
+unreachable regardless since `drut-mcp`'s `Cargo.toml` never enables that
+feature — verified at the actual `#[cfg(feature = ...)]` source level, not just
+inferred from the dependency graph), but that's a point-in-time check, not a
+standing guarantee — run [`cargo audit`](https://github.com/rustsec/rustsec) (or
+`cargo deny check advisories`) periodically, and wire it into CI once one
+exists, so an advisory filed after that date surfaces automatically.
+`editors/vscode`'s npm dependencies (`vscode-languageclient` and its own
+transitive tree, plus the `vscode-textmate`/`vscode-oniguruma`/`ts-node`
+devDependencies used by the grammar test) were confirmed free of known
+vulnerabilities via `npm audit` as of 2026-08-10 (0 found) — again a
+point-in-time check, not a standing guarantee; re-run periodically and wire into
+CI once one exists.
 
 ## Credits
 

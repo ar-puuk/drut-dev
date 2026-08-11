@@ -48,6 +48,13 @@ pub enum Command {
     /// FR-001) — no flags; launchable by an LSP client with no configuration
     /// beyond pointing it at this binary.
     Server,
+    /// Speak the Model Context Protocol over stdio (004-mcp-server FR-001)
+    /// — no flags; launchable by any MCP-capable client with no
+    /// configuration beyond pointing it at this binary. Exposes four
+    /// read-only tools (diagnose/format/query_structure/lookup_keyword)
+    /// over `voyager-core`, entirely independent of `Server` above (no
+    /// shared state, no dependency on a running LSP session, FR-011).
+    Mcp,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]

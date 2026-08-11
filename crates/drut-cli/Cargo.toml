@@ -15,12 +15,16 @@ path = "src/main.rs"
 [dependencies]
 voyager-core = { path = "../voyager-core" }
 drut-lsp = { path = "../drut-lsp" }
+drut-mcp = { path = "../drut-mcp" }
 clap = { version = "4.6.6", features = ["derive"] }
 ignore = "0.4.33"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 similar = "3.1.2"
 lsp-server = "0.10.0"
+# Only mcp_cmd.rs's own dispatch arm ever constructs a runtime from this --
+# check/format/server stay fully synchronous (004-mcp-server/research.md §2).
+tokio = { version = "1", features = ["rt-multi-thread"] }
 
 [dev-dependencies]
 jsonschema = "0.49.8"

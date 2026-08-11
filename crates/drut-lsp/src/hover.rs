@@ -1,140 +1,17 @@
 //! `textDocument/hover` (FR-008–FR-011, `contracts/lsp-capabilities.md`).
 //!
-//! `counterpart`'s derivation is **not** simply `Block.closer` — see the
-//! five-rule list in `find_hover_fact`'s body, matching
-//! `specs/003-lsp-vscode-extension/data-model.md` §4 exactly (corrected
-//! 2026-08-09 after CHK015/finding I1: `Block.closer` alone cannot
-//! distinguish an implicitly-closed `Run`/`Process` block from a genuinely
-//! unmatched one).
+//! The block-kind/matched-counterpart derivation itself lives in
+//! `voyager_core::block_at` (moved there 2026-08-10,
+//! `004-mcp-server/research.md` §5, `contracts/block-resolution-api.md`) —
+//! this module is now a thin translation from that result into
+//! `lsp_types::Hover` markdown, the same shape every other `drut-lsp`
+//! handler already has over its own `voyager-core` entry point.
 
-use voyager_core::{Block, BlockKind, DiagnosticKind, Node, ParseResult, Position as CorePosition, Span};
+use voyager_core::BlockInfo;
 
 use crate::document_store::ServerState;
 use crate::position::{from_lsp_position, to_lsp_range};
 use crate::spellcheck;
-
-/// The block kind, named per FR-008's seven kinds.
-fn block_kind_name(kind: &BlockKind) -> &'static str {
-    match kind {
-        BlockKind::If { .. } => "If",
-        BlockKind::Loop {} => "Loop",
-        BlockKind::Run { .. } => "Run",
-        BlockKind::Process { .. } => "Process",
-        BlockKind::JLoop {} => "JLoop",
-        BlockKind::LinkLoop {} => "LinkLoop",
-        BlockKind::DistributeMultistep { .. } => "DistributeMultistep",
-    }
-}
-
-struct BlockHoverFact {
-    kind: &'static str,
-    is_short_if: bool,
-    counterpart: Option<Span>,
-}
-
-/// `true` when `block` (an `If`) has no separate closer statement by
-/// construction (a self-closing short-`IF`), as opposed to a genuinely
-/// unmatched multi-branch `IF` — distinguished by absence of an
-/// `UnmatchedIf` diagnostic anchored at this block's own opener
-/// (data-model.md §4, backs FR-010).
-fn is_short_if(block: &Block, parse_result: &ParseResult) -> bool {
-    if block.closer.is_some() {
-        return false;
-    }
-    !parse_result
-        .diagnostics
-        .iter()
-        .any(|d| d.kind == DiagnosticKind::UnmatchedIf && d.span.start == block.span.start)
-}
-
-/// `true` when no `UnmatchedRun` diagnostic is anchored at this `Run`
-/// block's own opener — meaning it closed implicitly (data-model.md §4 rule
-/// 4), the same diagnostic-absence technique `is_short_if` uses.
-fn run_closed_implicitly(block: &Block, parse_result: &ParseResult) -> bool {
-    !parse_result
-        .diagnostics
-        .iter()
-        .any(|d| d.kind == DiagnosticKind::UnmatchedRun && d.span.start == block.span.start)
-}
-
-/// data-model.md §4's five-rule `counterpart` derivation.
-fn counterpart_for(block: &Block, parse_result: &ParseResult) -> Option<Span> {
-    if let Some(closer) = block.closer {
-        return Some(closer); // Rule 1.
-    }
-    match &block.kind {
-        BlockKind::If { .. } => None, // Rules 2 and 3 (short-IF or genuinely unmatched — either way, None).
-        BlockKind::Loop {} | BlockKind::JLoop {} | BlockKind::LinkLoop {} | BlockKind::DistributeMultistep { .. } => {
-            None // Rule 3: no implicit-close family for these kinds.
-        }
-        BlockKind::Run { .. } => {
-            // Rule 4.
-            if run_closed_implicitly(block, parse_result) {
-                Some(Span::at(block.span.end))
-            } else {
-                None
-            }
-        }
-        BlockKind::Process { .. } => Some(Span::at(block.span.end)), // Rule 5: unconditional.
-    }
-}
-
-/// Recursively locates the innermost block whose opener or closer line
-/// contains `pos` (approximated as "on the same line as the opener/closer
-/// statement" — the block/branch's own span, and `Block.closer`'s span,
-/// cover their full body content rather than storing a separate
-/// opener-only span, so the line-match is the precise, sound proxy for
-/// "hovering the keyword itself" that's available without a new
-/// `voyager-core` field).
-fn find_block_at(nodes: &[Node], pos: CorePosition) -> Option<&Block> {
-    for node in nodes {
-        if let Node::Block(block) = node {
-            // Search nested content first — an inner match is always more
-            // specific than this block's own opener/closer line.
-            if let Some(found) = find_block_at(&block.children, pos) {
-                return Some(found);
-            }
-            if let BlockKind::If { branches } = &block.kind {
-                for branch in branches {
-                    if let Some(found) = find_block_at(&branch.children, pos) {
-                        return Some(found);
-                    }
-                }
-            }
-
-            if on_opener_or_closer_line(block, pos) {
-                return Some(block);
-            }
-        }
-    }
-    None
-}
-
-fn on_opener_or_closer_line(block: &Block, pos: CorePosition) -> bool {
-    if block.span.start.line == pos.line {
-        return true;
-    }
-    if let BlockKind::If { branches } = &block.kind {
-        if branches.iter().any(|b| b.span.start.line == pos.line) {
-            return true;
-        }
-    }
-    if let Some(closer) = block.closer {
-        if closer.start.line == pos.line {
-            return true;
-        }
-    }
-    false
-}
-
-fn find_hover_fact(parse_result: &ParseResult, pos: CorePosition) -> Option<BlockHoverFact> {
-    let block = find_block_at(&parse_result.nodes, pos)?;
-    Some(BlockHoverFact {
-        kind: block_kind_name(&block.kind),
-        is_short_if: matches!(block.kind, BlockKind::If { .. }) && is_short_if(block, parse_result),
-        counterpart: counterpart_for(block, parse_result),
-    })
-}
 
 /// Handles a `textDocument/hover` request (FR-008–FR-011).
 pub fn handle(state: &ServerState, params: &lsp_types::HoverParams) -> Option<lsp_types::Hover> {
@@ -143,7 +20,9 @@ pub fn handle(state: &ServerState, params: &lsp_types::HoverParams) -> Option<ls
 
     let pos = from_lsp_position(&doc.text, params.text_document_position_params.position);
 
-    let Some(fact) = find_hover_fact(&doc.parse_result, pos) else {
+    let Some(fact): Option<BlockInfo> =
+        voyager_core::block_at(&doc.parse_result.nodes, &doc.parse_result.diagnostics, pos)
+    else {
         // Not a block opener/closer (FR-011) — try a spell-check nudge
         // instead (FR-014, `contracts/lsp-capabilities.md`'s "rides on
         // hover" decision) rather than fabricating block-structure info.
