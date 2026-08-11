@@ -250,7 +250,17 @@ fn computed_indent(plan: &IndentPlan, lines: &[Vec<char>], line_num: u32) -> usi
 /// The opener positions of every block-level diagnostic
 /// (`UnmatchedIf`/`UnmatchedLoop`/`UnmatchedRun`/`UnmatchedProcess`) in
 /// `diagnostics` — used by `plan_block` (see its own doc comment) to skip
-/// indentation-planning for a genuinely unmatched block's children. A
+/// indentation-planning for a genuinely unmatched block's *children only*.
+/// **Narrowed 2026-08-11 (008-top-level-indentation-normalization)**: this
+/// never protected the block's own *opener* line — `plan_indentation`'s
+/// unconditional top-level rule now owns that independently, and does so
+/// unconditionally even for a diagnosed block's opener (verified: a
+/// diagnosed block's own line is corrected to column 0 while its children
+/// stay untouched, `crates/voyager-core/src/format.rs`'s own
+/// `diagnosed_block_opener_is_normalized_but_children_stay_untouched`
+/// test). This set exists solely to protect a diagnosed block's children,
+/// whose structural relationship to that block remains genuinely
+/// uncertain regardless of what column the opener itself sits at. A
 /// dangling closer (e.g. a stray `ENDIF` with no open `IF`) also produces
 /// one of these four kinds, but has no corresponding `Block` node at all —
 /// its span never matches any real block's opener and is harmlessly
@@ -271,11 +281,19 @@ fn diagnosed_block_openers(diagnostics: &[Diagnostic]) -> BTreeSet<Position> {
         .collect()
 }
 
-/// Top-level nodes' own first lines are never planned (left untouched) —
-/// only their *descendants* get indentation targets, anchored to each
-/// block's own (possibly-untouched) opener line.
+/// Top-level nodes' own first lines are always normalized to column 0,
+/// unconditionally — every top-level statement or block opener, on every
+/// format pass, regardless of its current indentation or formatting
+/// history. **Reversed 2026-08-11
+/// (008-top-level-indentation-normalization)**: previously left untouched
+/// (the original 161-file corpus survey found no dominant top-level
+/// convention — only 20.4% at column 0, modal value column 8 — see
+/// `002-cli-check-format/spec.md`'s FR-012 for the historical record of
+/// that finding); the project has since deliberately traded preserving
+/// that real-author diversity for predictability.
 fn plan_indentation(nodes: &[Node], lines: &[Vec<char>], diagnosed_openers: &BTreeSet<Position>, plan: &mut IndentPlan) {
     for node in nodes {
+        plan.insert(node.span().start.line, 0);
         if let Node::Block(block) = node {
             plan_block(block, lines, diagnosed_openers, plan);
         }
@@ -303,16 +321,20 @@ fn plan_block(block: &Block, lines: &[Vec<char>], diagnosed_openers: &BTreeSet<P
     // fully planned below) has an unreliable structural home for its
     // children. Confidently reindenting them now, based on a nesting
     // relationship the diagnostic itself says may not be what the author
-    // intended, is how stale indentation gets *written* in the first
-    // place — and once a later edit resolves the block boundary and
-    // reveals the content's true (possibly top-level) structure, that
-    // stale indentation becomes untouchable residue, since a top-level
-    // line's own indentation is deliberately never re-planned (see this
-    // function's own doc comment above; corpus-evidenced,
-    // 002-cli-check-format/spec.md FR-012). Skipping the write here avoids
-    // ever creating that residue — a later format pass, once the file is
-    // well-formed, indents this content correctly in one shot instead
-    // (007-formatter-diagnosed-block-indent-fix/research.md).
+    // intended, risks getting it wrong in a way the author never asked
+    // for. **Narrowed 2026-08-11 (008-top-level-indentation-normalization)**:
+    // this is no longer about preventing opener-line residue — the
+    // block's own opener is now unconditionally corrected to column 0
+    // regardless of diagnosis (`plan_indentation`'s own doc comment), a
+    // stronger and more direct fix for that specific problem than this
+    // skip ever was (007-formatter-diagnosed-block-indent-fix/research.md
+    // §1 originally framed it that way; 008's own research.md §1 proves
+    // the opener-residue case no longer needs this skip at all). What
+    // remains genuinely necessary: not speculatively reindenting the
+    // *children*, whose relationship to this block stays uncertain no
+    // matter what column the opener itself lands on. A later format pass,
+    // once the file is well-formed, indents this content correctly in one
+    // shot instead.
     if diagnosed_openers.contains(&block.span.start) {
         return;
     }
