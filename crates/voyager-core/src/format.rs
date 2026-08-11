@@ -22,7 +22,7 @@
 //! might suggest in the abstract — it's exactly what FR-012's corpus-
 //! survey-backed rules specify, no more.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::block::{Block, BlockKind};
 use crate::decode;
@@ -98,7 +98,7 @@ pub struct FormatResult {
 /// defect.
 pub fn format(source: &str, options: FormatOptions) -> FormatResult {
     let parsed = parse(source);
-    let text = render(source, &parsed.nodes, options);
+    let text = render(source, &parsed.nodes, &parsed.diagnostics, options);
     let changed = text.as_bytes() != source.as_bytes();
     FormatResult {
         text,
@@ -147,12 +147,13 @@ type IndentPlan = BTreeMap<u32, usize>;
 /// (line, 0-based char start, 0-based char end (exclusive), replacement text)
 type CasingEdit = (u32, usize, usize, String);
 
-fn render(source: &str, nodes: &[Node], options: FormatOptions) -> String {
+fn render(source: &str, nodes: &[Node], diagnostics: &[Diagnostic], options: FormatOptions) -> String {
     let raw_lines = split_lines(source);
     let char_lines: Vec<Vec<char>> = raw_lines.iter().map(|(content, _)| content.chars().collect()).collect();
 
+    let diagnosed_openers = diagnosed_block_openers(diagnostics);
     let mut indent_plan: IndentPlan = BTreeMap::new();
-    plan_indentation(nodes, &char_lines, &mut indent_plan);
+    plan_indentation(nodes, &char_lines, &diagnosed_openers, &mut indent_plan);
 
     let mut casing_edits: Vec<CasingEdit> = Vec::new();
     if let Some(convention) = options.casing {
@@ -246,18 +247,42 @@ fn computed_indent(plan: &IndentPlan, lines: &[Vec<char>], line_num: u32) -> usi
         .unwrap_or_else(|| original_indent_width(lines, line_num))
 }
 
+/// The opener positions of every block-level diagnostic
+/// (`UnmatchedIf`/`UnmatchedLoop`/`UnmatchedRun`/`UnmatchedProcess`) in
+/// `diagnostics` — used by `plan_block` (see its own doc comment) to skip
+/// indentation-planning for a genuinely unmatched block's children. A
+/// dangling closer (e.g. a stray `ENDIF` with no open `IF`) also produces
+/// one of these four kinds, but has no corresponding `Block` node at all —
+/// its span never matches any real block's opener and is harmlessly
+/// ignored here.
+fn diagnosed_block_openers(diagnostics: &[Diagnostic]) -> BTreeSet<Position> {
+    diagnostics
+        .iter()
+        .filter(|d| {
+            matches!(
+                d.kind,
+                DiagnosticKind::UnmatchedIf
+                    | DiagnosticKind::UnmatchedLoop
+                    | DiagnosticKind::UnmatchedRun
+                    | DiagnosticKind::UnmatchedProcess
+            )
+        })
+        .map(|d| d.span.start)
+        .collect()
+}
+
 /// Top-level nodes' own first lines are never planned (left untouched) —
 /// only their *descendants* get indentation targets, anchored to each
 /// block's own (possibly-untouched) opener line.
-fn plan_indentation(nodes: &[Node], lines: &[Vec<char>], plan: &mut IndentPlan) {
+fn plan_indentation(nodes: &[Node], lines: &[Vec<char>], diagnosed_openers: &BTreeSet<Position>, plan: &mut IndentPlan) {
     for node in nodes {
         if let Node::Block(block) = node {
-            plan_block(block, lines, plan);
+            plan_block(block, lines, diagnosed_openers, plan);
         }
     }
 }
 
-fn plan_block(block: &Block, lines: &[Vec<char>], plan: &mut IndentPlan) {
+fn plan_block(block: &Block, lines: &[Vec<char>], diagnosed_openers: &BTreeSet<Position>, plan: &mut IndentPlan) {
     let opener_line = block.span.start.line;
     let base = computed_indent(plan, lines, opener_line);
 
@@ -272,6 +297,26 @@ fn plan_block(block: &Block, lines: &[Vec<char>], plan: &mut IndentPlan) {
         }
     }
 
+    // A genuinely unmatched block (`closer: None` *and* flagged by its own
+    // diagnostic — distinct from the legitimate implicit-close pattern,
+    // which is also `closer: None` but produces no diagnostic and is still
+    // fully planned below) has an unreliable structural home for its
+    // children. Confidently reindenting them now, based on a nesting
+    // relationship the diagnostic itself says may not be what the author
+    // intended, is how stale indentation gets *written* in the first
+    // place — and once a later edit resolves the block boundary and
+    // reveals the content's true (possibly top-level) structure, that
+    // stale indentation becomes untouchable residue, since a top-level
+    // line's own indentation is deliberately never re-planned (see this
+    // function's own doc comment above; corpus-evidenced,
+    // 002-cli-check-format/spec.md FR-012). Skipping the write here avoids
+    // ever creating that residue — a later format pass, once the file is
+    // well-formed, indents this content correctly in one shot instead
+    // (007-formatter-diagnosed-block-indent-fix/research.md).
+    if diagnosed_openers.contains(&block.span.start) {
+        return;
+    }
+
     match &block.kind {
         BlockKind::If { branches } => {
             for (idx, branch) in branches.iter().enumerate() {
@@ -283,16 +328,23 @@ fn plan_block(block: &Block, lines: &[Vec<char>], plan: &mut IndentPlan) {
                 if idx > 0 && branch_line != opener_line {
                     plan.insert(branch_line, base);
                 }
-                plan_children(&branch.children, branch_line, base, lines, plan);
+                plan_children(&branch.children, branch_line, base, lines, diagnosed_openers, plan);
             }
         }
         _ => {
-            plan_children(&block.children, opener_line, base, lines, plan);
+            plan_children(&block.children, opener_line, base, lines, diagnosed_openers, plan);
         }
     }
 }
 
-fn plan_children(children: &[Node], opener_line: u32, base: usize, lines: &[Vec<char>], plan: &mut IndentPlan) {
+fn plan_children(
+    children: &[Node],
+    opener_line: u32,
+    base: usize,
+    lines: &[Vec<char>],
+    diagnosed_openers: &BTreeSet<Position>,
+    plan: &mut IndentPlan,
+) {
     for child in children {
         let child_line = child.span().start.line;
         // A short-IF's trailing statement shares the IF's own line — never
@@ -302,7 +354,7 @@ fn plan_children(children: &[Node], opener_line: u32, base: usize, lines: &[Vec<
             plan.insert(child_line, base + INDENT_WIDTH);
         }
         if let Node::Block(b) = child {
-            plan_block(b, lines, plan);
+            plan_block(b, lines, diagnosed_openers, plan);
         }
     }
 }
@@ -685,11 +737,21 @@ mod tests {
     #[test]
     fn structurally_broken_input_still_produces_best_effort_output() {
         // Unmatched IF — format must not panic or refuse; it still
-        // re-renders whatever structure was recovered.
+        // re-renders whatever structure was recovered. Updated
+        // 2026-08-11 (007-formatter-diagnosed-block-indent-fix): a
+        // genuinely unmatched block's children are no longer confidently
+        // reindented (`Y = 2` used to become `    Y = 2`) — that's exactly
+        // what let stale, formatter-written indentation survive as
+        // untouchable residue once a later edit resolved the block
+        // boundary and revealed the content's true structure. "Best
+        // effort" now means "leave it exactly as written" for a diagnosed
+        // block's own subtree, not "guess a nesting depth that might be
+        // wrong."
         let src = "IF (X=1)\nY = 2\n";
         let result = format(src, FormatOptions::default());
         assert!(!result.diagnostics.is_empty());
-        assert_eq!(result.text, "IF (X=1)\n    Y = 2\n");
+        assert_eq!(result.text, src);
+        assert!(!result.changed);
     }
 
     #[test]

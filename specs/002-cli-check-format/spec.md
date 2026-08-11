@@ -246,7 +246,12 @@ unchanged from the pre-format parse (behavior preservation).
   - **Top-level (depth-0) statement indentation is left untouched.** The corpus
     shows no dominant convention here (best single value only 26.9%, at column 8;
     only 20.4% sit at column 0) — `format` normalizes the increment added per
-    nested level, never a file's own top-level baseline.
+    nested level, never a file's own top-level baseline. **Amended 2026-08-11
+    (007-formatter-diagnosed-block-indent-fix)**: this rule's own scope has a
+    corollary that wasn't originally spelled out — a block's children are only
+    ever indent-planned (per the per-nesting-level rule above) when that block
+    itself is *not* the subject of an `UnmatchedIf`/`UnmatchedLoop`/`UnmatchedRun`/
+    `UnmatchedProcess` diagnostic. See the dated Assumptions entry below for why.
   - **Continuation-line indentation is left untouched.** No dominant convention
     exists (best single value only 23.0%, with a long flat tail) — a weaker signal
     than even the casing survey found for `IF`/`LOOP`/`JLOOP`, so it receives the
@@ -479,6 +484,39 @@ unchanged from the pre-format parse (behavior preservation).
   where it didn't (top-level baseline, continuation lines, comment spacing), FR-012
   leaves that dimension untouched rather than picking a style — the identical
   reasoning FR-015 already applies to keyword casing, just re-run per dimension.
+- **2026-08-11 bug fix (`007-formatter-diagnosed-block-indent-fix`): genuinely
+  unmatched blocks no longer have their children speculatively indent-planned.**
+  Surfaced via real manual testing during `005-format-on-save-paste`'s
+  verification: a `PROCESS PHASE=...` left unclosed swallows trailing content
+  (e.g. a `RUN PGM=...` block) as its own children — correct, given the broken
+  structure at that point. `format` used to still confidently reindent that
+  swallowed content one level deeper, matching FR-012's ordinary per-nesting-level
+  rule. The bug: once the user added the real closer (`ENDPROCESS`) in a later
+  edit, the swallowed content became a genuine top-level sibling — but the
+  *indentation the formatter itself had written* while the block was still broken
+  survived untouched forever after, because top-level lines are deliberately
+  never re-planned (the bullet above) and there is no way, from source text
+  alone, to distinguish that formatter-written residue from an author's own
+  deliberate top-level indentation (which the same corpus survey — 26.9% at
+  column 8, only 20.4% at column 0 — shows is common and real, not rare). Fix:
+  `plan_indentation`/`plan_block` now take the parse's own `&[Diagnostic]` and
+  skip planning entirely for a block's children when that block's own opener
+  matches an `UnmatchedIf`/`UnmatchedLoop`/`UnmatchedRun`/`UnmatchedProcess`
+  diagnostic — the legitimate implicit-close pattern (`closer: None`, no
+  diagnostic — e.g. back-to-back `RUN`/`PROCESS`) is completely unaffected and
+  still fully indent-planned as before. Confirmed general, not `Process`-specific:
+  the identical residue reproduces for `RUN`/`IF` and is fixed by the same
+  change. New test category, `tests/format_sequence.rs` — every existing test in
+  `format_corpus.rs`/`block.rs` is single-shot (one fixture, one `format` call,
+  compared to itself repeated or a static golden file); none of them ever apply
+  a structural edit *between* two format calls, which is exactly why this bug had
+  zero prior coverage: `format(x)` on the buggy output was already a stable
+  no-op, so the existing idempotency check (`format(x) == format(format(x))`)
+  held trivially — idempotence proves stability of a fixed point, never its
+  correctness. All 161 real corpus files' golden output is unchanged by this fix
+  (none of them have a top-level diagnosed block) — re-confirmed, not assumed,
+  via `cargo test -p voyager-core --test format_corpus` needing zero golden-file
+  regeneration.
 - **FR-013(b)/FR-025's encoding-safety split was a deliberate, considered choice
   between two options**, not the only way to resolve the conflict between FR-013's
   "never alter meaningful content" guarantee and FR-034's decode fallback: (a) treat
