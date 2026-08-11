@@ -109,11 +109,24 @@ pointing at the `PROCESS`/`PHASE=` statement itself.
   (constitution Principle II — no verbatim vendor-documentation text),
   describing the specific defect.
 - **FR-007**: Every adapter that surfaces `voyager_core::parse`/
-  `parse_bytes` diagnostics (`drut-cli`'s `check`, `drut-lsp`'s live
-  diagnostics, `drut-mcp`'s `diagnose` tool) MUST report the new category
-  with zero adapter-specific code changes required — verified explicitly
-  during planning (each adapter's own diagnostic-surfacing code inspected,
-  not assumed to already be kind-agnostic).
+  `parse_bytes` diagnostics (`drut-cli`'s `check` — both text and SARIF
+  output — `drut-lsp`'s live diagnostics, `drut-mcp`'s `diagnose` tool)
+  MUST correctly report the new category. **Corrected 2026-08-11, during
+  planning, per this feature's own explicit "confirm, don't assume"
+  instruction**: the original draft of this requirement assumed zero
+  adapter-specific code changes would be needed. Verified false —
+  `drut-cli/src/report/sarif.rs` (`ALL_KINDS`, `rule_id`, `short_description`
+  — three exhaustive `match`/array sites), `drut-lsp/src/diagnostics.rs`
+  (`kind_name`), and `drut-mcp/src/diagnose.rs` (`category_name`) each
+  maintain an **exhaustive** `match` over `DiagnosticKind` with no wildcard
+  arm — confirmed by reading each file directly, not inferred. Adding
+  `UnmatchedProcess` without updating all three is a compile error, not a
+  silent gap. `drut-cli`'s plain-text output (`report/text.rs`) is the one
+  surface that needs no change — it Debug-formats `diag.kind` directly.
+  This remains a voyager-core-anchored feature (Principle I: the *decision*
+  of when to fire lives entirely in `voyager-core`) — the adapter changes
+  are the same category of thin, non-decision-making naming/rendering work
+  each adapter already does for the other six kinds, not new grammar logic.
 - **FR-008**: The full 161-file real reference corpus MUST remain 100%
   clean (zero diagnostics of any kind, including `UnmatchedProcess`) after
   this change — re-verified as part of this feature's own Definition of
@@ -148,12 +161,16 @@ pointing at the `PROCESS`/`PHASE=` statement itself.
 
 ## Assumptions
 
-- This is a `voyager-core`-only change (constitution Principle I). No
-  adapter (`drut-cli`, `drut-lsp`, `drut-mcp`, `editors/vscode`) requires
-  its own code change for the new diagnostic to surface — each already
-  reports whatever `voyager_core::parse`/`parse_bytes` returns without
-  hand-listing diagnostic kinds. This is confirmed, not assumed, during
-  planning (FR-007).
+- The *decision* logic (when `UnmatchedProcess` fires) is entirely a
+  `voyager-core` change (constitution Principle I) — no grammar/parsing
+  logic is added anywhere else. **The claim that literally zero adapter
+  code needed to change was checked and found false during planning
+  (FR-007's correction)**: three adapters (`drut-cli`, `drut-lsp`,
+  `drut-mcp`) maintain exhaustive `DiagnosticKind` matches that must each
+  gain one new arm — mechanical, non-decision-making rendering work, not a
+  Principle I violation, but real work nonetheless, not "free." `editors/
+  vscode` needs no change — it never lists diagnostic kinds itself, only
+  renders whatever `drut-lsp` already sends.
 - `JLoop`, `LinkLoop`, and `DistributeMultistep` are explicitly out of
   scope. They were not part of the real-corpus investigation this feature
   is based on, and adding diagnostics for them is deliberately left as a
