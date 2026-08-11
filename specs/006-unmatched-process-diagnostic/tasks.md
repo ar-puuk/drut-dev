@@ -51,7 +51,7 @@ workspace compiles again.
 
 ## Phase 1: Setup
 
-- [ ] T001 Confirm baseline: `cargo build --workspace` and
+- [X] T001 Confirm baseline: `cargo build --workspace` and
       `cargo clippy --workspace --all-targets -- -D warnings` both clean,
       on this fresh branch before any change.
 
@@ -69,10 +69,10 @@ any real logic or tests are added.
 task in this phase is done — there is no meaningful intermediate
 checkpoint partway through it.
 
-- [ ] T002 Add the `UnmatchedProcess` variant to `DiagnosticKind` in
+- [X] T002 Add the `UnmatchedProcess` variant to `DiagnosticKind` in
       `crates/voyager-core/src/diagnostic.rs`, with a doc comment matching
       the existing variants' convention (data-model.md, referencing FR-002).
-- [ ] T003 Add the matching arm to all three exhaustive adapter matches,
+- [X] T003 Add the matching arm to all three exhaustive adapter matches,
       using the final wording from `contracts/unmatched-process-
       diagnostic.md` (depends on T002 — these three edits are listed as one
       task because none of them compiles independently once T002 lands):
@@ -106,13 +106,13 @@ diagnostic, pointing at the `PROCESS`/`PHASE=` statement.
 
 ### Implementation for User Story 1
 
-- [ ] T004 [US1] Implement the firing logic in `parse_process`
+- [X] T004 [US1] Implement the firing logic in `parse_process`
       (`crates/voyager-core/src/block.rs`), per research.md §3's exact diff
       — add the `Role::Process` implicit-close branch (now explicit, no
       diagnostic) and the new `UnmatchedProcess` diagnostic push for
       everything else (true EOF or an enclosing block's own closer forcing
       an early stop). Depends on T002/T003 (Foundational).
-- [ ] T005 [US1] Unit tests in `crates/voyager-core/src/block.rs`'s own
+- [X] T005 [US1] Unit tests in `crates/voyager-core/src/block.rs`'s own
       `#[cfg(test)] mod tests`, mirroring `parse_run`'s existing test
       shape, covering all four spec.md Acceptance Scenarios: explicit
       `ENDPROCESS`/`ENDPHASE` close → no diagnostic; implicit close by a
@@ -122,14 +122,14 @@ diagnostic, pointing at the `PROCESS`/`PHASE=` statement.
       `IF` whose `ENDIF` arrives first → `UnmatchedProcess` fires (the
       nested-early-stop case, proving research.md §3's "falls out for
       free" claim isn't just asserted). Depends on T004.
-- [ ] T006 [P] [US1] Add `"UnmatchedProcess" =>
+- [X] T006 [P] [US1] Add `"UnmatchedProcess" =>
       Some(DiagnosticKind::UnmatchedProcess)` to `parse_diagnostic_kind` in
       `crates/voyager-core/tests/fixture_corpus.rs`, and add
       `DiagnosticKind::UnmatchedProcess` to
       `every_diagnostic_category_has_at_least_one_broken_fixture`'s
       hardcoded array. Depends on T002 only (not on T004/T005) — parallel
       with them, different file.
-- [ ] T007 [US1] Add the real-shaped broken fixture,
+- [X] T007 [US1] Add the real-shaped broken fixture,
       `crates/voyager-core/tests/fixtures/broken/
       unmatched_process_with_trailing_content.s` (FR-009): an unclosed
       `PROCESS PHASE=...` followed by multiple real subsequent statements
@@ -139,7 +139,7 @@ diagnostic, pointing at the `PROCESS`/`PHASE=` statement.
       diagnostic) and T006 (the marker must be recognized). Confirm
       `cargo test -p voyager-core --test fixture_corpus` passes, including
       `every_diagnostic_category_has_at_least_one_broken_fixture`.
-- [ ] T008 [P] [US1] Amend `specs/001-voyager-script-parser/contracts/
+- [X] T008 [P] [US1] Amend `specs/001-voyager-script-parser/contracts/
       diagnostics.md`: add the `UnmatchedProcess` table row, and rewrite
       the "Note on block kinds without a diagnostic category" paragraph to
       name only `JLoop`/`LinkLoop`/`DistributeMultistep` as still deferred,
@@ -158,7 +158,7 @@ covered by its own real-shaped fixture-corpus regression case.
 **Purpose**: Empirical re-proof of the zero-false-positive claim this
 whole feature is based on, plus whole-workspace regression checks.
 
-- [ ] T009 Full real-corpus revalidation (quickstart.md step 4) —
+- [X] T009 Full real-corpus revalidation (quickstart.md step 4) —
       **reported as its own explicit, standalone result, per this
       session's own established standard for core-crate changes (not
       folded into a general "tests pass" summary)**:
@@ -172,13 +172,13 @@ whole feature is based on, plus whole-workspace regression checks.
       empirical claim this feature's entire low-risk framing rests on
       (FR-008), re-verified through every adapter's own path, not just
       `voyager-core::parse` in isolation.
-- [ ] T010 [P] Manual adapter spot check (quickstart.md step 5, FR-007):
+- [X] T010 [P] Manual adapter spot check (quickstart.md step 5, FR-007):
       run `drut check` against a fixture containing an unclosed `PROCESS`
       in both text and `--format sarif` modes; confirm text output shows
       `UnmatchedProcess` and SARIF output includes a
       `"ruleId": "unmatched-process"` result with the correct
       `shortDescription` in the rule catalog.
-- [ ] T011 [P] `cargo test --workspace` and
+- [X] T011 [P] `cargo test --workspace` and
       `cargo clippy --workspace --all-targets -- -D warnings`, both clean —
       confirms zero regressions anywhere in the four-crate workspace.
 

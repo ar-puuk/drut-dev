@@ -81,6 +81,16 @@ mod tests {
     }
 
     #[test]
+    fn unmatched_process_is_reported() {
+        // 006-unmatched-process-diagnostic FR-007: proves drut-mcp's own
+        // diagnose() tool surfaces the new kind end to end, not just that
+        // voyager-core::parse itself reports it.
+        let result = diagnose(&text_input("PROCESS PHASE=INPUT\nFILEI=ni.1\n")).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].category, "UnmatchedProcess");
+    }
+
+    #[test]
     fn valid_script_has_zero_diagnostics() {
         let result = diagnose(&text_input("IF (a=b)\nENDIF\n")).unwrap();
         assert!(result.is_empty());
