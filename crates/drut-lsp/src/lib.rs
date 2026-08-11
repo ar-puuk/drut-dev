@@ -100,6 +100,8 @@ pub fn run(connection: Connection) {
         return;
     }
 
+    log_startup_info(&connection);
+
     let mut state = ServerState::new();
 
     for msg in &connection.receiver {
@@ -121,6 +123,39 @@ pub fn run(connection: Connection) {
             }
         }
     }
+}
+
+/// Reports exactly which binary/build is running, directly from inside the
+/// process itself — via the LSP-standard `window/logMessage` notification
+/// (constitution Principle VI: LSP-standard over editor-proprietary),
+/// visible in any LSP-capable client's own log/Output surface (VS Code's
+/// `vscode-languageclient` routes it into the language client's own Output
+/// channel automatically, with no extension-side code needed). Added
+/// 2026-08-11 so "which drut-lsp is VS Code actually running" is answerable
+/// definitively from inside the editor, rather than inferred from PATH
+/// resolution in a separate shell — found necessary during a live
+/// debugging session where PATH-resolution divergence between the terminal
+/// and VS Code's own spawned process was the leading, unconfirmed suspect
+/// for a reported bug that turned out (per a real LSP-protocol-level test)
+/// not to be a code defect at all.
+fn log_startup_info(connection: &Connection) {
+    let exe_path = std::env::current_exe()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|e| format!("<unavailable: {e}>"));
+    let message = format!(
+        "drut-lsp starting — binary: {exe_path} | commit: {} | built: {} (unix epoch seconds)",
+        env!("DRUT_GIT_COMMIT"),
+        env!("DRUT_BUILD_TIMESTAMP"),
+    );
+    let params = lsp_types::LogMessageParams {
+        typ: lsp_types::MessageType::INFO,
+        message,
+    };
+    let note = lsp_server::Notification::new(
+        lsp_types::notification::LogMessage::METHOD.to_string(),
+        params,
+    );
+    let _ = connection.sender.send(Message::Notification(note));
 }
 
 fn handle_notification(connection: &Connection, note: ServerNotification, state: &mut ServerState) {

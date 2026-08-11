@@ -243,15 +243,25 @@ unchanged from the pre-format parse (behavior preservation).
     99.2% of 2,461 real closer/opener pairs.
   - **`ELSEIF`/`ELSE`** align to the same column as their `IF` (delta 0). Confirmed
     near-unanimous: 98.7% of 1,250 real occurrences.
-  - **Top-level (depth-0) statement indentation is left untouched.** The corpus
-    shows no dominant convention here (best single value only 26.9%, at column 8;
-    only 20.4% sit at column 0) — `format` normalizes the increment added per
-    nested level, never a file's own top-level baseline. **Amended 2026-08-11
-    (007-formatter-diagnosed-block-indent-fix)**: this rule's own scope has a
-    corollary that wasn't originally spelled out — a block's children are only
-    ever indent-planned (per the per-nesting-level rule above) when that block
-    itself is *not* the subject of an `UnmatchedIf`/`UnmatchedLoop`/`UnmatchedRun`/
-    `UnmatchedProcess` diagnostic. See the dated Assumptions entry below for why.
+  - **Top-level (depth-0) statement indentation is always normalized to column
+    0**, on every format pass, unconditionally — regardless of the statement's
+    current indentation or formatting history. **Amended 2026-08-11
+    (`008-top-level-indentation-normalization`)**: this reverses the rule's
+    original form, which left top-level indentation untouched. The corpus
+    finding behind that original rule is historical record, not disproven —
+    only 20.4% of real top-level statements sit at column 0 (best single value
+    26.9%, at column 8) — but the project has deliberately traded preserving
+    that real-author diversity for predictability, knowing this reformats a
+    majority of real top-level statements in the reference corpus on first
+    run. See the dated Assumptions entry below for the full reversal writeup.
+    A block's children are still only ever indent-planned (per the
+    per-nesting-level rule above) when that block itself is *not* the subject
+    of an `UnmatchedIf`/`UnmatchedLoop`/`UnmatchedRun`/`UnmatchedProcess`
+    diagnostic (**`007-formatter-diagnosed-block-indent-fix`**, narrowed by
+    `008`'s own dated entry below) — the block's *own opener line* is
+    unconditionally corrected regardless of diagnosis; only its *children*
+    remain protected, since their structural relationship to a genuinely
+    unmatched block stays uncertain no matter what column the opener lands on.
   - **Continuation-line indentation is left untouched.** No dominant convention
     exists (best single value only 23.0%, with a long flat tail) — a weaker signal
     than even the casing survey found for `IF`/`LOOP`/`JLOOP`, so it receives the
@@ -517,6 +527,39 @@ unchanged from the pre-format parse (behavior preservation).
   (none of them have a top-level diagnosed block) — re-confirmed, not assumed,
   via `cargo test -p voyager-core --test format_corpus` needing zero golden-file
   regeneration.
+- **2026-08-11 policy reversal (`008-top-level-indentation-normalization`):
+  top-level indentation now always normalizes to column 0.** A deliberate
+  reversal, not new evidence contradicting the original survey — the
+  26.9%-at-column-8/20.4%-at-column-0 finding above remains an accurate
+  historical record of what real authors did; the project decided
+  predictability now outweighs preserving that diversity, knowingly accepting
+  that this reformats a majority of real top-level statements in the
+  reference corpus on first run. Fix: `plan_indentation` force-plans every
+  top-level node's own line (statement *or* block opener — a bare top-level
+  statement had *no* code path touching it at all before this change, since
+  `plan_indentation` only ever iterated `Node::Block` entries) to column 0,
+  unconditionally, before `plan_block` computes each block's own children's
+  base — `computed_indent`'s existing "prefer a planned value over the
+  original" fallback makes this a single-line addition, no other function
+  changed. Interaction with `007` above, resolved and tested explicitly (not
+  left to be inferred): `007`'s skip never actually protected a diagnosed
+  block's *opener* line — this new rule now does that independently, and
+  unconditionally even for a still-diagnosed block, proven against the exact
+  stale-indentation shape `007` alone never corrected (a `RUN` block left at
+  non-zero indentation by a prior pass, revealed as top-level once
+  `ENDPROCESS` is added, now resolves fully in the very next format pass).
+  `007`'s skip is kept, unchanged in code, because it protects something
+  `008` doesn't touch: a diagnosed block's *children*, whose structural
+  relationship to that block stays uncertain regardless of what column the
+  opener itself lands on — confirmed with a dedicated test asserting a
+  diagnosed block's opener is corrected while every child (legitimate body
+  content and swallowed trailing content alike) stays byte-for-byte
+  untouched. Golden-fixture impact measured, not estimated: 7 of the 9
+  `real_corpus/` fixtures drift (their own top-level content was not
+  already at column 0); zero hand-written `valid/` fixtures affected. Every
+  regenerated golden file was individually diff-reviewed before being
+  committed, confirming only top-level indentation shifted and nothing else
+  moved, matching the original `T023b` human-in-the-loop discipline.
 - **FR-013(b)/FR-025's encoding-safety split was a deliberate, considered choice
   between two options**, not the only way to resolve the conflict between FR-013's
   "never alter meaningful content" guarantee and FR-034's decode fallback: (a) treat

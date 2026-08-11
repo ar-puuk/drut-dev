@@ -80,6 +80,81 @@ fn run_if_residue_is_fixed_after_endrun_is_added() {
     );
 }
 
+/// Unlike `process_run_residue_is_fixed_after_endprocess_is_added` above
+/// (whose `RUN` was already correctly positioned once revealed at top
+/// level, because `007`'s own no-speculative-write behavior never touched
+/// it), this covers the harder shape `007` alone never corrected: `RUN`
+/// left at *stale*, non-zero indentation after `ENDPROCESS` is added —
+/// the shape `008-top-level-indentation-normalization`'s unconditional
+/// top-level rule fixes directly, in the same single pass.
+///
+/// This particular test hardcodes its `step2` input directly rather than
+/// deriving it from an actual pass-1 `format()` call — see
+/// `process_run_residue_full_sequence_with_stale_run_indentation_resolves_in_one_pass`
+/// below for the literal, end-to-end version of this same scenario (real
+/// pass 1, then a source edit, then real pass 2), which is what the
+/// original bug report actually described.
+#[test]
+fn process_run_residue_with_stale_run_indentation_resolves_in_one_pass() {
+    let step2 = "PROCESS PHASE=INPUT\n    FILEI = ni.1\n    LOOP DAY = 1, 5\n        PRINT LIST='Day = ', DAY\n    ENDLOOP\nENDPROCESS\n\n    RUN PGM=HWYASSIGN\n        FILEI NETI = 'net.net'\n    ENDRUN\n";
+    let pass2 = format(step2, FormatOptions::default());
+
+    let expected = "PROCESS PHASE=INPUT\n    FILEI = ni.1\n    LOOP DAY = 1, 5\n        PRINT LIST='Day = ', DAY\n    ENDLOOP\nENDPROCESS\n\nRUN PGM=HWYASSIGN\n    FILEI NETI = 'net.net'\nENDRUN\n";
+    assert!(
+        pass2.changed,
+        "a RUN block left at stale non-zero indentation after ENDPROCESS is added must be corrected, not left as residue: {:?}",
+        pass2.text
+    );
+    assert_eq!(
+        pass2.text, expected,
+        "stale RUN/FILEI NETI/ENDRUN indentation must fully resolve in the single pass that reveals RUN as top-level"
+    );
+}
+
+/// The exact original bug-report scenario, end to end: an author writes
+/// `RUN` nested under a not-yet-closed `PROCESS` (so its whole subtree —
+/// `RUN` itself, `FILEI NETI`, `ENDRUN` — sits at a deeper indentation, as
+/// if it belonged inside `PROCESS`). Format once — `007`'s skip leaves the
+/// diagnosed `PROCESS` subtree completely untouched (`changed: false`,
+/// same as `process_run_residue_is_fixed_after_endprocess_is_added`).
+/// The user then adds `ENDPROCESS`, the realistic fix, applied to pass 1's
+/// *actual* output (not a hand-written string) — closing `PROCESS` and
+/// revealing `RUN`'s whole subtree as a genuine top-level sibling still
+/// sitting at its original, now-stale, nested indentation. Format again:
+/// this single second pass must correct `RUN`'s own opener line *and*
+/// every line in its subtree down to the canonical top-level layout, with
+/// no manual indentation fix in between — the literal claim
+/// `008-top-level-indentation-normalization` shipped to prove.
+#[test]
+fn process_run_residue_full_sequence_with_stale_run_indentation_resolves_in_one_pass() {
+    let step1 = "PROCESS PHASE=INPUT\n    FILEI = ni.1\n    LOOP DAY = 1, 5\n        PRINT LIST='Day = ', DAY\n    ENDLOOP\n\n    RUN PGM=HWYASSIGN\n        FILEI NETI = 'net.net'\n    ENDRUN\n";
+
+    let pass1 = format(step1, FormatOptions::default());
+    assert!(
+        !pass1.changed,
+        "pass 1 (PROCESS still unclosed) must leave RUN's whole subtree untouched, not speculatively reindent it: {:?}",
+        pass1.text
+    );
+    assert_eq!(
+        pass1.text, step1,
+        "pass 1 must be a byte-for-byte no-op while PROCESS is genuinely unmatched"
+    );
+
+    let step2 = pass1.text.replacen("    ENDLOOP\n\n", "    ENDLOOP\nENDPROCESS\n\n", 1);
+    let pass2 = format(&step2, FormatOptions::default());
+
+    let expected = "PROCESS PHASE=INPUT\n    FILEI = ni.1\n    LOOP DAY = 1, 5\n        PRINT LIST='Day = ', DAY\n    ENDLOOP\nENDPROCESS\n\nRUN PGM=HWYASSIGN\n    FILEI NETI = 'net.net'\nENDRUN\n";
+    assert!(
+        pass2.changed,
+        "pass 2 (PROCESS now closed) must correct RUN's stale-nested subtree, not leave it as residue: {:?}",
+        pass2.text
+    );
+    assert_eq!(
+        pass2.text, expected,
+        "pass 2 must resolve RUN's own opener line AND its full subtree (FILEI NETI, ENDRUN) to the canonical top-level layout in this single pass, with no manual fix required"
+    );
+}
+
 /// Confirms the fix doesn't overcorrect: a still-broken file (no closer
 /// ever added) is left exactly as the author wrote it for the diagnosed
 /// block's own children — not reindented in some *other*, new way either.
