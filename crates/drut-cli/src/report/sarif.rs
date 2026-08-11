@@ -16,12 +16,13 @@ use voyager_core::{Diagnostic, DiagnosticKind};
 use crate::check_cmd::CheckReport;
 use crate::io_util::write_stdout_line;
 
-const ALL_KINDS: [DiagnosticKind; 7] = [
+const ALL_KINDS: [DiagnosticKind; 8] = [
     DiagnosticKind::UnmatchedIf,
     DiagnosticKind::UnmatchedLoop,
     DiagnosticKind::UnclosedBlockComment,
     DiagnosticKind::InvalidContinuation,
     DiagnosticKind::UnmatchedRun,
+    DiagnosticKind::UnmatchedProcess,
     DiagnosticKind::MisplacedBreak,
     DiagnosticKind::InvalidEncoding,
 ];
@@ -35,6 +36,7 @@ fn rule_id(kind: DiagnosticKind) -> &'static str {
         DiagnosticKind::UnclosedBlockComment => "unclosed-block-comment",
         DiagnosticKind::InvalidContinuation => "invalid-continuation",
         DiagnosticKind::UnmatchedRun => "unmatched-run",
+        DiagnosticKind::UnmatchedProcess => "unmatched-process",
         DiagnosticKind::MisplacedBreak => "misplaced-break",
         DiagnosticKind::InvalidEncoding => "invalid-encoding",
     }
@@ -57,6 +59,9 @@ fn short_description(kind: DiagnosticKind) -> &'static str {
         }
         DiagnosticKind::UnmatchedRun => {
             "A RUN has no matching ENDRUN and no implicit closer, or an ENDRUN has no open RUN."
+        }
+        DiagnosticKind::UnmatchedProcess => {
+            "A PROCESS/PHASE= has no matching ENDPROCESS/ENDPHASE and no implicit closer."
         }
         DiagnosticKind::MisplacedBreak => "A BREAK statement has no enclosing block of any kind.",
         DiagnosticKind::InvalidEncoding => {

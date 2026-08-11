@@ -1,7 +1,7 @@
 //! `textDocument/publishDiagnostics` (FR-005–FR-007, `contracts/
 //! lsp-capabilities.md`).
 //!
-//! Covers six of `voyager-core`'s seven `DiagnosticKind` values.
+//! Covers seven of `voyager-core`'s eight `DiagnosticKind` values.
 //! `InvalidEncoding` never appears in `parse_result.diagnostics` here by
 //! construction — `document_store.rs` always calls `parse()`, never
 //! `parse_bytes()` — not something this module needs to filter out
@@ -22,6 +22,7 @@ fn kind_name(kind: voyager_core::DiagnosticKind) -> &'static str {
         UnclosedBlockComment => "UnclosedBlockComment",
         InvalidContinuation => "InvalidContinuation",
         UnmatchedRun => "UnmatchedRun",
+        UnmatchedProcess => "UnmatchedProcess",
         MisplacedBreak => "MisplacedBreak",
         InvalidEncoding => "InvalidEncoding", // structurally unreachable here; kept exhaustive
     }

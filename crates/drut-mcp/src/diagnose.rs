@@ -13,7 +13,7 @@ pub struct DiagnosticsInput {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct DiagnosticDto {
-    /// One of the six reachable `DiagnosticKind` names, plus
+    /// One of the seven reachable `DiagnosticKind` names, plus
     /// `InvalidEncoding` when reachable via a `path` input (FR-003).
     pub category: String,
     pub message: String,
@@ -31,6 +31,7 @@ fn category_name(kind: voyager_core::DiagnosticKind) -> &'static str {
         UnclosedBlockComment => "UnclosedBlockComment",
         InvalidContinuation => "InvalidContinuation",
         UnmatchedRun => "UnmatchedRun",
+        UnmatchedProcess => "UnmatchedProcess",
         MisplacedBreak => "MisplacedBreak",
         InvalidEncoding => "InvalidEncoding",
     }
