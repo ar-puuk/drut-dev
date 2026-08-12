@@ -19,6 +19,7 @@ import {
   LanguageClientOptions,
   ServerOptions,
 } from "vscode-languageclient/node";
+import { shouldInjectFormatOnSave } from "./formatOnSaveDecision";
 
 let client: LanguageClient | undefined;
 
@@ -131,8 +132,56 @@ async function ensureVariableColorCustomization(context: vscode.ExtensionContext
   await context.workspaceState.update(VARIABLE_COLOR_INJECTED_KEY, true);
 }
 
+/// Workspace-state key tracking whether this workspace has already been
+/// offered the auto-enabled `editor.formatOnSave` override -- same
+/// one-time-ever, never-reapplied lifecycle as
+/// `VARIABLE_COLOR_INJECTED_KEY` above (specs/005-format-on-save-paste
+/// FR-006, contracts/extension-settings.md).
+const FORMAT_ON_SAVE_INJECTED_KEY = "drutFormatOnSaveInjected";
+
+/// Auto-enables `editor.formatOnSave` for `.s`/`.block` files the first
+/// time this extension activates in a workspace (specs/005-format-on-save-paste
+/// FR-004, Clarification Q1 Option C) -- unlike the color customization
+/// above, this writes a genuine VS Code language-scoped setting override
+/// (`getConfiguration(undefined, { languageId }).update(..., /*
+/// overrideInLanguage */ true)`, research.md §3), not a value nested inside
+/// one particular setting's own rule-map convention -- the two mechanisms
+/// solve different problems and are not interchangeable (research.md §3's
+/// own rationale for why the `"[drut-voyager]"`-object-merge trick above
+/// doesn't apply here). Deliberately does *not* touch
+/// `editor.formatOnPaste` -- that setting stays opt-in/documented-only,
+/// per the same resolved clarification (contracts/extension-settings.md).
+async function ensureFormatOnSaveEnabled(context: vscode.ExtensionContext): Promise<void> {
+  if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+    return; // Same guard as ensureVariableColorCustomization -- nothing to write into.
+  }
+
+  const alreadyInjected = context.workspaceState.get<boolean>(FORMAT_ON_SAVE_INJECTED_KEY) ?? false;
+
+  try {
+    const config = vscode.workspace.getConfiguration(undefined, { languageId: "drut-voyager" });
+    const existing = config.inspect<boolean>("editor.formatOnSave");
+    // shouldInjectFormatOnSave is the single source of truth for this
+    // decision (T002's own unit tests) -- no duplicated guard here.
+    if (shouldInjectFormatOnSave(alreadyInjected, existing?.workspaceLanguageValue)) {
+      await config.update(
+        "editor.formatOnSave",
+        true,
+        vscode.ConfigurationTarget.Workspace,
+        /* overrideInLanguage */ true
+      );
+    }
+  } catch {
+    // Never let this best-effort convenience fail extension activation --
+    // same discipline as ensureVariableColorCustomization above.
+  }
+
+  await context.workspaceState.update(FORMAT_ON_SAVE_INJECTED_KEY, true);
+}
+
 export function activate(context: vscode.ExtensionContext): void {
   void ensureVariableColorCustomization(context);
+  void ensureFormatOnSaveEnabled(context);
 
   const command = resolveDrutCommand();
 
