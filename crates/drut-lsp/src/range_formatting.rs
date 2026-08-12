@@ -204,22 +204,36 @@ mod tests {
     }
 
     /// contracts/range-formatting-api.md's verified block-boundary fixture:
-    /// a paste that opens a block (a lone `IF (c=3)`, no closer within the
-    /// paste) between two body statements of an already-open block. The
-    /// whole-document reformat needs to change four lines total (3, 4, 5,
-    /// 6) and reports one `UnmatchedIf` diagnostic -- only line 3 (the
-    /// pasted line itself) is within the requested range and must be
-    /// returned.
+    /// a paste that opens a block (`IF (c=3)`, pasted at column 0) directly
+    /// in front of an *existing* body statement (`PRINT LIST=2`) and its
+    /// own closer (`ENDIF`) -- both of the latter were already there,
+    /// previously flush with their old, shallower nesting level, and are
+    /// now wrong once the paste adds a level. This is deliberately a fully
+    /// *matched* document (every `IF` has its own `ENDIF`, zero
+    /// diagnostics) rather than the genuinely-unmatched shape this fixture
+    /// used before 2026-08-11: an unclosed-opener paste into an otherwise-
+    /// balanced document mathematically always leaves the *outermost*
+    /// still-open ancestor (`IF (a=1)` here) permanently unmatched -- and
+    /// once diagnosed, `007-formatter-diagnosed-block-indent-fix`'s skip
+    /// rule correctly leaves that whole subtree untouched, so the
+    /// whole-document reformat this test needs (multiple lines changing,
+    /// only one in range) can never happen for that shape. This fixture
+    /// sidesteps that by giving the pasted `IF` its own closer too (just
+    /// not adjacent to it), so nesting genuinely deepens instead of a block
+    /// going unmatched. The whole-document reformat changes three lines
+    /// (indices 3, 4, 5 -- confirmed via `drut format --diff` against this
+    /// exact text) -- only line 3 (the pasted line itself) is within the
+    /// requested range and must be returned.
     #[test]
     fn paste_that_opens_a_block_only_returns_the_in_range_edit() {
         let mut state = ServerState::new();
-        let text = "IF (a=1)\n    IF (b=2)\n        PRINT LIST=1\nIF (c=3)\n        PRINT LIST=2\n    ENDIF\nENDIF\n".to_string();
+        let text = "IF (a=1)\n    IF (b=2)\n        PRINT LIST=1\nIF (c=3)\n        PRINT LIST=2\nENDIF\n    ENDIF\nENDIF\n".to_string();
         state.did_open(lsp_types::Uri::from_str("file:///a.s").unwrap(), text, 1);
         let edits = handle(&state, &params("file:///a.s", 3, 3)).unwrap();
         assert_eq!(
             edits.len(),
             1,
-            "expected exactly one in-range edit (line 3), got {edits:?} -- lines 4/5/6 also \
+            "expected exactly one in-range edit (line 3), got {edits:?} -- lines 4/5 also \
              change in the whole-document reformat but must be filtered out"
         );
         assert_eq!(edits[0].new_text, "        IF (c=3)");
