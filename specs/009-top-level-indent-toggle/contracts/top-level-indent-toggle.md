@@ -28,7 +28,7 @@ second dated entry appended, preserving both prior entries:
 
 ## New FR (mirrors FR-015)
 
-> **FR-016**: `format` MUST support a `--top-level-indent` flag accepting
+> **FR-026**: `format` MUST support a `--top-level-indent` flag accepting
 > `preserve` (default) or `normalize`, selecting between the two FR-012
 > top-level indentation behaviors. Unlike FR-015's `--casing` flag, this
 > setting has no "off" state — omitting the flag resolves to the explicit

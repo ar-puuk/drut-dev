@@ -115,7 +115,7 @@ indentation, no flags, and confirm it's byte-identical to the input.
       protected). Depends on T003.
 - [ ] T006 [P] [US1] Amend `specs/002-cli-check-format/spec.md`'s FR-012
       bullet (second dated entry, `008`'s own entry preserved) and add the
-      new FR-016, plus amend `contracts/formatting-api.md`, using
+      new FR-026, plus amend `contracts/formatting-api.md`, using
       `contracts/top-level-indent-toggle.md`'s exact replacement text.
       Independent of T002-T005 — documentation only, different files.
 - [ ] T007 [US1] Before any regeneration, copy the *current* (`008`-era,
