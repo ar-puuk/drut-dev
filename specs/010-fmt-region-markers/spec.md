@@ -54,6 +54,17 @@ normalized exactly as they would be without any markers present.
    pairs, **When** `drut format` runs, **Then** each protected range is
    left untouched independently and the regions between and around them are
    normalized as usual.
+4. **Given** a file where `; FMT: OFF` appears twice in a row before any
+   `; FMT: ON` (a second `; FMT: OFF` while the region is already open),
+   **When** `drut format` runs, **Then** the second `; FMT: OFF` is a
+   no-op — the protected region continues uninterrupted from the first
+   marker, and a single subsequent `; FMT: ON` correctly closes it (not
+   requiring a second `; FMT: ON` to "balance" the redundant marker).
+5. **Given** a file where `; FMT: ON` appears with no preceding
+   `; FMT: OFF` (formatting was never turned off), **When** `drut format`
+   runs, **Then** the stray `; FMT: ON` is a no-op — the line it appears on
+   and all surrounding lines continue to be normalized exactly as if the
+   marker were not present.
 
 ---
 
@@ -73,13 +84,16 @@ new machinery.
 
 **Independent Test**: Format a fixture containing a `; FMT: OFF` marker with
 no following `; FMT: ON`; confirm every line from the marker to the end of
-the file is left untouched, and the file formats without error.
+the file is left untouched, the file formats without error, and a visible
+notice identifying the unclosed marker is present in the result.
 
 **Acceptance Scenarios**:
 
 1. **Given** a file with `; FMT: OFF` and no subsequent `; FMT: ON`,
    **When** `drut format` runs, **Then** every line from the marker to
-   end-of-file is unchanged and no diagnostic or error is produced.
+   end-of-file is unchanged, formatting completes with no error, and a
+   visible notice identifying the unclosed marker's line is surfaced
+   through every formatting surface (CLI, LSP, MCP) — not silently.
 
 ---
 
@@ -183,6 +197,14 @@ untouched identically.
   placement (e.g. only a closing marker, many markers in a row, markers
   inside a block comment) — every case in the Edge Cases section above
   MUST have defined, non-panicking behavior.
+- **FR-010**: `format`/`format_bytes` MUST report the position of every
+  `; FMT: OFF` marker left unmatched at end-of-file via a dedicated,
+  non-`Diagnostic` signal (not a new `DiagnosticKind` — kept outside the
+  six-category structural diagnostic system entirely). Every adapter
+  surface (CLI, both LSP handlers, MCP) MUST surface this signal to the
+  user in its own idiom (e.g. a CLI notice, an LSP hint-severity
+  diagnostic, an MCP response field) — a user MUST NOT be able to lose
+  formatting on the rest of a file with zero indication anything happened.
 
 ### Key Entities
 
@@ -217,17 +239,25 @@ untouched identically.
   (after the `;`) must match — a marker sharing a line with real statement
   content is not recognized, avoiding ambiguity about where the marker ends
   and the statement begins.
-- An unclosed `; FMT: OFF` protects through end-of-file rather than
-  producing a diagnostic or being ignored — modeled on Python Black's
-  `# fmt: off`/`# fmt: on`, the closest well-known prior art for this exact
-  mechanic (a general open-source tooling convention, not Cube Voyager
-  vendor documentation, so referencing it doesn't implicate constitution
-  Principle II).
-- No new `Diagnostic` category is introduced for marker misuse (unclosed
-  region, redundant marker, etc.) — this is a formatting-only concern
-  layered on top of the existing six diagnostic categories, which stay
-  exactly as they are; `tokenize`/`parse` output is unaffected by markers
-  entirely.
+- An unclosed `; FMT: OFF` protects through end-of-file — modeled on Python
+  Black's `# fmt: off`/`# fmt: on`, the closest well-known prior art for
+  this exact mechanic (a general open-source tooling convention, not Cube
+  Voyager vendor documentation, so referencing it doesn't implicate
+  constitution Principle II). Unlike Black's fully silent behavior, this
+  project's own recurring finding that silent unbounded-scope behavior is a
+  real source of confusing bugs (`UnmatchedProcess`, the formatter-residue
+  bug fixed in `007`) means end-of-file protection is surfaced via a
+  visible notice rather than left silent — see FR-010. The underlying
+  protection semantics still match Black's precedent; only the
+  visibility of the "this ran to EOF" fact differs.
+- No new `Diagnostic` category (i.e., no new `DiagnosticKind` variant) is
+  introduced for marker misuse — this stays a formatting-only concern,
+  layered outside the existing six structural diagnostic categories, which
+  are unchanged; `tokenize`/`parse` output is unaffected by markers
+  entirely. The unclosed-marker notice required by FR-010 is a distinct,
+  dedicated signal on `FormatResult`, not a `Diagnostic` — deliberately
+  lighter-weight than a new diagnostic category would be, while still
+  giving every adapter something structured to surface.
 - This feature is `voyager-core`-only new logic (a marker-scan pass plus a
   gate on the existing indent-plan/casing-edit collection, per
   `crates/voyager-core/src/format.rs`'s existing scope) — no new CLI flag,
