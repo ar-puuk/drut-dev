@@ -261,8 +261,13 @@ untouched identically.
 - This feature is `voyager-core`-only new logic (a marker-scan pass plus a
   gate on the existing indent-plan/casing-edit collection, per
   `crates/voyager-core/src/format.rs`'s existing scope) — no new CLI flag,
-  LSP capability, or MCP field is needed, since protection is driven
-  entirely by in-file markers, not caller configuration.
+  LSP capability, or MCP **input** field is needed, since protection
+  itself is driven entirely by in-file markers, not caller configuration.
+  **Clarified after `/speckit-analyze` review**: this does not contradict
+  FR-010 — the unclosed-marker notice adds new *output* surfaces (a CLI
+  stderr notice, an MCP response field, an LSP diagnostics stream), which
+  are additive reporting, not caller-configurable input; nothing about how
+  a caller invokes formatting changes.
 - Nesting/duplicate markers resolve by simple on/off state transition, not
   balanced-pair counting (a second `; FMT: OFF` while already off, or a
   stray `; FMT: ON` while already on, are both no-ops) — the simplest
