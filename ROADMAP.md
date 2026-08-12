@@ -50,12 +50,15 @@ already been researched or partially unblocked; see the note per item.
    `.vsix` — needs a copy step, or a `files`/`.vscodeignore` adjustment in
    `editors/vscode/`, before this step.
 
-## Queued items (not started, not part of the pre-publish sequence)
+## Resolved queued items (historical log, not part of the pre-publish sequence)
 
-Corrections, unspec'd features, and investigations agreed on but deliberately
-not started yet, so they don't context-switch away from whatever's actively
-being implemented (currently 008). Each needs explicit go-ahead from the
-owner once the in-flight work is clear.
+Corrections, features, and investigations raised alongside the `008`→`010`
+work, deliberately queued rather than context-switched into mid-stream at
+the time. All six below are now closed — done, deferred, or explicitly
+decided — kept here as a record rather than deleted, since several took
+real investigation to resolve. (Item 7, the one genuinely open question
+this queue surfaced, is **not** resolved — see "Open questions" below,
+after this log.)
 
 1. **Top-level indentation normalization: default reverts to leave-untouched,
    008's forcing becomes an opt-in toggle** — ✅ *done, merged 2026-08-12 as
@@ -74,13 +77,31 @@ owner once the in-flight work is clear.
    independently verified: workspace build/clippy/test clean, full 161-file
    corpus clean across CLI/LSP/MCP, and the 7 golden-fixture reverts
    confirmed whitespace-only. See `specs/009-top-level-indent-toggle/`.
-2. **`; FMT: OFF` / `; FMT: ON` region markers** — *not started, new feature,
-   not yet spec'd* (added 2026-08-11). Lets users mark a line range to be
-   skipped entirely by `drut format`. Reference 007's diagnosed-block-skip
-   mechanism (`diagnosed_block_openers`/`plan_block`'s skip-a-diagnosed-
-   block's-children logic, `specs/007-.../research.md` §1) as an
-   architectural starting point — not a direct reuse, since that mechanism
-   skips based on diagnosed block structure, not user-placed markers.
+2. **`; FMT: OFF` / `; FMT: ON` region markers** — ✅ *done, merged
+   2026-08-12 as `010-fmt-region-markers`* (added 2026-08-11, shipped the
+   next day). Marker recognition reuses the existing tokenizer's
+   `LineComment` — no new lexer/parser/grammar shape; protection is gated
+   at collection time (`plan_indentation`/`plan_block`/`plan_children`'s 4
+   `plan.insert` call sites, `push_if_present`'s single casing-edit
+   funnel), proven correct via three interaction tests against every
+   sibling "don't touch this range" mechanism already in `format.rs`: the
+   opener-residue case (a protected block opener's out-of-region children
+   anchor to its *true* on-disk column, not a discarded planned value —
+   the specific bug `007`'s own diagnosed-block-skip mechanism exists to
+   avoid), the `009` interaction (`TopLevelIndentMode::Normalize`), and
+   the `007` interaction (a protected region overlapping a diagnosed/
+   unmatched block). An unclosed `; FMT: OFF` protects through
+   end-of-file and is surfaced via a dedicated, non-`Diagnostic` signal at
+   every adapter (CLI stderr notice, MCP response field, LSP
+   `HINT`-severity/`"drut-fmt"`-sourced diagnostic) — reconsidered from a
+   fully-silent default during spec review, per this project's own
+   recurring finding that silent unbounded-scope behavior is a real bug
+   source. All 26 tasks complete and independently verified: workspace
+   build/clippy/test clean, full 161-file corpus clean across CLI/LSP/MCP,
+   2 new golden fixtures (1 hand-written, 1 derived from real
+   WF-TDM-Official-Releases shapes) manually verified with zero existing
+   fixture changed. Amends `002-cli-check-format/spec.md` (FR-027). See
+   `specs/010-fmt-region-markers/`.
 3. **Path-related error for `\n`/`\t`/etc. in file/folder names** —
    *deferred/out of scope, owner declined to pursue* (added 2026-08-11,
    clarified same day from WF-TDM-Development issue #52, private repo; set
@@ -138,7 +159,7 @@ owner once the in-flight work is clear.
    | Category | Confident lowercase exceptions | Notes |
    |---|---|---|
    | Pair-keywords (reachable today) | `NUMREC`, `CNT`, `ITER`, `LP`, `RECNUM`, `MISSINGZO`, `MISSINGZI`, `PERIOD` | Clean, ≥90%+, low volume (2–7 files each) |
-   | Control words (philosophy-dependent, item 7 below) | `IF`, `ENDIF`, `ELSE`, `ELSEIF`, `LOOP`, `ENDLOOP` | Corpus 81–95% lowercase; vendor docs 71–94% uppercase — disagree |
+   | Control words (philosophy-dependent, see "Open questions" below) | `IF`, `ENDIF`, `ELSE`, `ELSEIF`, `LOOP`, `ENDLOOP` | Corpus 81–95% lowercase; vendor docs 71–94% uppercase — disagree |
    | Operand prefixes (unreachable today) | `LW` 99.9%, `LI` 98.4%, `NI` 97.1%, `MI` 92.0%, `DBA` 95.2% lowercase | `ZI` borderline (89.8%); `DBI` too mixed (60.2%); `RO` is the *opposite* — 100% uppercase |
    | Not supported by evidence at all | `MO` (mixed 55/45), `MW` (assignment-target only, a category neither path below reaches) | Directly contradicts the owner's original example |
 
@@ -175,8 +196,8 @@ owner once the in-flight work is clear.
    **Decision**: not worth pursuing in the current pre-publish push. Revisit
    once real usage after publish confirms this is actually wanted, or take
    it on as a dedicated future phase with its own grammar-research spike
-   budgeted up front (see item 7 below for a related, independent question
-   that would need answering either way). Full findings (methodology, full
+   budgeted up front (see "Open questions" below for a related, independent
+   question that would need answering either way). Full findings (methodology, full
    corpus distribution tables, per-archive vendor-doc results) are not
    preserved elsewhere — re-run the census (throwaway `voyager-core`
    example calling `tokenize_bytes`/`build_statements` directly, same
@@ -208,24 +229,30 @@ owner once the in-flight work is clear.
    closing paren); the body statement now renders under the static
    grammar's own coloring again. LSP-only fix, no `voyager-core` change.
 
-7. **Casing philosophy question: real-usage-fidelity vs. vendor-canon-
-   fidelity** — *open, independent of item 4* (added 2026-08-12, surfaced
-   during item 4's investigation). The `IF`/`ENDIF`/`ELSE`/`ELSEIF`/
-   `LOOP`/`ENDLOOP` family sits on a genuine, high-volume fork: the real
-   WF-TDM-Official-Releases corpus is 81–95% lowercase for these
-   (hundreds to thousands of occurrences each); both vendor doc archives
-   (Citilabs 6.5.1 and OpenPaths — which gave near-identical counts on
-   every token checked, suggesting one underlying Bentley-authored source
-   lineage rather than two independent ones) are 71–94% uppercase. More
-   evidence won't resolve this — it's a values call: **should any future
-   `auto`-style casing mode match what real WFRC analysts actually write**
-   (minimizing reformatting diff on real scripts), **or Bentley's
-   documented canonical style** (the "textbook-correct" look)? Not urgent
-   on its own — nothing currently depends on it — but flagged as its own
-   entry because it would need an answer before item 4 (or any future
-   casing-related work) can proceed, and the answer likely isn't
-   token-specific: whichever philosophy is picked probably applies
-   consistently across future casing decisions, not just this one family.
+## Open questions (not part of the pre-publish sequence)
+
+Unlike the log above, this is **not** resolved — a genuine open question,
+surfaced during the resolved item 4's investigation, still awaiting an
+answer:
+
+- **Casing philosophy: real-usage-fidelity vs. vendor-canon-fidelity**
+  (added 2026-08-12). The `IF`/`ENDIF`/`ELSE`/`ELSEIF`/`LOOP`/`ENDLOOP`
+  family sits on a genuine, high-volume fork: the real
+  WF-TDM-Official-Releases corpus is 81–95% lowercase for these
+  (hundreds to thousands of occurrences each); both vendor doc archives
+  (Citilabs 6.5.1 and OpenPaths — which gave near-identical counts on
+  every token checked, suggesting one underlying Bentley-authored source
+  lineage rather than two independent ones) are 71–94% uppercase. More
+  evidence won't resolve this — it's a values call: **should any future
+  `auto`-style casing mode match what real WFRC analysts actually write**
+  (minimizing reformatting diff on real scripts), **or Bentley's
+  documented canonical style** (the "textbook-correct" look)? Not urgent
+  on its own — nothing currently depends on it — but flagged here because
+  it would need an answer before the resolved log's item 4 (`--casing
+  auto`) or any future casing-related work can proceed, and the answer
+  likely isn't token-specific: whichever philosophy is picked probably
+  applies consistently across future casing decisions, not just this one
+  family.
 
 ## Later / stretch (explicitly not part of the pre-publish sequence)
 
