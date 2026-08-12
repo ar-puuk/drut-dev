@@ -126,7 +126,7 @@ Scenarios).
       `activate()` in `editors/vscode/src/extension.ts`, alongside the
       existing `ensureVariableColorCustomization(context)` call. Depends
       on T003.
-- [ ] T005 [US1] Manual smoke test — quickstart.md step 5, first half
+- [X] T005 [US1] Manual smoke test — quickstart.md step 5, first half
       (steps 1–3 only: package/install the extension, open a fresh
       workspace with no prior `.vscode/settings.json`, save a misindented
       `.s` file without formatting it manually first). Report what was
@@ -196,7 +196,7 @@ code-plus-`#[cfg(test)]` convention — see `formatting.rs`, `hover.rs`,
       sentence explaining pasted script text is reformatted to match its
       surrounding indentation once the setting is on. No dependency on
       T006/T007 — documents an already-designed setting, not the code.
-- [ ] T009 [US2] Manual smoke test — quickstart.md step 6 (paste with
+- [X] T009 [US2] Manual smoke test — quickstart.md step 6 (paste with
       `formatOnPaste` off, confirm no change; enable it by hand per T008's
       instruction; paste again, confirm reindentation; paste
       already-correct content a third time, confirm no further edit —
@@ -218,7 +218,7 @@ and already unit-tested (T002's third case) at the predicate level.
 `editor.formatOnSave` off for `.s`/`.block` files, close and reopen the
 workspace, and confirm it stays off (spec.md US3 Acceptance Scenarios).
 
-- [ ] T010 [US3] Manual smoke test — quickstart.md step 5, second half
+- [X] T010 [US3] Manual smoke test — quickstart.md step 5, second half
       (steps 4–5: set
       `"[drut-voyager]": { "editor.formatOnSave": false }` by hand in the
       same workspace T005 used, close and reopen the workspace, introduce
