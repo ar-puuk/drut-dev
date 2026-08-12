@@ -10,6 +10,7 @@
 use lsp_server::{Connection, Message};
 use lsp_types::notification::{Notification as _, PublishDiagnostics};
 use lsp_types::{DiagnosticSeverity, PublishDiagnosticsParams, Uri};
+use voyager_core::{Position, Span};
 
 use crate::document_store::ServerState;
 use crate::position::to_lsp_range;
@@ -37,26 +38,54 @@ pub fn publish(connection: &Connection, state: &ServerState, uri: &Uri) {
         return;
     };
 
-    let diagnostics = doc
-        .parse_result
-        .diagnostics
-        .iter()
-        .map(|d| lsp_types::Diagnostic {
-            range: to_lsp_range(&doc.text, d.span),
-            severity: Some(DiagnosticSeverity::ERROR),
-            code: Some(lsp_types::NumberOrString::String(
-                kind_name(d.kind).to_string(),
-            )),
-            code_description: None,
-            source: Some("drut".to_string()),
-            message: d.message.clone(),
-            related_information: None,
-            tags: None,
-            data: None,
-        })
-        .collect();
+    let structural_diagnostics = doc.parse_result.diagnostics.iter().map(|d| lsp_types::Diagnostic {
+        range: to_lsp_range(&doc.text, d.span),
+        severity: Some(DiagnosticSeverity::ERROR),
+        code: Some(lsp_types::NumberOrString::String(kind_name(d.kind).to_string())),
+        code_description: None,
+        source: Some("drut".to_string()),
+        message: d.message.clone(),
+        related_information: None,
+        tags: None,
+        data: None,
+    });
+
+    // 010-fmt-region-markers FR-010: a second, independently-sourced stream
+    // for unclosed '; FMT: OFF' markers — deliberately not a
+    // voyager_core::Diagnostic/DiagnosticKind (spec.md Assumptions), so it's
+    // built here directly from the standalone unclosed_fmt_off_markers()
+    // scan rather than folded into parse_result.diagnostics above. HINT
+    // severity and a distinct "drut-fmt" source keep it visually and
+    // programmatically separate from the seven/eight real DiagnosticKind
+    // values, which all publish at ERROR above.
+    let fmt_marker_diagnostics =
+        voyager_core::unclosed_fmt_off_markers(&doc.text)
+            .into_iter()
+            .map(|pos| lsp_types::Diagnostic {
+                range: to_lsp_range(&doc.text, unclosed_marker_line_span(pos)),
+                severity: Some(DiagnosticSeverity::HINT),
+                code: Some(lsp_types::NumberOrString::String("UnclosedFmtOff".to_string())),
+                code_description: None,
+                source: Some("drut-fmt".to_string()),
+                message: "'; FMT: OFF' has no matching '; FMT: ON' — formatting is suppressed through end of file"
+                    .to_string(),
+                related_information: None,
+                tags: None,
+                data: None,
+            });
+
+    let diagnostics = structural_diagnostics.chain(fmt_marker_diagnostics).collect();
 
     send(connection, uri.clone(), diagnostics, Some(doc.version));
+}
+
+/// Widens a single marker position into a span covering the rest of its
+/// line — `to_lsp_position`'s own column-clamping (already tested in
+/// `position.rs`) takes care of stopping at the line's real end, so this
+/// needs no line-length lookup of its own. A zero-width range at just
+/// `pos` would be a valid but poorly-visible diagnostic in many editors.
+fn unclosed_marker_line_span(pos: Position) -> Span {
+    Span::new(pos, Position::new(pos.line, u32::MAX))
 }
 
 /// Publishes an empty diagnostics list for `uri` (FR-006: clear on close, or

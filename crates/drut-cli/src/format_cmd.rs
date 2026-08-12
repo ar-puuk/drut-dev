@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use similar::TextDiff;
 use voyager_core::format::{format_bytes, CasingConvention, EncodingFidelity, FormatOptions, TopLevelIndentMode};
+use voyager_core::Position;
 
 use crate::cli::{CasingArg, TopLevelIndentArg};
 use crate::exit::ExitOutcome;
@@ -47,6 +48,11 @@ pub struct FormatReport {
     pub unsafe_encoding_files: Vec<PathBuf>,
     /// Populated in every mode, not only `--diff` (FR-024).
     pub recovered_encoding_files: Vec<PathBuf>,
+    /// Populated in every mode — 010-fmt-region-markers FR-010. Informational
+    /// only; never affects the exit code (mirrors `recovered_encoding_files`'
+    /// own treatment, not `unsafe_encoding_files`', since an unclosed marker
+    /// is not an error, just a fact worth surfacing).
+    pub unclosed_fmt_off_files: Vec<(PathBuf, Vec<Position>)>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,6 +101,7 @@ pub fn run(
         read_failures: traversal.read_failures,
         unsafe_encoding_files: Vec::new(),
         recovered_encoding_files: Vec::new(),
+        unclosed_fmt_off_files: Vec::new(),
     };
 
     for file in &traversal.matched_files {
@@ -104,6 +111,11 @@ pub fn run(
             EncodingFidelity::Lossy => report.unsafe_encoding_files.push(file.path.clone()),
             EncodingFidelity::Recovered => report.recovered_encoding_files.push(file.path.clone()),
             EncodingFidelity::Faithful => {}
+        }
+        if !result.unclosed_fmt_off_markers.is_empty() {
+            report
+                .unclosed_fmt_off_files
+                .push((file.path.clone(), result.unclosed_fmt_off_markers.clone()));
         }
         let is_lossy = result.encoding_fidelity == EncodingFidelity::Lossy;
 
@@ -221,6 +233,16 @@ fn print_report(report: &FormatReport, mode: Mode) {
         );
         for path in &report.unsafe_encoding_files {
             eprintln!("  {}", path.display());
+        }
+    }
+    if !report.unclosed_fmt_off_files.is_empty() {
+        eprintln!(
+            "{} file(s) have an unclosed '; FMT: OFF' marker (protection extended to end of file):",
+            report.unclosed_fmt_off_files.len()
+        );
+        for (path, positions) in &report.unclosed_fmt_off_files {
+            let lines: Vec<String> = positions.iter().map(|p| format!("line {}", p.line)).collect();
+            eprintln!("  {} ({})", path.display(), lines.join(", "));
         }
     }
 }

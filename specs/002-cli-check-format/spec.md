@@ -286,6 +286,11 @@ unchanged from the pre-format parse (behavior preservation).
     (a long tail including 47- and 23-space gaps), and a rule that touches one side
     of `;` but not the other is fussier for a small gain. Comments are treated as
     opaque past their opening delimiter.
+  - **Any line inside a `; FMT: OFF`/`; FMT: ON` region
+    (`010-fmt-region-markers`) is never touched, regardless of any other rule
+    in this list** — an explicit, user-placed escape hatch for hand-tuned
+    formatting, layered on top of (not replacing) every rule above. See
+    FR-027.
 - **FR-013**: `format` MUST NOT change which lines are continuations of a prior
   statement, MUST NOT reorder statements or blocks, and MUST NOT alter any token's
   meaningful (non-whitespace) content — with exactly two named exceptions:
@@ -373,6 +378,14 @@ unchanged from the pre-format parse (behavior preservation).
   behaviors. Unlike FR-015's `--casing` flag, this setting has no "off" state —
   omitting the flag resolves to the explicit `preserve` default, not an unset/`None`
   value. Added `2026-08-12` (`009-top-level-indent-toggle`).
+- **FR-027**: `format` MUST recognize a `; FMT: OFF`/`; FMT: ON` comment-only-line
+  marker pair and leave every line from `; FMT: OFF` (inclusive) through its
+  matching `; FMT: ON` (inclusive), or through end-of-file if unmatched, byte-for-
+  byte untouched — no exception, overriding every other rule in FR-012. An unmatched
+  `; FMT: OFF` MUST be reported via a dedicated, non-`Diagnostic` signal at every
+  adapter surface (CLI, LSP, MCP), not left silent. No new CLI flag, LSP capability,
+  or MCP input field is required — protection is driven entirely by in-file markers.
+  Added `2026-08-12` (`010-fmt-region-markers`).
 
 ### Key Entities
 

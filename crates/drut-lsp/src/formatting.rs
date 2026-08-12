@@ -136,6 +136,22 @@ mod tests {
     }
 
     #[test]
+    fn protected_range_survives_textdocument_formatting() {
+        // 010-fmt-region-markers FR-007/US3: protection is inherited from
+        // voyager-core with no code change to this handler -- confirmed
+        // directly through the real handle() function, not inferred.
+        let mut state = ServerState::new();
+        let text = "IF (a=b)\nY = 1\n; FMT: OFF\n  weird = 1\n; FMT: ON\nZ = 2\nENDIF\n".to_string();
+        state.did_open(lsp_types::Uri::from_str("file:///a.s").unwrap(), text, 1);
+        let edits = handle(&state, &params("file:///a.s")).unwrap();
+        assert_eq!(edits.len(), 1);
+        assert_eq!(
+            edits[0].new_text,
+            "IF (a=b)\n    Y = 1\n; FMT: OFF\n  weird = 1\n; FMT: ON\n    Z = 2\nENDIF\n"
+        );
+    }
+
+    #[test]
     fn unopened_document_returns_none() {
         let state = ServerState::new();
         assert!(handle(&state, &params("file:///never-opened.s")).is_none());

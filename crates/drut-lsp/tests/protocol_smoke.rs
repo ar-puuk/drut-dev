@@ -212,6 +212,37 @@ fn did_close_clears_diagnostics() {
 }
 
 #[test]
+fn did_open_publishes_an_unclosed_fmt_off_hint_distinct_from_structural_diagnostics() {
+    // 010-fmt-region-markers T020: an unmatched '; FMT: OFF' publishes
+    // through the same textDocument/publishDiagnostics cycle as structural
+    // diagnostics, but as its own additive, HINT-severity, "drut-fmt"-
+    // sourced stream — never a voyager_core::DiagnosticKind.
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+
+    let note = did_open(&client, "file:///unclosed_marker.s", "IF (X=1)\n; FMT: OFF\nY = 1\nENDIF\n");
+    let diagnostics = note.params["diagnostics"].as_array().unwrap();
+    assert_eq!(diagnostics.len(), 1, "expected exactly one diagnostic, got: {diagnostics:?}");
+    assert_eq!(diagnostics[0]["code"], json!("UnclosedFmtOff"));
+    assert_eq!(diagnostics[0]["source"], json!("drut-fmt"));
+    assert_eq!(diagnostics[0]["severity"], json!(4), "HINT is severity 4 in the LSP spec, distinct from ERROR (1)");
+
+    shutdown(&client);
+}
+
+#[test]
+fn did_open_publishes_zero_fmt_off_hints_for_a_clean_document() {
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+
+    let note = did_open(&client, "file:///clean_markers.s", "IF (X=1)\n; FMT: OFF\nY = 1\n; FMT: ON\nENDIF\n");
+    let diagnostics = note.params["diagnostics"].as_array().unwrap();
+    assert!(diagnostics.is_empty(), "every marker matched -- expected zero diagnostics, got: {diagnostics:?}");
+
+    shutdown(&client);
+}
+
+#[test]
 fn did_change_reparses_and_republishes() {
     let (client, _handle) = spawn_server();
     initialize(&client);

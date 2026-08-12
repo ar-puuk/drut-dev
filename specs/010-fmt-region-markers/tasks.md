@@ -87,7 +87,7 @@ boundary, not cosmetic gaps.
 
 ## Phase 1: Setup
 
-- [ ] T001 Confirm baseline: `cargo build --workspace` and
+- [x] T001 Confirm baseline: `cargo build --workspace` and
       `cargo clippy --workspace --all-targets -- -D warnings` both clean,
       on this fresh branch before any change.
 
@@ -108,7 +108,7 @@ normalized exactly as they would be without any markers present.
 
 ### Implementation for User Story 1
 
-- [ ] T002 [US1] Add marker-recognition logic to
+- [x] T002 [US1] Add marker-recognition logic to
       `crates/voyager-core/src/format.rs` (research.md §1/§4): given a
       `TokenKind::LineComment` token, determine whether it is a whole-line
       `; FMT: OFF`/`; FMT: ON` marker — no other token in the stream
@@ -116,7 +116,7 @@ normalized exactly as they would be without any markers present.
       `token.text.trim_start_matches(';').trim()` splits once on `:` with
       both trimmed sides case-insensitively equal to `("FMT", "OFF")` or
       `("FMT", "ON")`.
-- [ ] T003 [US1] Add the internal scan function
+- [x] T003 [US1] Add the internal scan function
       `fn protected_regions(tokens: &[Token]) -> (BTreeSet<u32>, Vec<Position>)`
       to `format.rs` per contracts/fmt-region-markers.md's exact
       left-to-right state-machine algorithm: `FMT: OFF` while closed opens
@@ -126,7 +126,7 @@ normalized exactly as they would be without any markers present.
       contributes every remaining line through EOF to the protected set
       and its opening marker's position to the second return value.
       Depends on T002.
-- [ ] T004 [US1] Wire `protected_regions` into `render`: tokenize `source`,
+- [x] T004 [US1] Wire `protected_regions` into `render`: tokenize `source`,
       compute `(protected, _unclosed)`, and thread `&protected` as a new
       parameter through `plan_indentation`/`plan_block`/`plan_children`
       (guard every `plan.insert(line, value)` call with
@@ -137,7 +137,7 @@ normalized exactly as they would be without any markers present.
       it). No change to the final per-line render loop — a line with no
       plan entry and no casing edit is already reproduced untouched.
       Depends on T003.
-- [ ] T005 [US1] Add unit tests to `format.rs`'s own test module covering
+- [x] T005 [US1] Add unit tests to `format.rs`'s own test module covering
       every Edge Case spec.md names: a single protected range with wrong
       indentation and casing left untouched; a file with no markers
       produces identical output to before this feature; multiple
@@ -154,7 +154,7 @@ normalized exactly as they would be without any markers present.
       specifically to avoid; confirm the surrounding block comment's
       content (and everything after it) formats exactly as if that text
       weren't there. Depends on T004.
-- [ ] T006 [US1] **Opener-residue regression test** (research.md §2's
+- [x] T006 [US1] **Opener-residue regression test** (research.md §2's
       load-bearing finding — the exact interaction `007`'s diagnosed-block-
       skip mechanism exists to avoid, now re-created by markers instead of
       a diagnostic). Construct a fixture where a block's **opener** line
@@ -168,7 +168,7 @@ normalized exactly as they would be without any markers present.
       so these two values differ — a test where they happen to coincide
       would pass even under the render-time-filtering bug research.md §2
       ruled out, so it must not be built that way. Depends on T004.
-- [ ] T007 [US1] **009×010 interaction test** (added after
+- [x] T007 [US1] **009×010 interaction test** (added after
       `/speckit-analyze` review, G5 — matches this project's own
       precedent of an explicit cross-feature interaction test for the
       analogous 007+008 case, commit `0c8b51b`). Format a fixture
@@ -182,7 +182,7 @@ normalized exactly as they would be without any markers present.
       column is non-zero, so a bug that skipped this specific gate point
       would visibly force it to 0 rather than passing by coincidence.
       Depends on T004.
-- [ ] T008 [US1] **007×010 interaction test** (added after
+- [x] T008 [US1] **007×010 interaction test** (added after
       `/speckit-analyze` review, G5, extended per owner request beyond the
       009 case above). Format a fixture where a protected region
       (`; FMT: OFF`/`; FMT: ON`) contains, or sits immediately adjacent
@@ -201,7 +201,7 @@ normalized exactly as they would be without any markers present.
       unaffected by this feature; (c) the diagnostic itself (`parse`'s
       output) is unaffected by the presence of markers (ties to T009).
       Depends on T004.
-- [ ] T009 [US1] **`parse()`-untouched test** (added after
+- [x] T009 [US1] **`parse()`-untouched test** (added after
       `/speckit-analyze` review, G4). Add a direct test asserting
       `parse(source)` produces byte-for-byte identical `nodes` and
       `diagnostics` whether or not a structurally-equivalent file contains
@@ -211,7 +211,7 @@ normalized exactly as they would be without any markers present.
       assumption. No implementation dependency — `parse()` is unaffected
       by this feature by construction — sequenced here for coverage
       tracking alongside US1's other correctness proofs.
-- [ ] T010 [P] [US1] Add new hand-written golden fixtures with synthetic
+- [x] T010 [P] [US1] Add new hand-written golden fixtures with synthetic
       `; FMT: OFF`/`; FMT: ON` marker pairs under
       `crates/voyager-core/tests/fixtures/golden/` (existing fixtures
       untouched — SC-002), including one exercising T006's opener-residue
@@ -222,7 +222,7 @@ normalized exactly as they would be without any markers present.
       produces") before being locked in — there is no prior committed
       state to diff against, so this is the equivalent rigor to 008/009's
       per-file human review of a regenerated diff. Depends on T004.
-- [ ] T011 [P] [US1] **Real-corpus-derived marker fixtures** (added after
+- [x] T011 [P] [US1] **Real-corpus-derived marker fixtures** (added after
       `/speckit-analyze` review, G1 — SC-001 explicitly names "the real
       161-file corpus with synthetic marker pairs inserted" as part of
       its own evidence requirement; T010 alone, being purely hand-written,
@@ -258,27 +258,27 @@ visible notice identifying the unclosed marker is present in the result.
 
 ### Implementation for User Story 2
 
-- [ ] T012 [US2] Add
+- [x] T012 [US2] Add
       `pub fn unclosed_fmt_off_markers(source: &str) -> Vec<Position>` to
       `format.rs` (contracts/fmt-region-markers.md) — tokenizes `source`
       internally and returns `protected_regions`'s second return value
       directly, for callers that want this signal without a full
       format pass. Depends on T003.
-- [ ] T013 [US2] Add `unclosed_fmt_off_markers: Vec<Position>` to
+- [x] T013 [US2] Add `unclosed_fmt_off_markers: Vec<Position>` to
       `FormatResult`; populate it in `format`/`format_bytes` from the same
       scan `render` already computes (avoid tokenizing twice — thread the
       unclosed list out of `render`, or have `format`/`format_bytes` call
       `protected_regions` once and pass the protected set into `render`;
       either is correct per contracts' note that this wiring detail has no
       behavioral difference). Depends on T004, T012.
-- [ ] T014 [P] [US2] Add unit tests: an unmatched `; FMT: OFF` protects
+- [x] T014 [P] [US2] Add unit tests: an unmatched `; FMT: OFF` protects
       every line through end-of-file (protection behavior, not just the
       notice); `unclosed_fmt_off_markers` standalone returns the correct
       position(s) directly, independent of a full `format()` call; the
       common case (no markers, or every marker matched) returns an empty
       `Vec` from both the standalone function and `FormatResult`'s field.
       Depends on T013.
-- [ ] T015 [P] [US2] Add an idempotency test: formatting a fixture
+- [x] T015 [P] [US2] Add an idempotency test: formatting a fixture
       containing protected regions, including at least one unclosed
       `; FMT: OFF`, twice in a row produces byte-identical output on both
       passes (FR-008/SC-003). Depends on T004.
@@ -304,10 +304,10 @@ appears in each surface's own idiom.
 
 ### Implementation for User Story 3
 
-- [ ] T016 [US3] Re-export `unclosed_fmt_off_markers` from
+- [x] T016 [US3] Re-export `unclosed_fmt_off_markers` from
       `crates/voyager-core/src/lib.rs` alongside the existing
       `format`/`format_bytes` re-exports. Depends on T012.
-- [ ] T017 [P] [US3] In `crates/drut-cli/src/format_cmd.rs`: add
+- [x] T017 [P] [US3] In `crates/drut-cli/src/format_cmd.rs`: add
       `unclosed_fmt_off_files: Vec<(PathBuf, Vec<Position>)>` to
       `FormatReport`, populated in the existing per-file loop (same
       treatment as `recovered_encoding_files`/`unsafe_encoding_files` —
@@ -315,12 +315,12 @@ appears in each surface's own idiom.
       `print_report` reporting each file and its unclosed marker line(s);
       no `derive_exit_outcome` change (informational only, matches FR-010's
       "no error occurs"). Depends on T013.
-- [ ] T018 [P] [US3] Add coverage to
+- [x] T018 [P] [US3] Add coverage to
       `crates/drut-cli/tests/format_flags.rs`: a protected range survives
       `drut format`/`--check`/`--diff`/`--write` identically; the new
       stderr notice's exact text appears for a file with an unclosed
       marker and does not appear for a file with none. Depends on T017.
-- [ ] T019 [P] [US3] In `crates/drut-mcp/src/format.rs`: add
+- [x] T019 [P] [US3] In `crates/drut-mcp/src/format.rs`: add
       `unclosed_fmt_off_lines: Vec<u32>` to `FormatResultDto`, mapped from
       `result.unclosed_fmt_off_markers.iter().map(|p| p.line)`; add a test
       confirming correct population and the empty common case. **Also add
@@ -333,7 +333,7 @@ appears in each surface's own idiom.
       protected range byte-for-byte unchanged while normalizing everything
       else — matching the rigor T018/T021/T022 already apply to CLI/LSP.
       Depends on T013.
-- [ ] T020 [P] [US3] In `crates/drut-lsp/src/diagnostics.rs`: `publish()`
+- [x] T020 [P] [US3] In `crates/drut-lsp/src/diagnostics.rs`: `publish()`
       gains a second, independently-sourced diagnostics stream built from
       `voyager_core::unclosed_fmt_off_markers(&doc.text)`, each mapped to
       `DiagnosticSeverity::HINT`, `source: "drut-fmt"` (distinct from the
@@ -343,13 +343,13 @@ appears in each surface's own idiom.
       diagnostic for a fixture with one unclosed marker, zero for a clean
       fixture, and confirm no existing structural-diagnostic test's
       assertions change (purely additive stream). Depends on T016.
-- [ ] T021 [P] [US3] Add a test to `crates/drut-lsp/src/formatting.rs`'s
+- [x] T021 [P] [US3] Add a test to `crates/drut-lsp/src/formatting.rs`'s
       own test module: a document containing a protected range, formatted
       via the existing `handle` function, leaves the protected range
       untouched while normalizing everything else (no code change to
       `formatting.rs` itself — protection is inherited from
       `voyager-core`). Depends on T004.
-- [ ] T022 [P] [US3] Add a test to
+- [x] T022 [P] [US3] Add a test to
       `crates/drut-lsp/src/range_formatting.rs`'s own test module: same
       shape as T021, via `textDocument/rangeFormatting`'s `handle`
       function. Depends on T004.
@@ -366,15 +366,15 @@ notice, now proven at all four surfaces).
 **Purpose**: Spec-doc amendment and whole-workspace/full-corpus re-proof,
 once all three stories are done.
 
-- [ ] T023 Amend `specs/002-cli-check-format/spec.md` (new FR, numbered
+- [x] T023 Amend `specs/002-cli-check-format/spec.md` (new FR, numbered
       against the live file at implementation time — per `009`'s own "FR
       number collision" precedent, do not assume a number in advance) and
       `contracts/formatting-api.md`, using
       `contracts/fmt-region-markers.md`'s exact replacement text.
-- [ ] T024 `cargo test --release --workspace` and
+- [x] T024 `cargo test --release --workspace` and
       `cargo clippy --workspace --all-targets -- -D warnings`, both
       clean.
-- [ ] T025 Full 161-file corpus revalidation across all three adapter
+- [x] T025 Full 161-file corpus revalidation across all three adapter
       surfaces (quickstart.md step 7), each reported individually:
       ```powershell
       $env:DRUT_CORPUS_PATH = "path\to\WF-TDM-Official-Releases"
@@ -384,7 +384,7 @@ once all three stories are done.
       ```
       Expected and required: still 161/161 clean — a pure regression
       check, since no real corpus file contains markers today.
-- [ ] T026 Run quickstart.md end-to-end (all 8 steps); confirm each step's
+- [x] T026 Run quickstart.md end-to-end (all 8 steps); confirm each step's
       expected outcome individually before reporting the feature done.
 
 **Checkpoint**: Feature-complete against spec.md; opener-residue

@@ -27,9 +27,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::block::{Block, BlockKind};
 use crate::decode;
 use crate::diagnostic::{Diagnostic, DiagnosticKind};
+use crate::lexer::tokenize;
 use crate::span::{Position, Span};
 use crate::statement::{pair_keyword_boundaries, Statement, StatementKind};
-use crate::token::TokenKind;
+use crate::token::{Token, TokenKind};
 use crate::{parse, Node};
 
 /// 4 spaces per nesting level, relative to the enclosing block's own
@@ -109,6 +110,11 @@ pub struct FormatResult {
     /// Whatever `parse`/`parse_bytes` would have reported for this input.
     pub diagnostics: Vec<Diagnostic>,
     pub encoding_fidelity: EncodingFidelity,
+    /// The start position of every `; FMT: OFF` marker left unmatched at
+    /// end-of-file (010-fmt-region-markers FR-010) — deliberately **not**
+    /// a `Diagnostic`/`DiagnosticKind` (spec.md Assumptions); empty in the
+    /// overwhelming common case (no markers, or every marker matched).
+    pub unclosed_fmt_off_markers: Vec<Position>,
 }
 
 /// Parses `source` internally, then re-renders it per this module's scope
@@ -118,13 +124,14 @@ pub struct FormatResult {
 /// defect.
 pub fn format(source: &str, options: FormatOptions) -> FormatResult {
     let parsed = parse(source);
-    let text = render(source, &parsed.nodes, &parsed.diagnostics, options);
+    let (text, unclosed_fmt_off_markers) = render(source, &parsed.nodes, &parsed.diagnostics, options);
     let changed = text.as_bytes() != source.as_bytes();
     FormatResult {
         text,
         changed,
         diagnostics: parsed.diagnostics,
         encoding_fidelity: EncodingFidelity::Faithful,
+        unclosed_fmt_off_markers,
     }
 }
 
@@ -159,6 +166,19 @@ pub fn format_bytes(source: &[u8], options: FormatOptions) -> FormatResult {
     result
 }
 
+/// The start position of every `; FMT: OFF` marker left unmatched at
+/// end-of-file in `source` (010-fmt-region-markers FR-010) — the same
+/// detection `format`/`format_bytes` run internally, exposed standalone
+/// for callers that want this signal without paying for a full
+/// indentation/casing pass (e.g. `drut-lsp`'s independent diagnostics
+/// publish cycle, which runs on every document change, not only on a
+/// formatting request).
+pub fn unclosed_fmt_off_markers(source: &str) -> Vec<Position> {
+    let tokens = tokenize(source);
+    let total_lines = split_lines(source).len() as u32;
+    protected_regions(&tokens, total_lines).1
+}
+
 // ---------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------
@@ -167,17 +187,19 @@ type IndentPlan = BTreeMap<u32, usize>;
 /// (line, 0-based char start, 0-based char end (exclusive), replacement text)
 type CasingEdit = (u32, usize, usize, String);
 
-fn render(source: &str, nodes: &[Node], diagnostics: &[Diagnostic], options: FormatOptions) -> String {
+fn render(source: &str, nodes: &[Node], diagnostics: &[Diagnostic], options: FormatOptions) -> (String, Vec<Position>) {
     let raw_lines = split_lines(source);
     let char_lines: Vec<Vec<char>> = raw_lines.iter().map(|(content, _)| content.chars().collect()).collect();
+    let tokens = tokenize(source);
+    let (protected, unclosed) = protected_regions(&tokens, raw_lines.len() as u32);
 
     let diagnosed_openers = diagnosed_block_openers(diagnostics);
     let mut indent_plan: IndentPlan = BTreeMap::new();
-    plan_indentation(nodes, &char_lines, &diagnosed_openers, options.top_level_indent, &mut indent_plan);
+    plan_indentation(nodes, &char_lines, &diagnosed_openers, &protected, options.top_level_indent, &mut indent_plan);
 
     let mut casing_edits: Vec<CasingEdit> = Vec::new();
     if let Some(convention) = options.casing {
-        collect_casing_edits(nodes, &char_lines, convention, &mut casing_edits);
+        collect_casing_edits(nodes, &char_lines, &protected, convention, &mut casing_edits);
     }
     let mut edits_by_line: BTreeMap<u32, Vec<(usize, usize, String)>> = BTreeMap::new();
     for (line, start, end, text) in casing_edits {
@@ -217,7 +239,92 @@ fn render(source: &str, nodes: &[Node], diagnostics: &[Diagnostic], options: For
         out.push_str(terminator);
     }
 
-    out
+    (out, unclosed)
+}
+
+// ---------------------------------------------------------------------
+// FMT region markers (010-fmt-region-markers)
+// ---------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FmtMarker {
+    Off,
+    On,
+}
+
+/// Whether `text` (a `TokenKind::LineComment` token's raw text, including
+/// its leading `;`) is a `; FMT: OFF` / `; FMT: ON` marker — case-insensitive
+/// on `FMT`/`OFF`/`ON`, flexible whitespace around the leading `;` and the
+/// colon (spec.md FR-001/FR-002, research.md §4). Whether the comment is
+/// the *entire* content of its line is a separate check, made by
+/// `protected_regions` using the full token stream, not here.
+fn fmt_marker_kind(text: &str) -> Option<FmtMarker> {
+    let body = text.trim_start_matches(';').trim();
+    let (left, right) = body.split_once(':')?;
+    if !left.trim().eq_ignore_ascii_case("fmt") {
+        return None;
+    }
+    match right.trim().to_ascii_uppercase().as_str() {
+        "OFF" => Some(FmtMarker::Off),
+        "ON" => Some(FmtMarker::On),
+        _ => None,
+    }
+}
+
+/// Scans `tokens` for `; FMT: OFF`/`; FMT: ON` markers and returns every
+/// protected line number (inclusive of both marker lines, or through
+/// `total_lines` if a region is left open at end-of-file) plus the start
+/// position of every unmatched `; FMT: OFF` (research.md §2, contracts/
+/// fmt-region-markers.md). A `LineComment` only counts as a marker when it
+/// is the *entire* content of its physical line — a trailing
+/// `; FMT: OFF` after real statement content is not recognized (FR-001/
+/// FR-002). A second `; FMT: OFF` while a region is already open, or a
+/// stray `; FMT: ON` while none is open, is a no-op (FR-005) — this is a
+/// simple on/off state transition, not balanced-pair counting.
+fn protected_regions(tokens: &[Token], total_lines: u32) -> (BTreeSet<u32>, Vec<Position>) {
+    let mut lines_with_other_tokens: BTreeSet<u32> = BTreeSet::new();
+    for tok in tokens {
+        if tok.kind != TokenKind::LineComment {
+            lines_with_other_tokens.insert(tok.span.start.line);
+        }
+    }
+
+    let mut protected: BTreeSet<u32> = BTreeSet::new();
+    let mut unclosed: Vec<Position> = Vec::new();
+    let mut open: Option<Position> = None;
+
+    for tok in tokens {
+        if tok.kind != TokenKind::LineComment || lines_with_other_tokens.contains(&tok.span.start.line) {
+            continue;
+        }
+        let Some(marker) = fmt_marker_kind(&tok.text) else {
+            continue;
+        };
+        match marker {
+            FmtMarker::Off => {
+                if open.is_none() {
+                    open = Some(tok.span.start);
+                }
+            }
+            FmtMarker::On => {
+                if let Some(start) = open.take() {
+                    for line in start.line..=tok.span.start.line {
+                        protected.insert(line);
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(start) = open {
+        let end_line = total_lines.max(start.line);
+        for line in start.line..=end_line {
+            protected.insert(line);
+        }
+        unclosed.push(start);
+    }
+
+    (protected, unclosed)
 }
 
 /// Splits `source` into `(content, terminator)` pairs, `terminator` being
@@ -322,20 +429,30 @@ fn plan_indentation(
     nodes: &[Node],
     lines: &[Vec<char>],
     diagnosed_openers: &BTreeSet<Position>,
+    protected: &BTreeSet<u32>,
     mode: TopLevelIndentMode,
     plan: &mut IndentPlan,
 ) {
     for node in nodes {
         if mode == TopLevelIndentMode::Normalize {
-            plan.insert(node.span().start.line, 0);
+            let line = node.span().start.line;
+            if !protected.contains(&line) {
+                plan.insert(line, 0);
+            }
         }
         if let Node::Block(block) = node {
-            plan_block(block, lines, diagnosed_openers, plan);
+            plan_block(block, lines, diagnosed_openers, protected, plan);
         }
     }
 }
 
-fn plan_block(block: &Block, lines: &[Vec<char>], diagnosed_openers: &BTreeSet<Position>, plan: &mut IndentPlan) {
+fn plan_block(
+    block: &Block,
+    lines: &[Vec<char>],
+    diagnosed_openers: &BTreeSet<Position>,
+    protected: &BTreeSet<u32>,
+    plan: &mut IndentPlan,
+) {
     let opener_line = block.span.start.line;
     let base = computed_indent(plan, lines, opener_line);
 
@@ -345,7 +462,7 @@ fn plan_block(block: &Block, lines: &[Vec<char>], diagnosed_openers: &BTreeSet<P
     // gets the ordinary body-indent treatment via plan_children below.
     if let Some(closer_span) = block.closer {
         let closer_line = closer_span.start.line;
-        if closer_line != opener_line {
+        if closer_line != opener_line && !protected.contains(&closer_line) {
             plan.insert(closer_line, base);
         }
     }
@@ -382,14 +499,14 @@ fn plan_block(block: &Block, lines: &[Vec<char>], diagnosed_openers: &BTreeSet<P
                 // opener line — already resolved into `base` above (or left
                 // untouched at top level); only ELSEIF/ELSE get a fresh
                 // target here, aligned to the IF (delta 0).
-                if idx > 0 && branch_line != opener_line {
+                if idx > 0 && branch_line != opener_line && !protected.contains(&branch_line) {
                     plan.insert(branch_line, base);
                 }
-                plan_children(&branch.children, branch_line, base, lines, diagnosed_openers, plan);
+                plan_children(&branch.children, branch_line, base, lines, diagnosed_openers, protected, plan);
             }
         }
         _ => {
-            plan_children(&block.children, opener_line, base, lines, diagnosed_openers, plan);
+            plan_children(&block.children, opener_line, base, lines, diagnosed_openers, protected, plan);
         }
     }
 }
@@ -400,6 +517,7 @@ fn plan_children(
     base: usize,
     lines: &[Vec<char>],
     diagnosed_openers: &BTreeSet<Position>,
+    protected: &BTreeSet<u32>,
     plan: &mut IndentPlan,
 ) {
     for child in children {
@@ -407,11 +525,11 @@ fn plan_children(
         // A short-IF's trailing statement shares the IF's own line — never
         // touched (spec.md FR-012's body-indent rule only applies when the
         // child starts on its own line).
-        if child_line != opener_line {
+        if child_line != opener_line && !protected.contains(&child_line) {
             plan.insert(child_line, base + INDENT_WIDTH);
         }
         if let Node::Block(b) = child {
-            plan_block(b, lines, diagnosed_openers, plan);
+            plan_block(b, lines, diagnosed_openers, protected, plan);
         }
     }
 }
@@ -471,31 +589,55 @@ fn edit_for_span(lines: &[Vec<char>], span: Span, convention: CasingConvention) 
     Some((span.start.line, start, end, replacement))
 }
 
-fn push_if_present(edits: &mut Vec<CasingEdit>, lines: &[Vec<char>], span: Span, convention: CasingConvention) {
+fn push_if_present(
+    edits: &mut Vec<CasingEdit>,
+    lines: &[Vec<char>],
+    protected: &BTreeSet<u32>,
+    span: Span,
+    convention: CasingConvention,
+) {
+    // Single funnel point for every casing edit this module ever produces
+    // (010-fmt-region-markers) — a protected line never receives a casing
+    // edit, regardless of which caller reached here.
+    if protected.contains(&span.start.line) {
+        return;
+    }
     if let Some(edit) = edit_for_span(lines, span, convention) {
         edits.push(edit);
     }
 }
 
-fn collect_casing_edits(nodes: &[Node], lines: &[Vec<char>], convention: CasingConvention, edits: &mut Vec<CasingEdit>) {
+fn collect_casing_edits(
+    nodes: &[Node],
+    lines: &[Vec<char>],
+    protected: &BTreeSet<u32>,
+    convention: CasingConvention,
+    edits: &mut Vec<CasingEdit>,
+) {
     for node in nodes {
         match node {
-            Node::Statement(stmt) => collect_statement_casing_edits(stmt, lines, convention, edits),
-            Node::Block(block) => collect_block_casing_edits(block, lines, convention, edits),
+            Node::Statement(stmt) => collect_statement_casing_edits(stmt, lines, protected, convention, edits),
+            Node::Block(block) => collect_block_casing_edits(block, lines, protected, convention, edits),
         }
     }
 }
 
-fn collect_block_casing_edits(block: &Block, lines: &[Vec<char>], convention: CasingConvention, edits: &mut Vec<CasingEdit>) {
+fn collect_block_casing_edits(
+    block: &Block,
+    lines: &[Vec<char>],
+    protected: &BTreeSet<u32>,
+    convention: CasingConvention,
+    edits: &mut Vec<CasingEdit>,
+) {
     // The opener statement's own keyword=value pair names (RUN PGM=...,
     // etc.) — already exact token spans, no scanning needed.
     for span in &block.opener_pairs {
-        push_if_present(edits, lines, *span, convention);
+        push_if_present(edits, lines, protected, *span, convention);
     }
     // The explicit closer's own word, if one exists.
     if let Some(closer_span) = block.closer {
         if let Some(word_span) = first_word_span(lines, closer_span.start) {
-            push_if_present(edits, lines, word_span, convention);
+            push_if_present(edits, lines, protected, word_span, convention);
         }
     }
 
@@ -505,21 +647,27 @@ fn collect_block_casing_edits(block: &Block, lines: &[Vec<char>], convention: Ca
                 // Covers IF (idx 0) and ELSEIF/ELSE (idx > 0) uniformly —
                 // all are just "the word starting at this branch's span".
                 if let Some(word_span) = first_word_span(lines, branch.span.start) {
-                    push_if_present(edits, lines, word_span, convention);
+                    push_if_present(edits, lines, protected, word_span, convention);
                 }
-                collect_casing_edits(&branch.children, lines, convention, edits);
+                collect_casing_edits(&branch.children, lines, protected, convention, edits);
             }
         }
         _ => {
             if let Some(word_span) = first_word_span(lines, block.span.start) {
-                push_if_present(edits, lines, word_span, convention);
+                push_if_present(edits, lines, protected, word_span, convention);
             }
-            collect_casing_edits(&block.children, lines, convention, edits);
+            collect_casing_edits(&block.children, lines, protected, convention, edits);
         }
     }
 }
 
-fn collect_statement_casing_edits(stmt: &Statement, lines: &[Vec<char>], convention: CasingConvention, edits: &mut Vec<CasingEdit>) {
+fn collect_statement_casing_edits(
+    stmt: &Statement,
+    lines: &[Vec<char>],
+    protected: &BTreeSet<u32>,
+    convention: CasingConvention,
+    edits: &mut Vec<CasingEdit>,
+) {
     if !matches!(stmt.kind, StatementKind::Control { .. }) {
         // Casing never targets Assignment/Label/ShellEscape content — none
         // of those are "control-word/keyword-name" tokens (FR-015).
@@ -530,12 +678,12 @@ fn collect_statement_casing_edits(stmt: &Statement, lines: &[Vec<char>], convent
     // the ordinary case (tokens[0] itself is the Word) needing no special
     // branch.
     if let Some(word_tok) = stmt.tokens.iter().find(|t| t.kind == TokenKind::Word) {
-        push_if_present(edits, lines, word_tok.span, convention);
+        push_if_present(edits, lines, protected, word_tok.span, convention);
     }
     // Pair keyword names — never their values, never subscript contents.
     for (kw_start, _eq_idx) in pair_keyword_boundaries(&stmt.tokens) {
         if let Some(tok) = stmt.tokens.get(kw_start) {
-            push_if_present(edits, lines, tok.span, convention);
+            push_if_present(edits, lines, protected, tok.span, convention);
         }
     }
 }
@@ -940,5 +1088,230 @@ mod tests {
         let after = parse(&formatted);
         assert_eq!(before.nodes.len(), after.nodes.len());
         assert_eq!(before.diagnostics.len(), after.diagnostics.len());
+    }
+
+    // -- FMT region markers (010-fmt-region-markers) ------------------------
+
+    #[test]
+    fn protected_range_is_left_untouched_while_everything_else_normalizes() {
+        // `y`/`z` are Assignment targets, never a casing target (matches
+        // `casing_upper_never_touches_values_labels_or_variable_refs`
+        // above) — only `IF`/`ENDIF` are control words here.
+        let src = "if (x=1)\ny = 1\n; FMT: OFF\n  weird = 1\n    myvar = 2\n; FMT: ON\nz = 3\nendif\n";
+        let out = format(src, upper()).text;
+        assert_eq!(
+            out,
+            "IF (x=1)\n    y = 1\n; FMT: OFF\n  weird = 1\n    myvar = 2\n; FMT: ON\n    z = 3\nENDIF\n"
+        );
+    }
+
+    #[test]
+    fn file_with_no_fmt_markers_formats_exactly_as_before_this_feature() {
+        let src = "if (x=1)\ny = 1\nendif\n";
+        let out = format(src, upper()).text;
+        assert_eq!(out, "IF (x=1)\n    y = 1\nENDIF\n");
+    }
+
+    #[test]
+    fn multiple_non_overlapping_regions_are_each_independently_protected() {
+        let src = "if (x=1)\na = 1\n; FMT: OFF\n  b = 2\n; FMT: ON\nc = 3\n; FMT: OFF\n  d = 4\n; FMT: ON\ne = 5\nendif\n";
+        let out = format(src, FormatOptions::default()).text;
+        assert_eq!(
+            out,
+            "if (x=1)\n    a = 1\n; FMT: OFF\n  b = 2\n; FMT: ON\n    c = 3\n; FMT: OFF\n  d = 4\n; FMT: ON\n    e = 5\nendif\n"
+        );
+    }
+
+    #[test]
+    fn duplicate_fmt_off_while_already_open_is_a_no_op() {
+        // US1 Acceptance Scenario 4 — a single subsequent FMT: ON must
+        // close the whole region; if the duplicate OFF were incorrectly
+        // treated as needing its own paired ON, `c = 3` below would stay
+        // protected too instead of being normalized.
+        let src = "if (x=1)\n; FMT: OFF\n  a = 1\n; FMT: OFF\n  b = 2\n; FMT: ON\nc = 3\nendif\n";
+        let out = format(src, FormatOptions::default()).text;
+        assert_eq!(
+            out,
+            "if (x=1)\n; FMT: OFF\n  a = 1\n; FMT: OFF\n  b = 2\n; FMT: ON\n    c = 3\nendif\n"
+        );
+    }
+
+    #[test]
+    fn stray_fmt_on_with_no_open_region_is_a_no_op() {
+        // US1 Acceptance Scenario 5.
+        let src = "if (x=1)\n; FMT: ON\na = 1\nendif\n";
+        let out = format(src, FormatOptions::default()).text;
+        assert_eq!(out, "if (x=1)\n; FMT: ON\n    a = 1\nendif\n");
+    }
+
+    #[test]
+    fn protected_region_straddling_a_block_boundary_is_allowed() {
+        let src = "if (x=1)\n; FMT: OFF\n  a = 1\nendif\n; FMT: ON\nb = 2\n";
+        let result = format(src, FormatOptions::default());
+        assert_eq!(
+            result.text, src,
+            "region opens inside the IF block and closes after it — every line from \
+             FMT: OFF through FMT: ON stays untouched, including the block's own ENDIF"
+        );
+        assert!(
+            result.diagnostics.is_empty(),
+            "a marker straddling a block boundary must not produce a diagnostic (FR-006)"
+        );
+    }
+
+    #[test]
+    fn whole_file_is_one_protected_region_with_closing_marker() {
+        let src = "; FMT: OFF\nif (x=1)\n  a=1\nendif\n; FMT: ON\n";
+        let result = format(src, upper());
+        assert_eq!(result.text, src);
+        assert!(!result.changed);
+        assert!(result.unclosed_fmt_off_markers.is_empty());
+    }
+
+    #[test]
+    fn whole_file_is_one_protected_region_without_closing_marker() {
+        let src = "; FMT: OFF\nif (x=1)\n  a=1\nendif\n";
+        let result = format(src, upper());
+        assert_eq!(result.text, src);
+        assert!(!result.changed);
+        assert_eq!(result.unclosed_fmt_off_markers, vec![Position::new(1, 1)]);
+    }
+
+    #[test]
+    fn marker_text_inside_a_real_block_comment_is_not_treated_as_a_marker() {
+        // FR-009's own named example — the exact false-positive
+        // research.md §1 chose tokenizer-based recognition to avoid: block
+        // comments are never tokenized as `LineComment`, so text that only
+        // *looks* like a marker inside one is invisible to the scan.
+        let src = "if (x=1)\n/* ; FMT: OFF inside a block comment */\na = 1\nendif\n";
+        let out = format(src, FormatOptions::default()).text;
+        assert_eq!(
+            out,
+            "if (x=1)\n/* ; FMT: OFF inside a block comment */\n    a = 1\nendif\n",
+            "marker-looking text inside a real block comment must not suppress \
+             formatting for anything after it"
+        );
+    }
+
+    #[test]
+    fn opener_residue_child_anchors_to_protected_openers_true_on_disk_column_not_a_discarded_planned_value() {
+        // research.md §2's load-bearing finding, tasks.md T006: protection
+        // must be gated at *collection* time, not filtered at final render
+        // time. Under Normalize mode, a top-level opener would normally be
+        // forced to column 0 — but this opener is protected, so it must
+        // keep its real on-disk column (6), and the out-of-region child
+        // must anchor to THAT column, not to a discarded, would-have-been-0
+        // planned value.
+        let src = "; FMT: OFF\n      if (x=1)\n; FMT: ON\na = 1\nendif\n";
+        let out = format(src, normalize()).text;
+        assert_eq!(
+            out,
+            "; FMT: OFF\n      if (x=1)\n; FMT: ON\n          a = 1\n      endif\n",
+            "the protected IF opener must keep its true on-disk column (6), not be \
+             forced to 0 by Normalize mode; the out-of-region child must be indented \
+             4 spaces relative to that TRUE column (10), and the closer must align \
+             to that same true column (6) — none of these may anchor to a discarded \
+             planned value of 0"
+        );
+    }
+
+    #[test]
+    fn protected_top_level_line_stays_untouched_under_normalize_mode() {
+        // 009-top-level-indent-toggle interaction, tasks.md T007: gate
+        // point #1 (plan_indentation's top-level insert, only reached
+        // under Normalize) must be guarded by `protected` exactly like the
+        // other three gate points.
+        let src = "; FMT: OFF\n      a = 1\n; FMT: ON\nb = 2\n";
+        let out = format(src, normalize()).text;
+        assert_eq!(
+            out,
+            "; FMT: OFF\n      a = 1\n; FMT: ON\nb = 2\n",
+            "the protected top-level statement must keep its real on-disk column (6), \
+             not be forced to column 0 by Normalize mode"
+        );
+    }
+
+    #[test]
+    fn protected_region_containing_a_diagnosed_block_composes_correctly_with_007s_skip() {
+        // 007-formatter-diagnosed-block-indent-fix interaction, tasks.md
+        // T008: 007's diagnosed_block_openers-gated children-skip and this
+        // feature's marker-gate are both independent "don't touch this
+        // range" mechanisms that can apply to overlapping or adjacent
+        // territory. Here the FMT region covers only PART of a diagnosed
+        // (unmatched PROCESS) subtree — the opener and its direct FILEI
+        // child — while a swallowed RUN block (still structurally part of
+        // the same diagnosed subtree) sits outside the marked region
+        // entirely, protected only by 007's own unchanged mechanism.
+        let src = "; FMT: OFF\n    PROCESS PHASE=INPUT\n        FILEI = ni.1\n; FMT: ON\n\n    RUN PGM=HWYASSIGN\n        FILEI NETI = 'net.net'\n    ENDRUN\n";
+        let result = format(src, normalize());
+
+        assert_eq!(
+            result.diagnostics.len(),
+            1,
+            "the marker region must not affect parse's diagnostic output at all (FR-006)"
+        );
+        assert_eq!(result.diagnostics[0].kind, DiagnosticKind::UnmatchedProcess);
+        assert!(!result.changed);
+        assert_eq!(
+            result.text, src,
+            "content inside the marked region (PROCESS opener + FILEI) stays untouched by \
+             marker-protection regardless of also being diagnosed; the swallowed RUN block \
+             outside the marked region stays independently untouched by 007's own unchanged \
+             diagnosed-children skip, unaffected by this feature"
+        );
+    }
+
+    #[test]
+    fn parse_output_is_unaffected_by_fmt_markers() {
+        // FR-006, tasks.md T009: markers are a pure formatting-only
+        // concern with zero effect on tokenize/parse output.
+        let with_markers = "if (x=1)\n; FMT: OFF\na = 1\n; FMT: ON\nendif\n";
+        let without_markers = "if (x=1)\na = 1\nendif\n";
+        let with = parse(with_markers);
+        let without = parse(without_markers);
+        assert_eq!(
+            with.nodes.len(),
+            without.nodes.len(),
+            "markers must not add/remove top-level nodes"
+        );
+        assert!(with.diagnostics.is_empty());
+        assert!(without.diagnostics.is_empty());
+    }
+
+    #[test]
+    fn parse_diagnostic_kind_is_unaffected_by_fmt_markers_around_a_diagnosed_block() {
+        let with_markers = "; FMT: OFF\nif (x=1)\n; FMT: ON\na = 1\n";
+        let without_markers = "if (x=1)\na = 1\n";
+        let with = parse(with_markers);
+        let without = parse(without_markers);
+        assert_eq!(with.diagnostics.len(), 1);
+        assert_eq!(without.diagnostics.len(), 1);
+        assert_eq!(with.diagnostics[0].kind, without.diagnostics[0].kind);
+    }
+
+    #[test]
+    fn unclosed_fmt_off_markers_standalone_matches_format_result() {
+        let src = "; FMT: OFF\na = 1\n";
+        assert_eq!(unclosed_fmt_off_markers(src), vec![Position::new(1, 1)]);
+        assert_eq!(
+            format(src, FormatOptions::default()).unclosed_fmt_off_markers,
+            vec![Position::new(1, 1)]
+        );
+    }
+
+    #[test]
+    fn unclosed_fmt_off_markers_is_empty_in_the_common_case() {
+        assert!(unclosed_fmt_off_markers("a = 1\n").is_empty());
+        assert!(unclosed_fmt_off_markers("; FMT: OFF\na = 1\n; FMT: ON\n").is_empty());
+    }
+
+    #[test]
+    fn idempotency_holds_with_protected_and_unclosed_regions() {
+        let src = "if (x=1)\n; FMT: OFF\n  a = 1\nendif\n";
+        let once = format(src, FormatOptions::default());
+        let twice = format(&once.text, FormatOptions::default());
+        assert_eq!(once.text, twice.text);
+        assert!(!twice.changed);
+        assert_eq!(once.unclosed_fmt_off_markers, twice.unclosed_fmt_off_markers);
     }
 }

@@ -21,6 +21,11 @@ pub struct FormatResultDto {
     /// `"faithful"` / `"recovered"` / `"lossy"` — always `"faithful"` for a
     /// `text`-sourced input.
     pub encoding_fidelity: String,
+    /// Line numbers of every `; FMT: OFF` marker left unmatched at
+    /// end-of-file (010-fmt-region-markers FR-010). Empty in the common
+    /// case. Line only — a marker's column is never meaningful, since it
+    /// always starts a comment-only line.
+    pub unclosed_fmt_off_lines: Vec<u32>,
 }
 
 fn fidelity_name(f: voyager_core::EncodingFidelity) -> &'static str {
@@ -64,6 +69,7 @@ pub fn format(input: &FormatInput) -> Result<FormatResultDto, String> {
         text: result.text,
         changed: result.changed,
         encoding_fidelity: fidelity_name(result.encoding_fidelity).to_string(),
+        unclosed_fmt_off_lines: result.unclosed_fmt_off_markers.iter().map(|p| p.line).collect(),
     })
 }
 
@@ -115,5 +121,40 @@ mod tests {
         let result = format(&text_input(text, None)).unwrap();
         assert_eq!(result.text, text, "non-zero top-level indentation must be left untouched by default");
         assert!(!result.changed);
+    }
+
+    // -- FMT region markers (010-fmt-region-markers) -------------------------
+
+    #[test]
+    fn protected_range_survives_through_the_mcp_format_tool() {
+        // 010-fmt-region-markers FR-007/US3, added after /speckit-analyze
+        // review (G2): FR-007 requires identical protection at every
+        // adapter surface including MCP -- this previously had no
+        // assertion that MCP's format() actually protects a range, only
+        // that the notice field populates (see the test below).
+        let text = "IF (X=1)\nY = 1\n; FMT: OFF\n  weird = 1\n; FMT: ON\nZ = 2\nENDIF\n";
+        let result = format(&text_input(text, None)).unwrap();
+        assert_eq!(
+            result.text,
+            "IF (X=1)\n    Y = 1\n; FMT: OFF\n  weird = 1\n; FMT: ON\n    Z = 2\nENDIF\n",
+            "the protected range must stay byte-for-byte unchanged while everything \
+             else normalizes"
+        );
+    }
+
+    #[test]
+    fn unclosed_fmt_off_lines_is_populated_and_empty_in_the_common_case() {
+        let unclosed = format(&text_input("IF (X=1)\n; FMT: OFF\nY = 1\nENDIF\n", None)).unwrap();
+        assert_eq!(unclosed.unclosed_fmt_off_lines, vec![2]);
+
+        let clean = format(&text_input("IF (X=1)\nY = 1\nENDIF\n", None)).unwrap();
+        assert!(clean.unclosed_fmt_off_lines.is_empty());
+
+        let matched = format(&text_input(
+            "IF (X=1)\n; FMT: OFF\nY = 1\n; FMT: ON\nENDIF\n",
+            None,
+        ))
+        .unwrap();
+        assert!(matched.unclosed_fmt_off_lines.is_empty());
     }
 }

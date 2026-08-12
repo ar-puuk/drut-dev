@@ -197,6 +197,87 @@ fn write_check_and_diff_are_mutually_exclusive() {
     assert_eq!(fs::read_to_string(&file).unwrap(), MESSY, "must not touch the file");
 }
 
+// -- FMT region markers (010-fmt-region-markers) ----------------------------
+
+const PROTECTED_RANGE: &str = "IF (X=1)\nY = 1\n; FMT: OFF\n  weird = 1\n; FMT: ON\nZ = 2\nENDIF\n";
+const PROTECTED_RANGE_FORMATTED: &str = "IF (X=1)\n    Y = 1\n; FMT: OFF\n  weird = 1\n; FMT: ON\n    Z = 2\nENDIF\n";
+
+#[test]
+fn protected_range_survives_default_mode() {
+    let dir = TempDir::new("fmt-marker-default");
+    let file = dir.path().join("x.s");
+    fs::write(&file, PROTECTED_RANGE).unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(String::from_utf8_lossy(&out.stdout), PROTECTED_RANGE_FORMATTED);
+}
+
+#[test]
+fn protected_range_survives_check_mode() {
+    let dir = TempDir::new("fmt-marker-check");
+    let file = dir.path().join("x.s");
+    fs::write(&file, PROTECTED_RANGE_FORMATTED).unwrap();
+
+    // Already in its final form (including the protected range) -- --check
+    // must report clean, since re-formatting it is a no-op.
+    let out = drut(&["format", file.to_str().unwrap(), "--check"]);
+    assert_eq!(out.status.code(), Some(0));
+}
+
+#[test]
+fn protected_range_survives_diff_mode() {
+    let dir = TempDir::new("fmt-marker-diff");
+    let file = dir.path().join("x.s");
+    fs::write(&file, PROTECTED_RANGE).unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--diff"]);
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    // Only Y/Z's indentation changes -- the protected "  weird = 1" line
+    // must not appear as a removed/added line in the diff at all.
+    assert!(!stdout.contains("-  weird = 1"), "protected line must not appear as changed:\n{stdout}");
+    assert!(!stdout.contains("+  weird = 1") || stdout.matches("weird = 1").count() <= 1, "protected line must not appear twice (once unchanged is fine, changed is not):\n{stdout}");
+}
+
+#[test]
+fn protected_range_survives_write_mode() {
+    let dir = TempDir::new("fmt-marker-write");
+    let file = dir.path().join("x.s");
+    fs::write(&file, PROTECTED_RANGE).unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--write"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(fs::read_to_string(&file).unwrap(), PROTECTED_RANGE_FORMATTED);
+}
+
+#[test]
+fn unclosed_fmt_off_notice_appears_on_stderr_with_line_number() {
+    let dir = TempDir::new("fmt-marker-unclosed");
+    let file = dir.path().join("x.s");
+    fs::write(&file, "IF (X=1)\n; FMT: OFF\nY = 1\nENDIF\n").unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0), "an unclosed marker is informational, not an error");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("unclosed") && stderr.contains("FMT: OFF") && stderr.contains("line 2"),
+        "expected an unclosed-marker notice naming line 2, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn no_unclosed_fmt_off_notice_when_every_marker_is_matched() {
+    let dir = TempDir::new("fmt-marker-matched");
+    let file = dir.path().join("x.s");
+    fs::write(&file, PROTECTED_RANGE).unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!stderr.contains("unclosed"), "no notice expected when every marker is matched, got:\n{stderr}");
+}
+
 /// Regression test for a real bug this session's own quickstart walkthrough
 /// caught: `println!`/`print!` panic on a broken stdout pipe (Rust's exit
 /// code for an unhandled panic is 101), which is exactly what happens

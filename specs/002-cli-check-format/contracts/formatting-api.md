@@ -29,9 +29,14 @@ fn format_bytes(source: &[u8], options: FormatOptions) -> FormatResult
   left untouched, comments left entirely untouched) — not an unspecified
   "canonical form," but this exact, corpus-derived rule set. Only if
   `options.casing` is `Some`, matched control-word/keyword-name tokens are
-  additionally rewritten to that casing.
-  Returns the rendered text plus a `changed` flag plus whatever diagnostics parsing
-  `source` would have produced (see data-model.md § FormatResult).
+  additionally rewritten to that casing. **Amended 2026-08-12
+  (`010-fmt-region-markers`, FR-027)**: any line inside a `; FMT: OFF`/
+  `; FMT: ON` region is never touched regardless of any rule above — this
+  overrides the whole rule set just described, not an additional case within
+  it.
+  Returns the rendered text plus a `changed` flag, whatever diagnostics parsing
+  `source` would have produced, and (FR-027) the position of every `; FMT: OFF`
+  marker left unmatched at end-of-file — see data-model.md § FormatResult.
 - **`format_bytes`**: Decodes `source` the same way `parse_bytes` does (UTF-8 first,
   per-byte Windows-1252 fallback, FR-034 in `001-voyager-script-parser`) before
   formatting. Any `InvalidEncoding` diagnostics come first in the result's

@@ -254,6 +254,25 @@ mod tests {
         assert_eq!(edits[0].new_text, "        IF (c=3)");
     }
 
+    #[test]
+    fn protected_range_survives_textdocument_range_formatting() {
+        // 010-fmt-region-markers FR-007/US3: protection is inherited from
+        // voyager-core with no code change to this handler.
+        let mut state = ServerState::new();
+        let text = "IF (a=b)\nY = 1\n; FMT: OFF\n  weird = 1\n; FMT: ON\nZ = 2\nENDIF\n".to_string();
+        state.did_open(lsp_types::Uri::from_str("file:///a.s").unwrap(), text, 1);
+        // Range covers lines 1-3 (0-based): Y = 1, the FMT: OFF marker, and
+        // the protected "weird = 1" line -- only Y = 1 differs from the
+        // formatted output, since the protected line is never a diff at all.
+        let edits = handle(&state, &params("file:///a.s", 1, 3)).unwrap();
+        assert_eq!(
+            edits.len(),
+            1,
+            "expected exactly one in-range edit (the unprotected Y = 1), got {edits:?}"
+        );
+        assert_eq!(edits[0].new_text, "    Y = 1");
+    }
+
     /// The mirror case: a paste that closes a block (a lone `ENDIF`, no
     /// opener within the paste) between the same two body statements. The
     /// whole-document reformat needs to change three lines total (3, 4, 5)
