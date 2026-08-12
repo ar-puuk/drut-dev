@@ -4,7 +4,7 @@
 
 ;System
     ;In case TP+ crashes during batch, this will halt process & help identify error.
-    *(ECHO model crashed > 09_TAZ_Based_Metrics.txt)
+*(ECHO model crashed > 09_TAZ_Based_Metrics.txt)
 
 
 
@@ -140,70 +140,70 @@ SkimMatIdx = 11
 NumMetrics = 1
     ;AM --------------------------------------------------------------
     ;assign Cluster multi-step processing group
-    DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=2
+DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=2
         
-        PeriodLp1     = 'AM'
-        PeriodHr      = 'am3hr'
-        PeriodMetrics = PeriodLp1
+    PeriodLp1     = 'AM'
+    PeriodHr      = 'am3hr'
+    PeriodMetrics = PeriodLp1
         
-        RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
+    RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
             
-            READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
+        READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
             
-        ENDRUN
+    ENDRUN
         
-    EndDistributeMULTISTEP
+EndDistributeMULTISTEP
     
     
     ;MD --------------------------------------------------------------
     ;assign Cluster multi-step processing group
-    DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=3
+DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=3
         
-        PeriodLp1     = 'MD'
-        PeriodHr      = 'md6hr'
-        PeriodMetrics = PeriodLp1
+    PeriodLp1     = 'MD'
+    PeriodHr      = 'md6hr'
+    PeriodMetrics = PeriodLp1
         
-        RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
+    RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
             
-            READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
+        READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
             
-        ENDRUN
+    ENDRUN
         
-    EndDistributeMULTISTEP
+EndDistributeMULTISTEP
     
     
     ;PM --------------------------------------------------------------
     ;assign Cluster multi-step processing group
-    DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=4
+DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=4
         
-        PeriodLp1     = 'PM'
-        PeriodHr      = 'pm3hr'
-        PeriodMetrics = PeriodLp1
+    PeriodLp1     = 'PM'
+    PeriodHr      = 'pm3hr'
+    PeriodMetrics = PeriodLp1
         
-        RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
+    RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
             
-            READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
+        READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
             
-        ENDRUN
+    ENDRUN
         
-    EndDistributeMULTISTEP
+EndDistributeMULTISTEP
     
     
     ;EV --------------------------------------------------------------
     ;assign Cluster multi-step processing group
-    DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=5
+DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=5
         
-        PeriodLp1     = 'EV'
-        PeriodHr      = 'ev12hr'
-        PeriodMetrics = PeriodLp1
+    PeriodLp1     = 'EV'
+    PeriodHr      = 'ev12hr'
+    PeriodMetrics = PeriodLp1
         
-        RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
+    RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
             
-            READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
+        READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
             
-        ENDRUN
+    ENDRUN
         
-    EndDistributeMULTISTEP
+EndDistributeMULTISTEP
 
 
 ;PHT -------------------------------------------------------------------------------------
@@ -214,70 +214,70 @@ NumMetrics = 2
 
     ;AM --------------------------------------------------------------
     ;assign Cluster multi-step processing group
-    DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=6
+DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=6
         
-        PeriodLp1     = 'AM'
-        PeriodHr      = 'am3hr'
-        PeriodMetrics = PeriodLp1
+    PeriodLp1     = 'AM'
+    PeriodHr      = 'am3hr'
+    PeriodMetrics = PeriodLp1
         
-        RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
+    RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
             
-            READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
+        READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
             
-        ENDRUN
+    ENDRUN
         
-    EndDistributeMULTISTEP
+EndDistributeMULTISTEP
     
     
     ;MD --------------------------------------------------------------
     ;assign Cluster multi-step processing group
-    DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=7
+DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=7
         
-        PeriodLp1     = 'MD'
-        PeriodHr      = 'md6hr'
-        PeriodMetrics = PeriodLp1
+    PeriodLp1     = 'MD'
+    PeriodHr      = 'md6hr'
+    PeriodMetrics = PeriodLp1
         
-        RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
+    RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
             
-            READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
+        READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
             
-        ENDRUN
+    ENDRUN
         
-    EndDistributeMULTISTEP
+EndDistributeMULTISTEP
     
     
     ;PM --------------------------------------------------------------
     ;assign Cluster multi-step processing group
-    DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=8
+DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=8
         
-        PeriodLp1     = 'PM'
-        PeriodHr      = 'pm3hr'
-        PeriodMetrics = PeriodLp1
+    PeriodLp1     = 'PM'
+    PeriodHr      = 'pm3hr'
+    PeriodMetrics = PeriodLp1
         
-        RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
+    RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
             
-            READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
+        READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
             
-        ENDRUN
+    ENDRUN
         
-    EndDistributeMULTISTEP
+EndDistributeMULTISTEP
     
     
     ;EV --------------------------------------------------------------
     ;assign Cluster multi-step processing group
-    DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=9
+DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=9
         
-        PeriodLp1     = 'EV'
-        PeriodHr      = 'ev12hr'
-        PeriodMetrics = PeriodLp1
+    PeriodLp1     = 'EV'
+    PeriodHr      = 'ev12hr'
+    PeriodMetrics = PeriodLp1
         
-        RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
+    RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
             
-            READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
+        READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
             
-        ENDRUN
+    ENDRUN
         
-    EndDistributeMULTISTEP
+EndDistributeMULTISTEP
 
 
 ;PHT_FF ----------------------------------------------------------------------------------
@@ -288,67 +288,67 @@ NumMetrics = 3
 
     ;AM --------------------------------------------------------------
     ;assign Cluster multi-step processing group
-    DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=10
+DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=10
         
-        PeriodLp1     = 'AM'
-        PeriodHr      = 'am3hr'
-        PeriodMetrics = PeriodLp1
+    PeriodLp1     = 'AM'
+    PeriodHr      = 'am3hr'
+    PeriodMetrics = PeriodLp1
         
-        RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
+    RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
             
-            READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
+        READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
             
-        ENDRUN
+    ENDRUN
         
-    EndDistributeMULTISTEP
+EndDistributeMULTISTEP
     
     
     ;MD --------------------------------------------------------------
     ;assign Cluster multi-step processing group
-    DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=11
+DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=11
         
-        PeriodLp1     = 'MD'
-        PeriodHr      = 'md6hr'
-        PeriodMetrics = PeriodLp1
+    PeriodLp1     = 'MD'
+    PeriodHr      = 'md6hr'
+    PeriodMetrics = PeriodLp1
         
-        RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
+    RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
             
-            READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
+        READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
             
-        ENDRUN
+    ENDRUN
         
-    EndDistributeMULTISTEP
+EndDistributeMULTISTEP
     
     
     ;PM --------------------------------------------------------------
     ;assign Cluster multi-step processing group
-    DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=12
+DistributeMULTISTEP PROCESSID=ClusterNodeID PROCESSNUM=12
         
-        PeriodLp1     = 'PM'
-        PeriodHr      = 'pm3hr'
-        PeriodMetrics = PeriodLp1
+    PeriodLp1     = 'PM'
+    PeriodHr      = 'pm3hr'
+    PeriodMetrics = PeriodLp1
         
-        RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
+    RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
             
-            READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
+        READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
             
-        ENDRUN
+    ENDRUN
         
-    EndDistributeMULTISTEP
+EndDistributeMULTISTEP
     
     
     ;EV --------------------------------------------------------------
     ;assign Cluster multi-step processing group - keep on processor 1 (Main)
         
-        PeriodLp1     = 'EV'
-        PeriodHr      = 'ev12hr'
-        PeriodMetrics = PeriodLp1
+PeriodLp1     = 'EV'
+PeriodHr      = 'ev12hr'
+PeriodMetrics = PeriodLp1
         
-        RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
+RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - @Metric@ @PeriodLp1@'
             
-            READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
+    READ FILE = '@ParentDir@2_ModelScripts\5_AssignHwy\block\TAZ_Based_Metrics - metric calculation.block'
             
-        ENDRUN
+ENDRUN
         
 
 ;Cluster: wait for all multi-step processing to finish before continuing
@@ -448,15 +448,15 @@ ENDLOOP ;metric=1,3
 
 
 ;calculate run time for metrics calculations
-    RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - Runtime'
+RUN PGM=MATRIX   MSG='TAZ Based Metrics: Calculate Metrics - Runtime'
         
-        ZONES = 1
+    ZONES = 1
         
         ;calculate time
-        paEndTime = currenttime()
-        paRunTime = paEndTime - @paStartTime@
+    paEndTime = currenttime()
+    paRunTime = paEndTime - @paStartTime@
         
-        PRINT FILE='@ParentDir@@ScenarioDir@\_Log\_RunTime - @RID@ - TAZ-Based Metrics.csv',
+    PRINT FILE='@ParentDir@@ScenarioDir@\_Log\_RunTime - @RID@ - TAZ-Based Metrics.csv',
             APPEND=T,
             CSV=T,
             LIST='metrics'        ,
@@ -467,7 +467,7 @@ ENDLOOP ;metric=1,3
                  paEndTime        ,
                  paRunTime        
         
-    ENDRUN
+ENDRUN
 
 
 

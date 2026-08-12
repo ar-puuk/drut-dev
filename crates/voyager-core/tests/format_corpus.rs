@@ -20,13 +20,29 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use voyager_core::format::{format_bytes, EncodingFidelity, FormatOptions};
-use voyager_core::{parse, BlockKind, Node, Statement, StatementKind};
+use voyager_core::{parse, BlockKind, Node, Statement, StatementKind, TopLevelIndentMode};
 
 const VALID_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/valid");
 const GOLDEN_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/golden");
 const REAL_CORPUS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/valid/real_corpus");
 const REAL_CORPUS_GOLDEN_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/golden/real_corpus");
 const ENCODING_FALLBACK_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/encoding_fallback");
+
+// 009-top-level-indent-toggle: a second, separate fixture set holding 008's
+// already-committed, already-human-reviewed golden output verbatim (copied
+// before GOLDEN_DIR was regenerated to preserve-mode output) -- proves
+// explicit Normalize mode reproduces 008's shipped behavior exactly, with
+// no second human-review pass needed since this content never changed.
+const GOLDEN_NORMALIZE_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/golden_normalize");
+const REAL_CORPUS_GOLDEN_NORMALIZE_DIR: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/golden_normalize/real_corpus");
+
+fn normalize_options() -> FormatOptions {
+    FormatOptions {
+        casing: None,
+        top_level_indent: TopLevelIndentMode::Normalize,
+    }
+}
 
 fn script_files_in(dir: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
@@ -90,7 +106,12 @@ fn golden_path_for_real_corpus(fixture: &Path) -> PathBuf {
     Path::new(REAL_CORPUS_GOLDEN_DIR).join(rel)
 }
 
-fn check_golden(fixtures: Vec<PathBuf>, golden_dir: &Path, golden_path_for: impl Fn(&Path) -> PathBuf) {
+fn check_golden(
+    fixtures: Vec<PathBuf>,
+    golden_dir: &Path,
+    golden_path_for: impl Fn(&Path) -> PathBuf,
+    options: FormatOptions,
+) {
     let update = std::env::var_os("UPDATE_GOLDEN").is_some();
     if update {
         fs::create_dir_all(golden_dir).unwrap();
@@ -99,7 +120,7 @@ fn check_golden(fixtures: Vec<PathBuf>, golden_dir: &Path, golden_path_for: impl
     let mut mismatches = Vec::new();
     for fixture in fixtures {
         let bytes = fs::read(&fixture).unwrap();
-        let result = format_bytes(&bytes, FormatOptions::default());
+        let result = format_bytes(&bytes, options);
         let golden_path = golden_path_for(&fixture);
 
         if update {
@@ -127,11 +148,11 @@ fn check_golden(fixtures: Vec<PathBuf>, golden_dir: &Path, golden_path_for: impl
     );
 }
 
-fn check_idempotent(fixtures: Vec<PathBuf>) {
+fn check_idempotent(fixtures: Vec<PathBuf>, options: FormatOptions) {
     for fixture in fixtures {
         let bytes = fs::read(&fixture).unwrap();
-        let once = format_bytes(&bytes, FormatOptions::default());
-        let twice = format_bytes(once.text.as_bytes(), FormatOptions::default());
+        let once = format_bytes(&bytes, options);
+        let twice = format_bytes(once.text.as_bytes(), options);
         assert_eq!(once.text, twice.text, "not idempotent: {}", fixture.display());
         assert!(
             !twice.changed,
@@ -141,11 +162,11 @@ fn check_idempotent(fixtures: Vec<PathBuf>) {
     }
 }
 
-fn check_structure_and_diagnostics_preserved(fixtures: Vec<PathBuf>) {
+fn check_structure_and_diagnostics_preserved(fixtures: Vec<PathBuf>, options: FormatOptions) {
     for fixture in fixtures {
         let bytes = fs::read(&fixture).unwrap();
         let source = String::from_utf8_lossy(&bytes).into_owned();
-        let formatted = format_bytes(&bytes, FormatOptions::default());
+        let formatted = format_bytes(&bytes, options);
 
         let before = parse(&source);
         let after = parse(&formatted.text);
@@ -171,17 +192,17 @@ fn check_structure_and_diagnostics_preserved(fixtures: Vec<PathBuf>) {
 
 #[test]
 fn hand_written_fixtures_match_golden_output() {
-    check_golden(hand_written_fixtures(), Path::new(GOLDEN_DIR), golden_path_for);
+    check_golden(hand_written_fixtures(), Path::new(GOLDEN_DIR), golden_path_for, FormatOptions::default());
 }
 
 #[test]
 fn hand_written_fixtures_are_idempotent() {
-    check_idempotent(hand_written_fixtures());
+    check_idempotent(hand_written_fixtures(), FormatOptions::default());
 }
 
 #[test]
 fn hand_written_fixtures_preserve_structure_and_diagnostics() {
-    check_structure_and_diagnostics_preserved(hand_written_fixtures());
+    check_structure_and_diagnostics_preserved(hand_written_fixtures(), FormatOptions::default());
 }
 
 #[test]
@@ -190,17 +211,18 @@ fn real_corpus_fixtures_match_golden_output() {
         real_corpus_fixtures(),
         Path::new(REAL_CORPUS_GOLDEN_DIR),
         golden_path_for_real_corpus,
+        FormatOptions::default(),
     );
 }
 
 #[test]
 fn real_corpus_fixtures_are_idempotent() {
-    check_idempotent(real_corpus_fixtures());
+    check_idempotent(real_corpus_fixtures(), FormatOptions::default());
 }
 
 #[test]
 fn real_corpus_fixtures_preserve_structure_and_diagnostics() {
-    check_structure_and_diagnostics_preserved(real_corpus_fixtures());
+    check_structure_and_diagnostics_preserved(real_corpus_fixtures(), FormatOptions::default());
 }
 
 #[test]
@@ -209,6 +231,48 @@ fn real_corpus_fixture_count_is_the_known_nine() {
     // file without updating this comment (or the golden set silently grew
     // stale) — see T023b's provenance note.
     assert_eq!(real_corpus_fixtures().len(), 9);
+}
+
+// -- 009-top-level-indent-toggle: explicit Normalize mode reproduces 008's
+// already-committed, already-human-reviewed golden_normalize/ output
+// byte-for-byte (FR-006/SC-002) -- no second human-review pass needed,
+// since golden_normalize/ is a verbatim copy of what 008 already had
+// reviewed, never regenerated by this feature's own work.
+
+fn golden_normalize_path_for(fixture: &Path) -> PathBuf {
+    Path::new(GOLDEN_NORMALIZE_DIR).join(fixture.file_name().expect("fixture has a filename"))
+}
+
+fn golden_normalize_path_for_real_corpus(fixture: &Path) -> PathBuf {
+    let rel = fixture
+        .strip_prefix(REAL_CORPUS_DIR)
+        .expect("real_corpus_fixtures() only returns paths under REAL_CORPUS_DIR");
+    Path::new(REAL_CORPUS_GOLDEN_NORMALIZE_DIR).join(rel)
+}
+
+#[test]
+fn hand_written_fixtures_match_golden_output_under_normalize() {
+    check_golden(
+        hand_written_fixtures(),
+        Path::new(GOLDEN_NORMALIZE_DIR),
+        golden_normalize_path_for,
+        normalize_options(),
+    );
+}
+
+#[test]
+fn real_corpus_fixtures_match_golden_output_under_normalize() {
+    check_golden(
+        real_corpus_fixtures(),
+        Path::new(REAL_CORPUS_GOLDEN_NORMALIZE_DIR),
+        golden_normalize_path_for_real_corpus,
+        normalize_options(),
+    );
+}
+
+#[test]
+fn real_corpus_fixtures_are_idempotent_under_normalize() {
+    check_idempotent(real_corpus_fixtures(), normalize_options());
 }
 
 /// A structural "shape" — statement kinds/words/pair-keys and block

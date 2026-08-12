@@ -1,7 +1,7 @@
 
 ;System
     ;In case TP+ crashes during batch, this will halt process & help identify error.
-    *(ECHO model crashed > 3_SumToDistricts_GRAVITY.txt)
+*(ECHO model crashed > 3_SumToDistricts_GRAVITY.txt)
 
 
 
@@ -449,4 +449,4 @@ ENDRUN
 
 
 ;System cleanup
-  *(DEL 3_SumToDistricts_GRAVITY.txt)
+*(DEL 3_SumToDistricts_GRAVITY.txt)
