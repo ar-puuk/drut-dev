@@ -69,7 +69,7 @@ current codebase during planning (research.md §1-§4), not estimated**:
 
 ## Phase 1: Setup
 
-- [ ] T001 Confirm baseline: `cargo build --workspace` and
+- [x] T001 Confirm baseline: `cargo build --workspace` and
       `cargo clippy --workspace --all-targets -- -D warnings` both clean,
       on this fresh branch before any change.
 
@@ -87,17 +87,17 @@ indentation, no flags, and confirm it's byte-identical to the input.
 
 ### Implementation for User Story 1
 
-- [ ] T002 [US1] Add `TopLevelIndentMode` (`Preserve`/`Normalize`,
+- [x] T002 [US1] Add `TopLevelIndentMode` (`Preserve`/`Normalize`,
       `#[default]` on `Preserve`) to `crates/voyager-core/src/format.rs`
       per data-model.md; add the `top_level_indent: TopLevelIndentMode`
       field to `FormatOptions`; re-export `TopLevelIndentMode` from
       `crates/voyager-core/src/lib.rs` alongside `CasingConvention`.
-- [ ] T003 [US1] Make `plan_indentation`'s column-0 insert conditional on
+- [x] T003 [US1] Make `plan_indentation`'s column-0 insert conditional on
       `mode == TopLevelIndentMode::Normalize` (research.md §1's exact
       diff — thread the mode through `render`'s call into
       `plan_indentation` from `options.top_level_indent`). No change to
       `plan_block`/`plan_children`/`computed_indent`. Depends on T002.
-- [ ] T004 [US1] Retarget the 3 tests research.md §3 names in
+- [x] T004 [US1] Retarget the 3 tests research.md §3 names in
       `crates/voyager-core/src/format.rs`'s own test module to construct
       `FormatOptions { top_level_indent: TopLevelIndentMode::Normalize,
       ..Default::default() }` explicitly:
@@ -105,7 +105,7 @@ indentation, no flags, and confirm it's byte-identical to the input.
       `bare_top_level_statement_is_normalized_to_zero`,
       `diagnosed_block_opener_is_normalized_but_children_stay_untouched`.
       Depends on T003.
-- [ ] T005 [P] [US1] Add 3 new `Preserve`-mode sibling tests to the same
+- [x] T005 [P] [US1] Add 3 new `Preserve`-mode sibling tests to the same
       module (default `FormatOptions`, i.e. no explicit mode needed):
       a top-level `RUN` at non-zero indentation stays untouched (revives
       pre-`008`'s `top_level_baseline_is_left_untouched` assertion); a
@@ -113,19 +113,19 @@ indentation, no flags, and confirm it's byte-identical to the input.
       top-level block's opener *and* children both stay untouched
       (unlike the `Normalize`-mode sibling, where only children stay
       protected). Depends on T003.
-- [ ] T006 [P] [US1] Amend `specs/002-cli-check-format/spec.md`'s FR-012
+- [x] T006 [P] [US1] Amend `specs/002-cli-check-format/spec.md`'s FR-012
       bullet (second dated entry, `008`'s own entry preserved) and add the
       new FR-026, plus amend `contracts/formatting-api.md`, using
       `contracts/top-level-indent-toggle.md`'s exact replacement text.
       Independent of T002-T005 — documentation only, different files.
-- [ ] T007 [US1] Before any regeneration, copy the *current* (`008`-era,
+- [x] T007 [US1] Before any regeneration, copy the *current* (`008`-era,
       already-reviewed) `tests/fixtures/golden/` and
       `tests/fixtures/golden/real_corpus/` contents verbatim into a new
       `tests/fixtures/golden_normalize/` directory, mirroring the same
       structure — this captures `008`'s already-shipped, already-
       human-reviewed output as-is, before it gets overwritten by T009's
       `preserve`-mode regeneration. No test changes yet — just the copy.
-- [ ] T008 [US1] Regenerate and individually human-review every affected
+- [x] T008 [US1] Regenerate and individually human-review every affected
       golden fixture back to `preserve`-mode output (quickstart.md step
       4):
       ```powershell
@@ -159,14 +159,14 @@ shipped output byte-for-byte.
 
 ### Implementation for User Story 2
 
-- [ ] T009 [US2] Add `TopLevelIndentArg` (`ValueEnum`, mirrors
+- [x] T009 [US2] Add `TopLevelIndentArg` (`ValueEnum`, mirrors
       `CasingArg`'s shape) to `crates/drut-cli/src/cli.rs`; add
       `#[arg(long, value_enum, default_value_t = TopLevelIndentArg::
       Preserve)] top_level_indent: TopLevelIndentArg` to `Command::
       Format` (research.md §4 — the `OutputFormat` shape, not
       `CasingArg`'s `Option<...>` shape, since this setting is never
       "off").
-- [ ] T010 [US2] In `crates/drut-cli/src/format_cmd.rs`: add `impl From
+- [x] T010 [US2] In `crates/drut-cli/src/format_cmd.rs`: add `impl From
       <TopLevelIndentArg> for TopLevelIndentMode` (mirrors the existing
       `CasingArg`→`CasingConvention` impl); add a `top_level_indent:
       TopLevelIndentArg` parameter to `run()`; set the field explicitly
@@ -175,20 +175,20 @@ shipped output byte-for-byte.
       top_level_indent } => format_cmd::run(&path, write, check, diff,
       casing, top_level_indent)`) to destructure and pass the new field.
       Depends on T002, T009.
-- [ ] T011 [P] [US2] Add `--top-level-indent` coverage to
+- [x] T011 [P] [US2] Add `--top-level-indent` coverage to
       `crates/drut-cli/tests/format_flags.rs`, mirroring the existing
       `--casing` test shape: omitted flag defaults to `preserve`
       (non-zero top-level indentation untouched); `--top-level-indent=
       normalize` forces column 0; `--top-level-indent=preserve` explicit
       is identical to omitting it. Depends on T010.
-- [ ] T012 [US2] Retarget all 5 tests in
+- [x] T012 [US2] Retarget all 5 tests in
       `crates/voyager-core/tests/format_sequence.rs` to construct
       `FormatOptions { top_level_indent: TopLevelIndentMode::Normalize,
       ..Default::default() }` explicitly at every `format(...,
       FormatOptions::default())` call site in the file — proving `008`'s
       own guarantee (the `PROCESS`/`RUN` residue sequence resolving in
       one pass) still holds under explicit `Normalize`. Depends on T003.
-- [ ] T013 [US2] Parameterize `crates/voyager-core/tests/format_corpus.rs`'s
+- [x] T013 [US2] Parameterize `crates/voyager-core/tests/format_corpus.rs`'s
       three shared helpers (`check_golden`, `check_idempotent`,
       `check_structure_and_diagnostics_preserved`) to accept an explicit
       `FormatOptions` argument instead of hardcoding
@@ -221,13 +221,13 @@ top-level fixture — confirm all three leave it untouched.
 
 ### Implementation for User Story 3
 
-- [ ] T014 [P] [US3] Add a direct, minimal test to
+- [x] T014 [P] [US3] Add a direct, minimal test to
       `crates/voyager-core/src/format.rs`'s test module asserting
       `FormatOptions::default().top_level_indent ==
       TopLevelIndentMode::Preserve` — the single most direct
       confirmation of FR-004(b), distinct from (and cheaper than) the
       behavioral tests around it. Depends on T002.
-- [ ] T015 [P] [US3] In `crates/drut-mcp/src/format.rs`'s
+- [x] T015 [P] [US3] In `crates/drut-mcp/src/format.rs`'s
       `casing_option` function (or a renamed equivalent covering both
       fields): explicitly set `top_level_indent:
       voyager_core::TopLevelIndentMode::default()` on the `FormatOptions`
@@ -235,17 +235,17 @@ top-level fixture — confirm all three leave it untouched.
       makes the choice visible in the diff, not merely satisfied). No new
       `FormatInput` field — no MCP-side toggle in scope (spec
       Assumptions). Depends on T002.
-- [ ] T016 [P] [US3] Add a new test to `crates/drut-mcp/src/format.rs`'s
+- [x] T016 [P] [US3] Add a new test to `crates/drut-mcp/src/format.rs`'s
       own test module with a genuinely non-zero top-level fixture (e.g.
       `"    IF (a=b)\n    PRINT LIST=1\n    ENDIF\n"`), confirming the
       `format` tool's default output leaves it untouched. Depends on T015.
-- [ ] T017 [P] [US3] Add a new test to `crates/drut-lsp/src/formatting.rs`'s
+- [x] T017 [P] [US3] Add a new test to `crates/drut-lsp/src/formatting.rs`'s
       own test module: a document with non-zero top-level indentation,
       formatted via the existing `handle` function with no client-side
       override, is left untouched at the top level (nested content still
       corrects normally). No code change to `formatting.rs` itself.
       Depends on T002.
-- [ ] T018 [P] [US3] Add a new test to
+- [x] T018 [P] [US3] Add a new test to
       `crates/drut-lsp/src/range_formatting.rs`'s own test module: same
       shape as T017, via `textDocument/rangeFormatting`'s `handle`
       function — a non-zero top-level line inside (or at the edge of) the
@@ -263,10 +263,10 @@ handlers, and the MCP tool.
 **Purpose**: Whole-workspace and full-corpus re-proof, once all three
 stories are done.
 
-- [ ] T019 `cargo test --release --workspace` and
+- [x] T019 `cargo test --release --workspace` and
       `cargo clippy --workspace --all-targets -- -D warnings`, both
       clean.
-- [ ] T020 [P] Full 161-file corpus revalidation across all three adapter
+- [x] T020 [P] Full 161-file corpus revalidation across all three adapter
       surfaces (quickstart.md step 7), each reported individually:
       ```powershell
       $env:DRUT_CORPUS_PATH = "path\to\WF-TDM-Official-Releases"
