@@ -122,6 +122,20 @@ mod tests {
     }
 
     #[test]
+    fn non_zero_top_level_indentation_is_left_untouched_by_default() {
+        // 009-top-level-indent-toggle FR-004(c)/User Story 3: no compiler
+        // forcing function exists for this call site (it's a bare
+        // FormatOptions::default(), not a struct literal) -- confirmed
+        // directly rather than inferred from any other adapter's own test
+        // passing.
+        let mut state = ServerState::new();
+        let text = "    IF (a=b)\n        PRINT LIST=1\n    ENDIF\n".to_string();
+        state.did_open(lsp_types::Uri::from_str("file:///a.s").unwrap(), text.clone(), 1);
+        let edits = handle(&state, &params("file:///a.s")).unwrap();
+        assert!(edits.is_empty(), "non-zero top-level indentation must be left untouched by default, got {edits:?}");
+    }
+
+    #[test]
     fn unopened_document_returns_none() {
         let state = ServerState::new();
         assert!(handle(&state, &params("file:///never-opened.s")).is_none());

@@ -1,5 +1,6 @@
 //! `format` flag behavior: default/`--write`/`--check`/`--diff` disposition,
-//! `--casing` validation, and mutual exclusivity (spec.md FR-015–FR-019).
+//! `--casing` validation, mutual exclusivity (spec.md FR-015–FR-019), and
+//! `--top-level-indent` (FR-026, 009-top-level-indent-toggle).
 
 use std::fs;
 use std::io::Read;
@@ -133,6 +134,56 @@ fn casing_upper_rewrites_control_words() {
     let out = drut(&["format", file.to_str().unwrap(), "--casing=upper"]);
     assert_eq!(out.status.code(), Some(0));
     assert_eq!(String::from_utf8_lossy(&out.stdout), "IF (x=1)\nENDIF\n");
+}
+
+const TOP_LEVEL_NON_ZERO: &str = "    IF (X=1)\n        Y = 2\n    ENDIF\n";
+
+#[test]
+fn top_level_indent_omitted_defaults_to_preserve() {
+    // 009-top-level-indent-toggle FR-004(a): the CLI flag's own default,
+    // confirmed end to end (not just via clap's declared default_value_t)
+    // -- a non-zero top-level IF, already correctly nested relative to its
+    // own (non-zero) position, is left completely untouched.
+    let dir = TempDir::new("top-level-indent-omitted");
+    let file = dir.path().join("x.s");
+    fs::write(&file, TOP_LEVEL_NON_ZERO).unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(String::from_utf8_lossy(&out.stdout), TOP_LEVEL_NON_ZERO);
+}
+
+#[test]
+fn top_level_indent_normalize_forces_column_zero() {
+    let dir = TempDir::new("top-level-indent-normalize");
+    let file = dir.path().join("x.s");
+    fs::write(&file, TOP_LEVEL_NON_ZERO).unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--top-level-indent=normalize"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "IF (X=1)\n    Y = 2\nENDIF\n");
+}
+
+#[test]
+fn top_level_indent_preserve_explicit_matches_omitted() {
+    let dir = TempDir::new("top-level-indent-preserve-explicit");
+    let file = dir.path().join("x.s");
+    fs::write(&file, TOP_LEVEL_NON_ZERO).unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--top-level-indent=preserve"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(String::from_utf8_lossy(&out.stdout), TOP_LEVEL_NON_ZERO);
+}
+
+#[test]
+fn top_level_indent_invalid_value_is_a_usage_error() {
+    let dir = TempDir::new("top-level-indent-invalid");
+    let file = dir.path().join("x.s");
+    fs::write(&file, MESSY).unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--top-level-indent=sideways"]);
+    assert_ne!(out.status.code(), Some(0));
+    assert_eq!(fs::read_to_string(&file).unwrap(), MESSY);
 }
 
 #[test]

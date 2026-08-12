@@ -16,7 +16,19 @@
 //! fixed point itself against an independently-derived correct expectation
 //! after a real structural edit, which is the piece that was missing.
 
-use voyager_core::{format, FormatOptions};
+use voyager_core::{format, FormatOptions, TopLevelIndentMode};
+
+/// 009-top-level-indent-toggle: explicit Normalize mode, for the two tests
+/// below whose fixture genuinely needs a non-zero top-level RUN corrected
+/// to column 0 -- the other three tests in this file (007-era, predating
+/// 008) are mode-independent by fixture construction and are left on
+/// FormatOptions::default() unchanged.
+fn normalize() -> FormatOptions {
+    FormatOptions {
+        casing: None,
+        top_level_indent: TopLevelIndentMode::Normalize,
+    }
+}
 
 /// The exact real-world sequence that surfaced the bug: a `PROCESS
 /// PHASE=INPUT` left unclosed swallows a trailing `RUN PGM=HWYASSIGN` as
@@ -96,8 +108,11 @@ fn run_if_residue_is_fixed_after_endrun_is_added() {
 /// original bug report actually described.
 #[test]
 fn process_run_residue_with_stale_run_indentation_resolves_in_one_pass() {
+    // Retargeted 2026-08-12 (009-top-level-indent-toggle) to explicit
+    // Normalize mode now that Preserve is the default -- this test exists
+    // to keep proving 008's own guarantee still holds, opt-in.
     let step2 = "PROCESS PHASE=INPUT\n    FILEI = ni.1\n    LOOP DAY = 1, 5\n        PRINT LIST='Day = ', DAY\n    ENDLOOP\nENDPROCESS\n\n    RUN PGM=HWYASSIGN\n        FILEI NETI = 'net.net'\n    ENDRUN\n";
-    let pass2 = format(step2, FormatOptions::default());
+    let pass2 = format(step2, normalize());
 
     let expected = "PROCESS PHASE=INPUT\n    FILEI = ni.1\n    LOOP DAY = 1, 5\n        PRINT LIST='Day = ', DAY\n    ENDLOOP\nENDPROCESS\n\nRUN PGM=HWYASSIGN\n    FILEI NETI = 'net.net'\nENDRUN\n";
     assert!(
@@ -127,9 +142,12 @@ fn process_run_residue_with_stale_run_indentation_resolves_in_one_pass() {
 /// `008-top-level-indentation-normalization` shipped to prove.
 #[test]
 fn process_run_residue_full_sequence_with_stale_run_indentation_resolves_in_one_pass() {
+    // Retargeted 2026-08-12 (009-top-level-indent-toggle) to explicit
+    // Normalize mode now that Preserve is the default -- see the sibling
+    // test above.
     let step1 = "PROCESS PHASE=INPUT\n    FILEI = ni.1\n    LOOP DAY = 1, 5\n        PRINT LIST='Day = ', DAY\n    ENDLOOP\n\n    RUN PGM=HWYASSIGN\n        FILEI NETI = 'net.net'\n    ENDRUN\n";
 
-    let pass1 = format(step1, FormatOptions::default());
+    let pass1 = format(step1, normalize());
     assert!(
         !pass1.changed,
         "pass 1 (PROCESS still unclosed) must leave RUN's whole subtree untouched, not speculatively reindent it: {:?}",
@@ -141,7 +159,7 @@ fn process_run_residue_full_sequence_with_stale_run_indentation_resolves_in_one_
     );
 
     let step2 = pass1.text.replacen("    ENDLOOP\n\n", "    ENDLOOP\nENDPROCESS\n\n", 1);
-    let pass2 = format(&step2, FormatOptions::default());
+    let pass2 = format(&step2, normalize());
 
     let expected = "PROCESS PHASE=INPUT\n    FILEI = ni.1\n    LOOP DAY = 1, 5\n        PRINT LIST='Day = ', DAY\n    ENDLOOP\nENDPROCESS\n\nRUN PGM=HWYASSIGN\n    FILEI NETI = 'net.net'\nENDRUN\n";
     assert!(

@@ -179,6 +179,21 @@ mod tests {
     }
 
     #[test]
+    fn non_zero_top_level_indentation_is_left_untouched_by_default() {
+        // 009-top-level-indent-toggle FR-004(c)/User Story 3: same forcing-
+        // function gap as formatting.rs's own default-verification test --
+        // this call site is a bare FormatOptions::default(), so nothing
+        // else catches a stale default here.
+        let mut state = ServerState::new();
+        let text = "    IF (a=b)\n        PRINT LIST=1\n    ENDIF\n".to_string();
+        state.did_open(lsp_types::Uri::from_str("file:///a.s").unwrap(), text, 1);
+        // Range covers the whole document -- if anything were going to be
+        // touched, it would show up here.
+        let edits = handle(&state, &params("file:///a.s", 0, 2)).unwrap();
+        assert!(edits.is_empty(), "non-zero top-level indentation must be left untouched by default, got {edits:?}");
+    }
+
+    #[test]
     fn change_outside_requested_range_is_not_returned() {
         let mut state = ServerState::new();
         // Two unrelated, independently-misindented lines inside two
