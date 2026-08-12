@@ -38,7 +38,7 @@ Recognize a whole-line `; FMT: OFF` / `; FMT: ON` comment pair (via the existing
 - MUST gate at collection time, not render time (research.md §2's "opener residue" finding) — a child of a protected block opener must anchor to the opener's true on-disk column, not a planned-but-discarded value.
 - MUST regenerate no existing golden fixture (SC-002) — new fixtures only, additive.
 
-**Scale/Scope**: Same 161-file corpus, used only for regression revalidation (zero real corpus file contains markers today — this feature's own proof comes entirely from new hand-written fixtures, per quickstart.md step 5).
+**Scale/Scope**: Same 161-file corpus. The existing `real_corpus/` set is used only for regression revalidation (zero real corpus file contains markers today, so it must stay byte-identical — SC-002). This feature's own SC-001 proof comes from two additive fixture sets: new hand-written fixtures, and (added after `/speckit-analyze` review — SC-001 explicitly requires this) a small sample of real-world script shapes derived from the existing corpus with synthetic marker pairs inserted, kept as a separate new fixture set rather than modifying `real_corpus/` itself (quickstart.md step 5, tasks.md T010/T011).
 
 ## Constitution Check
 

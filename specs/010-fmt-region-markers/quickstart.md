@@ -20,7 +20,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test -p voyager-core --lib format::
 ```
 
-Expected: all green, including hand-written tests for every Edge Case named in spec.md — a protected range with wrong indentation/casing left untouched (FR-003), lines outside a region normalized as usual (FR-004), duplicate `; FMT: OFF` and stray `; FMT: ON` no-ops (US1 Acceptance Scenarios 4-5), a protected range straddling a block boundary, and a whole-file-is-one-region case.
+Expected: all green, including hand-written tests for every Edge Case named in spec.md — a protected range with wrong indentation/casing left untouched (FR-003), lines outside a region normalized as usual (FR-004), duplicate `; FMT: OFF` and stray `; FMT: ON` no-ops (US1 Acceptance Scenarios 4-5), a protected range straddling a block boundary, a whole-file-is-one-region case, and marker-looking text inside a real block comment correctly ignored (FR-009). Also includes this feature's three most important tests (added after `/speckit-analyze` review): the opener-residue regression test (a protected block opener whose out-of-region children still anchor to its *true* on-disk column, not a discarded planned value — research.md §2), and its two sibling-mechanism interaction tests against `009`'s `TopLevelIndentMode::Normalize` and `007`'s diagnosed-block skip. A direct `parse()`-untouched assertion (FR-006) is included as well.
 
 ## 3. Unclosed-marker detection — validates FR-010, US2
 
@@ -44,7 +44,7 @@ Expected: formatting a fixture containing protected regions twice in a row produ
 cargo test -p voyager-core --test format_corpus
 ```
 
-Expected: all green with **zero** golden-fixture diffs — this feature must not change output for any existing fixture, since none of them contain `; FMT: OFF`/`; FMT: ON` markers yet (FR-004/SC-002). New fixtures with synthetic marker pairs inserted (a copy of an existing fixture, markers added around a deliberately "wrong" section) are added under `tests/fixtures/golden/` following the existing naming convention, proving SC-001 without disturbing the existing 161-file-corpus-derived set.
+Expected: all green with **zero** golden-fixture diffs — this feature must not change output for any existing fixture, since none of them contain `; FMT: OFF`/`; FMT: ON` markers yet (FR-004/SC-002). Two additive fixture sets prove SC-001, neither disturbing the existing `real_corpus/`-derived set: new hand-written fixtures with synthetic marker pairs inserted (tasks.md T010), and (added after `/speckit-analyze` review — SC-001 explicitly requires this) a small sample of real-world script shapes derived from the existing corpus, with synthetic marker pairs inserted, kept as a separate new subdirectory rather than modifying `real_corpus/` itself (tasks.md T011).
 
 ## 6. Adapter surfaces — validates FR-007, US3
 
