@@ -136,23 +136,30 @@ owner once the in-flight work is clear.
    silently picking one. Findings get reported directly to the owner before
    any `--casing=auto` spec work begins.
 5. **Short-form (single-line, self-closing, no explicit closer) syntax for
-   other block-opening control words** — *not started, investigate first*
-   (added 2026-08-11). Short-`IF` (`IF (...) STATEMENT` on one line, no
-   `ENDIF`) is already implemented and correctly produces zero diagnostics
-   (FR-007). Investigate whether Voyager has an equivalent shorthand for
-   `LOOP`, `JLOOP`, `PROCESS`, `RUN`, or any other block-opening control
-   word. Check the local Cube 6.5.1/OpenPaths documentation archive first —
-   same method used for the original short-`IF` discovery — before assuming
-   `IF` is the only one that has this.
-6. **Short-`IF` TextMate syntax-highlighting gap** — *not started* (added
-   2026-08-11). `IF (...) STATEMENT` on one line correctly produces zero
-   diagnostics (working as designed per FR-007), but the static
-   `.tmLanguage.json` grammar has no pattern for this shape, so everything
-   after `IF (...)` renders in one generic/undifferentiated highlight color
-   instead of proper keyword/string/etc. token coloring. Check whether LSP
-   semantic tokens have the same gap or only the static grammar does — if
-   only the static grammar is affected, the LSP-connected editor path may
-   already be fine and this is VS Code's non-LSP fallback highlighting only.
+   other block-opening control words** — *closed, IF-only confirmed*
+   (investigated 2026-08-11). Checked both archive sources' dedicated
+   sections for `LOOP`, `JLOOP`, `LINKLOOP`, `RUN`, `PROCESS`/`PHASE`, and
+   `DISTRIBUTEMULTISTEP` (Citilabs Cube 6.5.1 Reference Guide; cross-checked
+   independently against OpenPaths Cube's own control-statements docs).
+   Only `IF` is ever documented as having two forms (a single-statement
+   form and a block form) — both sources agree, no disagreement to
+   surface. `RUN`'s optional-`ENDRUN`/implicit-close-by-next-`RUN`-or-
+   shell-escape and `PROCESS`'s `PHASE=`-shorthand/implicit-close-by-next-
+   `PROCESS` are already fully implemented (matches what both sources
+   document) and are a different kind of shorthand than short-`IF`'s
+   self-closing single-line form, not a gap. No implementation work
+   surfaced; no further action needed.
+6. **Short-`IF` TextMate syntax-highlighting gap** — *done* (fixed
+   2026-08-11). Root cause was not the static grammar (its patterns are
+   token-level and line-position-agnostic, so they'd have colored a
+   short-IF's body statement correctly on their own) — it was
+   `crates/drut-lsp/src/semantic_tokens.rs` emitting one `shortIf` semantic
+   token spanning the *entire* short-IF line (header + body statement),
+   which overrides the static grammar's normal coloring for everything in
+   that span (LSP semantic tokens take priority over TextMate scopes).
+   Narrowed the token to just the header (`IF` through the condition's
+   closing paren); the body statement now renders under the static
+   grammar's own coloring again. LSP-only fix, no `voyager-core` change.
 
 ## Later / stretch (explicitly not part of the pre-publish sequence)
 
