@@ -20,12 +20,16 @@ fn format_bytes(source: &[u8], options: FormatOptions) -> FormatResult
   re-renders it: whitespace is normalized to the canonical form spec.md FR-012
   defines concretely (4-space-per-nesting-level indentation relative to each
   block's own opener, zero-delta closer/`ELSEIF`/`ELSE` alignment, top-level
-  baseline always normalized to column 0 — `008-top-level-indentation-
-  normalization`, 2026-08-11, reversing the original "left untouched" rule —
-  continuation-line indentation left untouched, comments left entirely
-  untouched) — not an unspecified "canonical form," but this exact,
-  corpus-derived rule set. Only if `options.casing` is `Some`, matched
-  control-word/keyword-name tokens are additionally rewritten to that casing.
+  baseline defaults to left untouched (`preserve`), or always normalized to
+  column 0 when `options.top_level_indent` is explicitly `Normalize` —
+  `008-top-level-indentation-normalization`, 2026-08-11, first reversed the
+  original "left untouched" rule to always-normalize; `009-top-level-indent-
+  toggle`, 2026-08-12, reverted that to `preserve` as the default while
+  keeping `normalize` fully available, opt-in — continuation-line indentation
+  left untouched, comments left entirely untouched) — not an unspecified
+  "canonical form," but this exact, corpus-derived rule set. Only if
+  `options.casing` is `Some`, matched control-word/keyword-name tokens are
+  additionally rewritten to that casing.
   Returns the rendered text plus a `changed` flag plus whatever diagnostics parsing
   `source` would have produced (see data-model.md § FormatResult).
 - **`format_bytes`**: Decodes `source` the same way `parse_bytes` does (UTF-8 first,

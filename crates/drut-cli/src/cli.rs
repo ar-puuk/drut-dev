@@ -43,6 +43,14 @@ pub enum Command {
         /// when given; no bare `--casing` (FR-015).
         #[arg(long, value_enum)]
         casing: Option<CasingArg>,
+        /// Top-level (depth-0) indentation policy — `preserve` (default,
+        /// FR-001) leaves it exactly as written; `normalize` forces every
+        /// top-level line to column 0 (FR-002/FR-003,
+        /// 009-top-level-indent-toggle). Unlike `--casing`, always has a
+        /// value — omitting the flag is not a third "off" state
+        /// (research.md §4).
+        #[arg(long, value_enum, default_value_t = TopLevelIndentArg::Preserve)]
+        top_level_indent: TopLevelIndentArg,
     },
     /// Speak the Language Server Protocol over stdio (003-lsp-vscode-extension
     /// FR-001) — no flags; launchable by an LSP client with no configuration
@@ -69,7 +77,13 @@ pub enum CasingArg {
     Lower,
 }
 
-// The CasingArg -> voyager_core::CasingConvention conversion lives in
-// format_cmd.rs (added alongside the voyager-core format module, US2) rather
-// than here, so this Foundational-phase module has no dependency on US2's
-// not-yet-built types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum TopLevelIndentArg {
+    Preserve,
+    Normalize,
+}
+
+// The CasingArg -> voyager_core::CasingConvention and TopLevelIndentArg ->
+// voyager_core::TopLevelIndentMode conversions live in format_cmd.rs (added
+// alongside the voyager-core format module) rather than here, so this
+// Foundational-phase module has no dependency on those not-yet-built types.

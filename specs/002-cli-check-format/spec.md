@@ -243,25 +243,36 @@ unchanged from the pre-format parse (behavior preservation).
     99.2% of 2,461 real closer/opener pairs.
   - **`ELSEIF`/`ELSE`** align to the same column as their `IF` (delta 0). Confirmed
     near-unanimous: 98.7% of 1,250 real occurrences.
-  - **Top-level (depth-0) statement indentation is always normalized to column
-    0**, on every format pass, unconditionally — regardless of the statement's
-    current indentation or formatting history. **Amended 2026-08-11
-    (`008-top-level-indentation-normalization`)**: this reverses the rule's
-    original form, which left top-level indentation untouched. The corpus
-    finding behind that original rule is historical record, not disproven —
-    only 20.4% of real top-level statements sit at column 0 (best single value
-    26.9%, at column 8) — but the project has deliberately traded preserving
-    that real-author diversity for predictability, knowing this reformats a
-    majority of real top-level statements in the reference corpus on first
-    run. See the dated Assumptions entry below for the full reversal writeup.
+  - **Top-level (depth-0) statement indentation defaults to left untouched
+    (`preserve`)**, on every format pass, unless `--top-level-indent=normalize`
+    is explicitly requested, in which case it is always normalized to column 0,
+    unconditionally — regardless of the statement's current indentation or
+    formatting history. **Amended 2026-08-11 (`008-top-level-indentation-
+    normalization`)**: this reverses the rule's original form, which left
+    top-level indentation untouched. The corpus finding behind that original
+    rule is historical record, not disproven — only 20.4% of real top-level
+    statements sit at column 0 (best single value 26.9%, at column 8) — but the
+    project has deliberately traded preserving that real-author diversity for
+    predictability, knowing this reformats a majority of real top-level
+    statements in the reference corpus on first run. See the dated Assumptions
+    entry below for the full reversal writeup. **Amended again 2026-08-12
+    (`009-top-level-indent-toggle`)**: this reverts `008`'s *default* back to
+    the original `007`-era `preserve` behavior — `008`'s corpus-evidence
+    framing was never in question; the project simply decided predictability-
+    by-default was the wrong trade for users who never asked for it. `008`'s
+    `normalize` behavior is fully retained, unchanged, as an explicit opt-in
+    (FR-026). See the second dated Assumptions entry below.
     A block's children are still only ever indent-planned (per the
     per-nesting-level rule above) when that block itself is *not* the subject
     of an `UnmatchedIf`/`UnmatchedLoop`/`UnmatchedRun`/`UnmatchedProcess`
     diagnostic (**`007-formatter-diagnosed-block-indent-fix`**, narrowed by
-    `008`'s own dated entry below) — the block's *own opener line* is
-    unconditionally corrected regardless of diagnosis; only its *children*
-    remain protected, since their structural relationship to a genuinely
-    unmatched block stays uncertain no matter what column the opener lands on.
+    `008`'s own dated entry below) — under `normalize`, the block's *own opener
+    line* is unconditionally corrected regardless of diagnosis; only its
+    *children* remain protected, since their structural relationship to a
+    genuinely unmatched block stays uncertain no matter what column the opener
+    lands on. Under `preserve` (the default), neither the opener nor the
+    children are touched — the same non-overlapping-responsibility split, just
+    with nothing forcing the opener in the first place.
   - **Continuation-line indentation is left untouched.** No dominant convention
     exists (best single value only 23.0%, with a long flat tail) — a weaker signal
     than even the casing survey found for `IF`/`LOOP`/`JLOOP`, so it receives the
@@ -357,6 +368,11 @@ unchanged from the pre-format parse (behavior preservation).
   code MUST reflect the same "couldn't safely complete" outcome as a read/write
   failure (FR-020(c)) — this is a specific *reason* within that existing outcome,
   not a new, fourth exit-code case.
+- **FR-026**: `format` MUST support a `--top-level-indent` flag accepting `preserve`
+  (default) or `normalize`, selecting between FR-012's two top-level indentation
+  behaviors. Unlike FR-015's `--casing` flag, this setting has no "off" state —
+  omitting the flag resolves to the explicit `preserve` default, not an unset/`None`
+  value. Added `2026-08-12` (`009-top-level-indent-toggle`).
 
 ### Key Entities
 
@@ -560,6 +576,44 @@ unchanged from the pre-format parse (behavior preservation).
   regenerated golden file was individually diff-reviewed before being
   committed, confirming only top-level indentation shifted and nothing else
   moved, matching the original `T023b` human-in-the-loop discipline.
+- **2026-08-12 default reversal (`009-top-level-indent-toggle`): top-level
+  indentation reverts to left-untouched by default; `008`'s always-normalize
+  behavior becomes opt-in via `--top-level-indent=normalize` (FR-026).** Not
+  new evidence against `008`'s own reasoning — the project simply decided
+  predictability-by-default was the wrong trade for users who never asked for
+  it, while retaining it fully for users who do want it. Fix: `plan_indentation`
+  gained a `TopLevelIndentMode` parameter (`Preserve`/`Normalize`,
+  `Preserve` the new `#[default]`); the single line `008` added
+  (`plan.insert(node.span().start.line, 0)`) became conditional on
+  `mode == Normalize` — no other line of `plan_indentation`, and no line at
+  all of `plan_block`/`plan_children`/`computed_indent`, changed. `007`'s
+  skip needed no rationale change this time (unlike `008`, which had to
+  re-derive it): under `Preserve` it behaves exactly as it did pre-`008`
+  (protects a diagnosed block's children; the opener is also untouched, but
+  because nothing forces it under `Preserve`, not because the skip protects
+  it); under `Normalize` it behaves exactly as `008` already verified.
+  Default-placement correctness — the exact class of bug
+  (`pair_keyword_boundaries`, `structural_query_parity`) that has bitten this
+  codebase before, a setting correct at one call site but silently stale at
+  another — was verified individually, not transitively, at all four
+  integration points: the CLI flag's own `clap` default, `FormatOptions::
+  default()`, and both `drut-lsp` `FormatOptions::default()` call sites
+  (`formatting.rs`, `range_formatting.rs`, neither compiler-forced, each
+  given its own dedicated test since nothing else would catch a regression
+  there); `drut-mcp`'s own struct-literal call site was compiler-forced to
+  set the field explicitly by Rust's own struct-literal exhaustiveness (no
+  `..Default::default()` spread was used there), converting what could have
+  been a silent-miss risk into a build error. `008`'s original `normalize`
+  behavior was independently re-proven byte-identical against its own
+  already-committed, already-human-reviewed golden output (copied verbatim
+  into a new `golden_normalize/` fixture set before any `preserve`-mode
+  regeneration touched the original `golden/` directory) — no second
+  human-review pass needed, since the expected content itself never changed.
+  Golden-fixture impact for the `preserve` default: the same 7
+  `real_corpus/` fixtures `008` changed revert toward their pre-`008`
+  content; zero hand-written `valid/` fixtures affected either direction.
+  Every regenerated golden file was individually diff-reviewed before being
+  committed, same `T023b` discipline.
 - **FR-013(b)/FR-025's encoding-safety split was a deliberate, considered choice
   between two options**, not the only way to resolve the conflict between FR-013's
   "never alter meaningful content" guarantee and FR-034's decode fallback: (a) treat

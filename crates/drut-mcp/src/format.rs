@@ -39,7 +39,14 @@ fn casing_option(casing: &Option<String>) -> Result<voyager_core::FormatOptions,
         Some("lower") => Some(voyager_core::CasingConvention::Lower),
         Some(other) => return Err(format!("`casing` must be \"upper\" or \"lower\" if given, got {other:?}")),
     };
-    Ok(voyager_core::FormatOptions { casing: convention })
+    Ok(voyager_core::FormatOptions {
+        casing: convention,
+        // No MCP-side top-level-indent toggle in scope
+        // (009-top-level-indent-toggle/spec.md Assumptions) — explicit,
+        // not spread from `..Default::default()`, so the choice is
+        // visible in the diff rather than implicit.
+        top_level_indent: voyager_core::TopLevelIndentMode::default(),
+    })
 }
 
 /// Runs `voyager_core::format`/`format_bytes` (depending on whether
@@ -96,5 +103,17 @@ mod tests {
         let second = format(&text_input(&first.text, None)).unwrap();
         assert!(!second.changed);
         assert_eq!(second.text, first.text);
+    }
+
+    #[test]
+    fn top_level_indentation_defaults_to_preserve_not_normalize() {
+        // 009-top-level-indent-toggle FR-004(c): the MCP format tool has
+        // no top-level-indent toggle of its own, so it must pick up
+        // FormatOptions::default() -- confirmed here directly, not
+        // inferred from any other adapter's own test passing.
+        let text = "    IF (a=b)\n        PRINT LIST=1\n    ENDIF\n";
+        let result = format(&text_input(text, None)).unwrap();
+        assert_eq!(result.text, text, "non-zero top-level indentation must be left untouched by default");
+        assert!(!result.changed);
     }
 }

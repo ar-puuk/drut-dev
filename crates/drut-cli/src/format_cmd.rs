@@ -3,9 +3,9 @@
 use std::path::{Path, PathBuf};
 
 use similar::TextDiff;
-use voyager_core::format::{format_bytes, CasingConvention, EncodingFidelity, FormatOptions};
+use voyager_core::format::{format_bytes, CasingConvention, EncodingFidelity, FormatOptions, TopLevelIndentMode};
 
-use crate::cli::CasingArg;
+use crate::cli::{CasingArg, TopLevelIndentArg};
 use crate::exit::ExitOutcome;
 use crate::io_util::{write_stdout, write_stdout_line};
 use crate::traverse::{traverse, ReadFailure};
@@ -15,6 +15,15 @@ impl From<CasingArg> for CasingConvention {
         match value {
             CasingArg::Upper => CasingConvention::Upper,
             CasingArg::Lower => CasingConvention::Lower,
+        }
+    }
+}
+
+impl From<TopLevelIndentArg> for TopLevelIndentMode {
+    fn from(value: TopLevelIndentArg) -> Self {
+        match value {
+            TopLevelIndentArg::Preserve => TopLevelIndentMode::Preserve,
+            TopLevelIndentArg::Normalize => TopLevelIndentMode::Normalize,
         }
     }
 }
@@ -48,7 +57,14 @@ enum Mode {
     Diff,
 }
 
-pub fn run(path: &Path, write: bool, check: bool, diff: bool, casing: Option<CasingArg>) -> ExitOutcome {
+pub fn run(
+    path: &Path,
+    write: bool,
+    check: bool,
+    diff: bool,
+    casing: Option<CasingArg>,
+    top_level_indent: TopLevelIndentArg,
+) -> ExitOutcome {
     let mode = if write {
         Mode::Write
     } else if check {
@@ -60,6 +76,7 @@ pub fn run(path: &Path, write: bool, check: bool, diff: bool, casing: Option<Cas
     };
     let options = FormatOptions {
         casing: casing.map(CasingConvention::from),
+        top_level_indent: TopLevelIndentMode::from(top_level_indent),
     };
 
     let traversal = traverse(path);

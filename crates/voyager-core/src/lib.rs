@@ -22,7 +22,7 @@ pub mod token;
 pub use block::{Block, BlockKind};
 pub use block_resolution::{block_at, BlockInfo, BlockKindName};
 pub use diagnostic::{Diagnostic, DiagnosticKind};
-pub use format::{format, format_bytes, CasingConvention, EncodingFidelity, FormatOptions, FormatResult};
+pub use format::{format, format_bytes, CasingConvention, EncodingFidelity, FormatOptions, FormatResult, TopLevelIndentMode};
 pub use keywords::{completion_candidates, did_you_mean, CompletionContext, KeywordEntry, KeywordRole};
 pub use span::{Position, Span};
 pub use statement::{Statement, StatementKind};

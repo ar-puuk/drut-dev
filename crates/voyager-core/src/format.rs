@@ -46,12 +46,32 @@ pub enum CasingConvention {
     Lower,
 }
 
+/// Whether `format` leaves existing top-level (depth-0) indentation
+/// untouched or unconditionally forces it to column 0 (spec.md FR-001/
+/// FR-002 in `009-top-level-indent-toggle`). Two-valued, no "off" state —
+/// `format` always does one or the other (research.md §4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TopLevelIndentMode {
+    /// Leave existing top-level indentation exactly as written — the
+    /// `007`-era, and (since `009`) once again default, behavior.
+    #[default]
+    Preserve,
+    /// Force every top-level line to column 0, unconditionally —
+    /// `008`'s original behavior, unchanged, now opt-in.
+    Normalize,
+}
+
 /// Caller-supplied configuration for one `format`/`format_bytes` call.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct FormatOptions {
     /// `None` (default) leaves all keyword/control-word casing untouched,
     /// exactly as the current input has it (FR-015).
     pub casing: Option<CasingConvention>,
+    /// Defaults to `Preserve` (FR-001) via `TopLevelIndentMode`'s own
+    /// `#[default]` — every call site is still individually verified
+    /// (`009-top-level-indent-toggle`/research.md §2), not trusted
+    /// transitively from this derive alone.
+    pub top_level_indent: TopLevelIndentMode,
 }
 
 /// How `format_bytes`'s decoding of the input relates to what's safe to
@@ -153,7 +173,7 @@ fn render(source: &str, nodes: &[Node], diagnostics: &[Diagnostic], options: For
 
     let diagnosed_openers = diagnosed_block_openers(diagnostics);
     let mut indent_plan: IndentPlan = BTreeMap::new();
-    plan_indentation(nodes, &char_lines, &diagnosed_openers, &mut indent_plan);
+    plan_indentation(nodes, &char_lines, &diagnosed_openers, options.top_level_indent, &mut indent_plan);
 
     let mut casing_edits: Vec<CasingEdit> = Vec::new();
     if let Some(convention) = options.casing {
@@ -281,19 +301,34 @@ fn diagnosed_block_openers(diagnostics: &[Diagnostic]) -> BTreeSet<Position> {
         .collect()
 }
 
-/// Top-level nodes' own first lines are always normalized to column 0,
-/// unconditionally — every top-level statement or block opener, on every
-/// format pass, regardless of its current indentation or formatting
-/// history. **Reversed 2026-08-11
+/// Top-level nodes' own first lines are normalized to column 0 — every
+/// top-level statement or block opener, on every format pass, regardless
+/// of its current indentation or formatting history — **only when `mode`
+/// is `Normalize`**. **Reversed 2026-08-11
 /// (008-top-level-indentation-normalization)**: previously left untouched
 /// (the original 161-file corpus survey found no dominant top-level
 /// convention — only 20.4% at column 0, modal value column 8 — see
 /// `002-cli-check-format/spec.md`'s FR-012 for the historical record of
-/// that finding); the project has since deliberately traded preserving
-/// that real-author diversity for predictability.
-fn plan_indentation(nodes: &[Node], lines: &[Vec<char>], diagnosed_openers: &BTreeSet<Position>, plan: &mut IndentPlan) {
+/// that finding); the project deliberately traded preserving that
+/// real-author diversity for predictability. **Reverted again 2026-08-12
+/// (`009-top-level-indent-toggle`)**: that trade was the wrong *default*
+/// — `Preserve` (never inserting a plan entry for a top-level line, so
+/// `computed_indent` falls back to the line's real on-disk column) is
+/// the default again; `008`'s unconditional behavior survives unchanged
+/// as `Normalize`, opt-in only (research.md §1 in `009`'s own spec
+/// confirms `plan_block`/`plan_children`/`computed_indent` need no
+/// change at all to support both modes).
+fn plan_indentation(
+    nodes: &[Node],
+    lines: &[Vec<char>],
+    diagnosed_openers: &BTreeSet<Position>,
+    mode: TopLevelIndentMode,
+    plan: &mut IndentPlan,
+) {
     for node in nodes {
-        plan.insert(node.span().start.line, 0);
+        if mode == TopLevelIndentMode::Normalize {
+            plan.insert(node.span().start.line, 0);
+        }
         if let Node::Block(block) = node {
             plan_block(block, lines, diagnosed_openers, plan);
         }
@@ -512,6 +547,14 @@ mod tests {
     fn upper() -> FormatOptions {
         FormatOptions {
             casing: Some(CasingConvention::Upper),
+            top_level_indent: TopLevelIndentMode::default(),
+        }
+    }
+
+    fn normalize() -> FormatOptions {
+        FormatOptions {
+            casing: None,
+            top_level_indent: TopLevelIndentMode::Normalize,
         }
     }
 
@@ -547,24 +590,57 @@ mod tests {
     }
 
     #[test]
+    fn format_options_default_top_level_indent_is_preserve() {
+        // 009-top-level-indent-toggle FR-004(b): the single most direct
+        // confirmation of the derived Default -- distinct from (and
+        // cheaper than) the behavioral tests around it.
+        assert_eq!(FormatOptions::default().top_level_indent, TopLevelIndentMode::Preserve);
+    }
+
+    #[test]
     fn top_level_baseline_is_always_normalized_to_zero() {
-        // Reversed 2026-08-11 (008-top-level-indentation-normalization):
-        // was top_level_baseline_is_left_untouched, asserting RUN kept its
-        // original 8-space baseline. Now RUN's own line is corrected to
-        // column 0, and its body is re-anchored to *that* corrected base.
+        // 008-top-level-indentation-normalization's own behavior, retargeted
+        // 2026-08-12 (009-top-level-indent-toggle) to explicit Normalize
+        // mode now that Preserve is the default -- this test exists to
+        // keep proving 008's guarantee still holds, opt-in.
+        let src = "        RUN PGM=MATRIX\n        X = 1\n        ENDRUN\n";
+        let out = format(src, normalize()).text;
+        assert_eq!(out, "RUN PGM=MATRIX\n    X = 1\nENDRUN\n");
+    }
+
+    #[test]
+    fn top_level_baseline_is_left_untouched_by_default() {
+        // 009-top-level-indent-toggle FR-001: the default reverts to
+        // 007-era preserve -- revives this test's original pre-008
+        // assertion (top_level_baseline_is_left_untouched, git history
+        // 4f1d5fe~1): RUN keeps its original 8-space baseline; its body
+        // still gets exactly +4 relative to *that* baseline (the
+        // per-nesting-level rule is unaffected by this feature and stays
+        // active regardless of mode); ENDRUN aligns to the same baseline
+        // as its own opener.
         let src = "        RUN PGM=MATRIX\n        X = 1\n        ENDRUN\n";
         let out = format(src, FormatOptions::default()).text;
-        assert_eq!(out, "RUN PGM=MATRIX\n    X = 1\nENDRUN\n");
+        assert_eq!(out, "        RUN PGM=MATRIX\n            X = 1\n        ENDRUN\n");
     }
 
     #[test]
     fn bare_top_level_statement_is_normalized_to_zero() {
         // Previously had zero code path touching it at all -- plan_indentation
-        // only ever iterated Node::Block entries (research.md §1). Now every
-        // top-level node, statement or block alike, is force-planned.
+        // only ever iterated Node::Block entries (research.md §1 in 008's
+        // own spec). Retargeted 2026-08-12 (009-top-level-indent-toggle) to
+        // explicit Normalize mode now that Preserve is the default.
         let src = "    X = 1\n";
-        let out = format(src, FormatOptions::default()).text;
+        let out = format(src, normalize()).text;
         assert_eq!(out, "X = 1\n");
+    }
+
+    #[test]
+    fn bare_top_level_statement_is_left_untouched_by_default() {
+        // 009-top-level-indent-toggle FR-001.
+        let src = "    X = 1\n";
+        let result = format(src, FormatOptions::default());
+        assert!(!result.changed);
+        assert_eq!(result.text, src);
     }
 
     #[test]
@@ -589,13 +665,14 @@ mod tests {
 
     #[test]
     fn diagnosed_block_opener_is_normalized_but_children_stay_untouched() {
-        // The explicit 007/008 interaction point, verified against a real
-        // prototype before this task was written (tasks.md T006): a
-        // genuinely unmatched PROCESS whose own opener sits at non-zero
-        // indentation, with both its legitimate body content (FILEI) and
-        // a swallowed trailing RUN block also at non-zero indentation.
+        // The explicit 007/008 interaction point (008's own tasks.md T006).
+        // Retargeted 2026-08-12 (009-top-level-indent-toggle) to explicit
+        // Normalize mode now that Preserve is the default: a genuinely
+        // unmatched PROCESS whose own opener sits at non-zero indentation,
+        // with both its legitimate body content (FILEI) and a swallowed
+        // trailing RUN block also at non-zero indentation.
         let src = "    PROCESS PHASE=INPUT\n        FILEI = ni.1\n\n    RUN PGM=HWYASSIGN\n        FILEI NETI = 'net.net'\n    ENDRUN\n";
-        let result = format(src, FormatOptions::default());
+        let result = format(src, normalize());
 
         assert!(result.changed);
         assert_eq!(result.diagnostics.len(), 1);
@@ -607,6 +684,26 @@ mod tests {
             "PROCESS's own opener must be corrected to column 0, but every child \
              (both the legitimate FILEI body content and the swallowed RUN block) \
              must stay byte-for-byte untouched"
+        );
+    }
+
+    #[test]
+    fn diagnosed_block_opener_and_children_both_stay_untouched_by_default() {
+        // 009-top-level-indent-toggle FR-001: under the Preserve default,
+        // nothing forces the opener's own line either (unlike the
+        // Normalize-mode sibling above, where 008's unconditional rule
+        // corrects it independently of 007's children-only skip) -- the
+        // whole diagnosed subtree, opener included, is byte-for-byte
+        // untouched, same as pre-008.
+        let src = "    PROCESS PHASE=INPUT\n        FILEI = ni.1\n\n    RUN PGM=HWYASSIGN\n        FILEI NETI = 'net.net'\n    ENDRUN\n";
+        let result = format(src, FormatOptions::default());
+
+        assert!(!result.changed);
+        assert_eq!(result.diagnostics.len(), 1);
+        assert_eq!(result.diagnostics[0].kind, DiagnosticKind::UnmatchedProcess);
+        assert_eq!(
+            result.text, src,
+            "under Preserve, the diagnosed block's opener must stay untouched too, not just its children"
         );
     }
 
@@ -738,6 +835,7 @@ mod tests {
             src,
             FormatOptions {
                 casing: Some(CasingConvention::Lower),
+                top_level_indent: TopLevelIndentMode::default(),
             },
         )
         .text;
