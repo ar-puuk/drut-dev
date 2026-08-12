@@ -58,20 +58,22 @@ being implemented (currently 008). Each needs explicit go-ahead from the
 owner once the in-flight work is clear.
 
 1. **Top-level indentation normalization: default reverts to leave-untouched,
-   008's forcing becomes an opt-in toggle** — *not started* (corrected
-   2026-08-11, owner's explicit preference). `008-top-level-indentation-
-   normalization` changed FR-012 so top-level (depth-0) statement indentation
-   is *always* normalized to column 0, unconditionally, replacing 007-era
-   FR-012 (leave top-level indentation untouched — the corpus showed no
-   dominant convention: best single value only 26.9% at column 8, only 20.4%
-   at column 0; see `specs/008-.../contracts/top-level-indentation.md`). This
-   item reverses that reversal: the **original 007-era leave-untouched
-   behavior becomes the default again**, and 008's column-0-forcing becomes
-   an **opt-in toggle** for users who want Python-style predictability
-   instead. Belongs with pre-publish item 3 (TOML-based configuration) —
-   the toggle is a TOML config item, not a new CLI flag. Not yet
-   implemented; needs its own amendment pass over FR-012 and the 008
-   contract the same way 008 amended 007.
+   008's forcing becomes an opt-in toggle** — ✅ *done, merged 2026-08-12 as
+   `009-top-level-indent-toggle`* (corrected 2026-08-11, owner's explicit
+   preference; shipped the next day). `008-top-level-indentation-
+   normalization` had changed FR-012 so top-level (depth-0) statement
+   indentation was *always* normalized to column 0, unconditionally,
+   replacing 007-era FR-012 (leave top-level indentation untouched — the
+   corpus showed no dominant convention: best single value only 26.9% at
+   column 8, only 20.4% at column 0). `009` reversed that reversal: the
+   **original 007-era leave-untouched (`Preserve`) behavior is the default
+   again**, and 008's column-0-forcing is now an **opt-in**
+   `--top-level-indent=normalize` CLI flag (still a CLI flag, not the TOML
+   config item originally guessed here — TOML-based configuration, pre-
+   publish item 3 above, remains unbuilt). All 20 tasks complete and
+   independently verified: workspace build/clippy/test clean, full 161-file
+   corpus clean across CLI/LSP/MCP, and the 7 golden-fixture reverts
+   confirmed whitespace-only. See `specs/009-top-level-indent-toggle/`.
 2. **`; FMT: OFF` / `; FMT: ON` region markers** — *not started, new feature,
    not yet spec'd* (added 2026-08-11). Lets users mark a line range to be
    skipped entirely by `drut format`. Reference 007's diagnosed-block-skip
@@ -79,9 +81,11 @@ owner once the in-flight work is clear.
    block's-children logic, `specs/007-.../research.md` §1) as an
    architectural starting point — not a direct reuse, since that mechanism
    skips based on diagnosed block structure, not user-placed markers.
-3. **Path-related error for `\n`/`\t`/etc. in file/folder names** — *scope
-   against drut still unclear* (added 2026-08-11, clarified same day from
-   WF-TDM-Development issue #52, private repo). Turns out this is **not**
+3. **Path-related error for `\n`/`\t`/etc. in file/folder names** —
+   *deferred/out of scope, owner declined to pursue* (added 2026-08-11,
+   clarified same day from WF-TDM-Development issue #52, private repo; set
+   aside 2026-08-11 — already decided when the queue was planned, not
+   awaiting a decision). Turns out this is **not**
    a Cube Voyager engine bug — it's a bug in WF-TDM-Development's own
    Python automation scripts, which build scenario-data paths via manual
    string concatenation like
@@ -97,14 +101,11 @@ owner once the in-flight work is clear.
    broadly, and as of that comment still couldn't locate the exact
    file/line where the reported `r"...\\" + ScenarioCode` concatenation
    happens (asked the reporter to point to it — unresolved as of the
-   pasted issue text). **Open question before this is actionable for
-   drut**: this bug lives entirely in a separate Python codebase, not in
-   any `.s`/`.block` Voyager script — does it have any analog *inside*
-   Voyager control statements themselves (e.g. a `FILEI`/`FILEO` path
-   built by concatenating a literal ending in `\` with an `@TOKEN@` that
-   could start with `n`/`t`) that would be in drut's tokenizer/lint scope,
-   or is this simply out of scope for drut entirely? Owner to weigh in
-   before any further action.
+   pasted issue text). This bug lives entirely in a separate Python
+   codebase, not in any `.s`/`.block` Voyager script. **Decided**: out of
+   scope for drut — set aside, not pursued. No open question remains here;
+   don't resurface unless new evidence of a Voyager-script-side analog
+   turns up.
 4. **`--casing` gains a third mode, `auto`** — *not started, two open
    questions block spec-readiness* (added 2026-08-11, refined same day).
    `--casing` currently supports `upper`/`lower` (002-cli-check-format,
