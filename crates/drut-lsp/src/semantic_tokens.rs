@@ -39,8 +39,26 @@ fn walk(nodes: &[Node], parse_result: &ParseResult, out: &mut Vec<RawToken>) {
                 // None` and no `UnmatchedIf` diagnostic for it (same
                 // is_short_if technique as hover.rs).
                 if block.closer.is_none() && !has_unmatched_if(parse_result, block) {
+                    // A short-IF's single branch holds its self-closing body
+                    // statement as its only child (block.rs's
+                    // parse_if_chain), and `block.span` deliberately merges
+                    // in that body statement's own span too. Tokenizing the
+                    // *whole* merged span here would, per LSP semantics,
+                    // override the static TextMate grammar's normal
+                    // keyword/string/pair-keyword coloring for the entire
+                    // body statement with this one uniform scope -- narrow
+                    // to just the header (IF through the condition's closing
+                    // paren) so the body's own tokens still render normally
+                    // (confirmed via real VS Code testing this was the
+                    // actual cause of "everything after IF (...) renders in
+                    // one color", not a missing static-grammar pattern).
+                    let header_end = branches[0]
+                        .children
+                        .first()
+                        .map(|c| c.span().start)
+                        .unwrap_or(block.span.end);
                     out.push(RawToken {
-                        span: block.span,
+                        span: Span::new(block.span.start, header_end),
                         token_type: SHORT_IF_TYPE_INDEX,
                         modifiers_bitset: 0,
                     });
@@ -230,6 +248,38 @@ mod tests {
         let result = voyager_core::parse(text);
         let tokens = collect(&result);
         assert!(tokens.iter().any(|t| t.token_type == SHORT_IF_TYPE_INDEX));
+    }
+
+    #[test]
+    fn short_if_token_span_excludes_the_body_statement() {
+        let text = "IF (a=b) PRINT LIST=1\n";
+        let result = voyager_core::parse(text);
+        let tokens = collect(&result);
+        let short_if = tokens
+            .iter()
+            .find(|t| t.token_type == SHORT_IF_TYPE_INDEX)
+            .expect("short-IF token must be present");
+        let body_start_column = text.find("PRINT").unwrap() as u32 + 1;
+        assert_eq!(
+            short_if.span.end,
+            CorePosition::new(1, body_start_column),
+            "the shortIf token must stop where the body statement (PRINT...) begins, not swallow it -- swallowing it overrides the static grammar's normal coloring for everything after the IF condition: {:?}",
+            short_if.span
+        );
+    }
+
+    #[test]
+    fn short_if_with_variable_ref_and_quoted_string_body_leaves_body_uncovered() {
+        // The exact real-world report: IF (@MODE@ = 1) PRINT LIST="...".
+        let text = "IF (@MODE@ = 1) PRINT LIST=\"Mode 1 selected\"\n";
+        let result = voyager_core::parse(text);
+        let tokens = collect(&result);
+        let short_if = tokens
+            .iter()
+            .find(|t| t.token_type == SHORT_IF_TYPE_INDEX)
+            .expect("short-IF token must be present");
+        let body_start_column = text.find("PRINT").unwrap() as u32 + 1;
+        assert_eq!(short_if.span.end, CorePosition::new(1, body_start_column));
     }
 
     #[test]
