@@ -98,6 +98,14 @@ impl ServerState {
     pub fn get(&self, uri: &Uri) -> Option<&OpenDocument> {
         self.documents.get(uri)
     }
+
+    /// Every currently-open document's URI (013-lsp-config-file-watch,
+    /// data-model.md) — used to re-publish diagnostics for every open
+    /// document on a `workspace/didChangeWatchedFiles` event, not just one.
+    /// No new stored field; a read-only view over `documents`.
+    pub fn open_uris(&self) -> impl Iterator<Item = &Uri> {
+        self.documents.keys()
+    }
 }
 
 #[cfg(test)]
@@ -151,5 +159,23 @@ mod tests {
         state.did_open(uri("file:///a.s"), "text\n".to_string(), 1);
         state.did_close(&uri("file:///a.s"));
         assert!(state.get(&uri("file:///a.s")).is_none());
+    }
+
+    #[test]
+    fn open_uris_is_empty_with_no_documents_open() {
+        let state = ServerState::new();
+        assert_eq!(state.open_uris().count(), 0);
+    }
+
+    #[test]
+    fn open_uris_returns_every_open_document() {
+        let mut state = ServerState::new();
+        state.did_open(uri("file:///a.s"), "IF (a=b)\nENDIF\n".to_string(), 1);
+        state.did_open(uri("file:///b.s"), "IF (a=b)\nENDIF\n".to_string(), 1);
+        let mut uris: Vec<Uri> = state.open_uris().cloned().collect();
+        uris.sort();
+        let mut expected = vec![uri("file:///a.s"), uri("file:///b.s")];
+        expected.sort();
+        assert_eq!(uris, expected);
     }
 }

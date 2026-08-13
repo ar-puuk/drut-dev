@@ -7,7 +7,7 @@
 mod common;
 
 use common::*;
-use lsp_server::Connection;
+use lsp_server::{Connection, Message, Response};
 use serde_json::json;
 
 #[test]
@@ -460,6 +460,414 @@ fn did_open_publishes_zero_drut_config_hints_for_a_document_with_no_drut_toml() 
     let note = did_open(&client, "file:///no_config_here.s", "IF (a=b)\nENDIF\n");
     let diagnostics = note.params["diagnostics"].as_array().unwrap();
     assert!(diagnostics.is_empty(), "no drut.toml anywhere -- expected zero diagnostics, got: {diagnostics:?}");
+
+    shutdown(&client);
+}
+
+// --- 013-lsp-config-file-watch ------------------------------------------
+//
+// The three helpers below are local to this file (not `common`) since
+// they're only needed by this feature's own tests — `common`'s dead-code
+// lint is per test-binary, and every other `tests/*.rs` file also includes
+// `mod common;` without calling these.
+
+/// Same handshake as `common::initialize`, but with caller-supplied client
+/// capabilities — needed for tests that must control
+/// `workspace.didChangeWatchedFiles.dynamicRegistration` explicitly, rather
+/// than always sending an empty `{}` capabilities object.
+fn initialize_with_capabilities(client: &Connection, capabilities: serde_json::Value) {
+    send_request(client, 1, "initialize", json!({"capabilities": capabilities}));
+    recv_response(client);
+    send_notification(client, "initialized", json!({}));
+}
+
+/// Waits for a server-initiated request matching `method` — skips over
+/// notifications (e.g. the startup log) and responses in between, same
+/// draining style as `common::recv_notification`.
+fn recv_request(client: &Connection, method: &str) -> lsp_server::Request {
+    loop {
+        match client.receiver.recv_timeout(std::time::Duration::from_secs(5)).unwrap() {
+            Message::Request(r) if r.method == method => return r,
+            _ => continue,
+        }
+    }
+}
+
+/// Confirms no server-initiated request arrives within `duration` — drains
+/// any notifications/responses seen in the meantime (e.g. the startup log,
+/// sent unconditionally on every session) without treating them as a
+/// failure, but panics the instant an actual `Request` shows up. Used to
+/// prove a negative (T013: no registration request when the client doesn't
+/// advertise support).
+fn assert_no_request_arrives_within(client: &Connection, duration: std::time::Duration) {
+    let deadline = std::time::Instant::now() + duration;
+    loop {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        if remaining.is_zero() {
+            return; // Timed out cleanly with nothing matching -- success.
+        }
+        match client.receiver.recv_timeout(remaining) {
+            Ok(Message::Request(req)) => panic!("expected no server-initiated request, got: {req:?}"),
+            Ok(_) => continue, // Some other message (e.g. the startup log) -- keep draining.
+            Err(_) => return, // Channel recv timed out -- nothing arrived, success.
+        }
+    }
+}
+
+fn watched_files_capabilities(dynamic_registration: bool) -> serde_json::Value {
+    json!({
+        "workspace": {
+            "didChangeWatchedFiles": {
+                "dynamicRegistration": dynamic_registration
+            }
+        }
+    })
+}
+
+#[test]
+fn initialize_with_dynamic_registration_supported_sends_a_correctly_formed_registration_request() {
+    // T007 -- asserts on the request's actual content, not just "a request
+    // of some kind was sent."
+    let (client, _handle) = spawn_server();
+    initialize_with_capabilities(&client, watched_files_capabilities(true));
+
+    let req = recv_request(&client, "client/registerCapability");
+    let registrations = req.params["registrations"].as_array().unwrap();
+    assert_eq!(registrations.len(), 1, "expected exactly one registration, got: {registrations:?}");
+    assert_eq!(registrations[0]["method"], json!("workspace/didChangeWatchedFiles"));
+    let watchers = registrations[0]["registerOptions"]["watchers"].as_array().unwrap();
+    assert_eq!(watchers.len(), 1);
+    assert_eq!(watchers[0]["globPattern"], json!("**/drut.toml"));
+
+    shutdown(&client);
+}
+
+#[test]
+fn initialize_with_dynamic_registration_unsupported_sends_no_registration_request() {
+    // T013 / US2 Acceptance Scenario 1.
+    let (client, _handle) = spawn_server();
+    initialize_with_capabilities(&client, watched_files_capabilities(false));
+
+    assert_no_request_arrives_within(&client, std::time::Duration::from_millis(300));
+
+    shutdown(&client);
+}
+
+#[test]
+fn unsupported_client_config_edit_stays_stale_until_the_script_itself_is_touched() {
+    // T014 / US2 Acceptance Scenario 2 -- matches pre-013 behavior exactly:
+    // no notification is ever sent for the drut.toml edit (a well-behaved
+    // client wouldn't, since it never registered to watch it), so the
+    // document's diagnostics can only change via its own didChange/didOpen.
+    let dir = std::env::temp_dir().join(format!("drut_lsp_watch_test_{}_unsupported_stale", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let config_path = dir.join("drut.toml");
+    std::fs::write(&config_path, "[format]\ncasing = \"upper\"\n").unwrap();
+    let script = dir.join("a.s");
+    let uri = file_uri_str(&script);
+
+    let (client, _handle) = spawn_server();
+    initialize_with_capabilities(&client, watched_files_capabilities(false));
+
+    let note = did_open(&client, &uri, "IF (a=b)\nENDIF\n");
+    assert!(note.params["diagnostics"].as_array().unwrap().is_empty(), "valid config -- expected zero diagnostics");
+
+    // Edit the config to something invalid, but send no notification of any
+    // kind for it (no well-behaved client would, since registration never
+    // happened) -- confirm the channel stays completely silent (not even a
+    // stray publishDiagnostics), unlike `assert_no_request_arrives_within`'s
+    // more lenient "drain notifications, only forbid requests" check.
+    std::fs::write(&config_path, "[format]\ncasing = \"sideways\"\n").unwrap();
+    let silence = client.receiver.recv_timeout(std::time::Duration::from_millis(300));
+    assert!(silence.is_err(), "expected complete silence with no watcher registered, got: {silence:?}");
+
+    // Only a real didChange on the script itself picks up the new config --
+    // matching drut-lsp's behavior from before this feature existed.
+    send_notification(
+        &client,
+        "textDocument/didChange",
+        json!({
+            "textDocument": {"uri": uri, "version": 2},
+            "contentChanges": [{"text": "IF (a=b)\nENDIF\n"}]
+        }),
+    );
+    let note = recv_notification(&client, "textDocument/publishDiagnostics");
+    assert_eq!(
+        note.params["diagnostics"].as_array().unwrap().len(),
+        1,
+        "the new config is only picked up once the script itself changes"
+    );
+
+    shutdown(&client);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn initialize_with_no_workspace_capabilities_at_all_sends_no_registration_request() {
+    // The plain `initialize()` helper sends `{"capabilities": {}}` -- no
+    // `workspace` key at all, the common real-world "client doesn't mention
+    // this capability" shape, distinct from explicitly advertising `false`.
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+
+    assert_no_request_arrives_within(&client, std::time::Duration::from_millis(300));
+
+    shutdown(&client);
+}
+
+fn temp_config_project(label: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("drut_lsp_watch_test_{}_{label}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+fn watched_file_event(path: &std::path::Path, change_type: u8) -> serde_json::Value {
+    json!({
+        "changes": [
+            { "uri": file_uri_str(path), "type": change_type }
+        ]
+    })
+}
+
+#[test]
+fn editing_drut_toml_live_updates_the_open_documents_diagnostic_to_the_new_bad_value() {
+    // T009 -- the PRIMARY, REQUIRED regression test: the exact sequence
+    // that surfaced this bug during 012's own manual verification. A
+    // script file stays open throughout -- no didChange, didClose, or
+    // didOpen is ever sent for it.
+    let dir = temp_config_project("live_edit_primary_repro");
+    let config_path = dir.join("drut.toml");
+    std::fs::write(&config_path, "[format]\ncasing = \"middle\"\n").unwrap();
+    let script = dir.join("a.s");
+    let script_uri = file_uri_str(&script);
+
+    let (client, _handle) = spawn_server();
+    initialize_with_capabilities(&client, watched_files_capabilities(true));
+    recv_request(&client, "client/registerCapability"); // consume, but never respond (T015 covers that case explicitly).
+
+    let note = did_open(&client, &script_uri, "IF (a=b)\nENDIF\n");
+    let diagnostics = note.params["diagnostics"].as_array().unwrap();
+    assert_eq!(diagnostics.len(), 1, "expected one config diagnostic, got: {diagnostics:?}");
+    assert!(diagnostics[0]["message"].as_str().unwrap().contains("\"middle\""));
+
+    // Edit drut.toml on disk to a *different* invalid value, then simulate
+    // the client forwarding the watched-file-change notification -- no
+    // action of any kind is taken on the script file itself.
+    std::fs::write(&config_path, "[format]\ncasing = \"midle\"\n").unwrap();
+    send_notification(&client, "workspace/didChangeWatchedFiles", watched_file_event(&config_path, 2));
+
+    let note = recv_notification(&client, "textDocument/publishDiagnostics");
+    let diagnostics = note.params["diagnostics"].as_array().unwrap();
+    assert_eq!(diagnostics.len(), 1, "expected the diagnostic to still be present, got: {diagnostics:?}");
+    assert!(
+        diagnostics[0]["message"].as_str().unwrap().contains("\"midle\""),
+        "expected the diagnostic to name the NEW bad value \"midle\", got: {:?}",
+        diagnostics[0]["message"]
+    );
+
+    shutdown(&client);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn editing_drut_toml_refreshes_every_open_document_it_affects_not_only_the_focused_one() {
+    // T010 / US1 Acceptance Scenario 2.
+    let dir = temp_config_project("multiple_documents");
+    let config_path = dir.join("drut.toml");
+    std::fs::write(&config_path, "[format]\ncasing = \"upper\"\n").unwrap();
+    let script_a = dir.join("a.s");
+    let script_b = dir.join("b.s");
+    let uri_a = file_uri_str(&script_a);
+    let uri_b = file_uri_str(&script_b);
+
+    let (client, _handle) = spawn_server();
+    initialize_with_capabilities(&client, watched_files_capabilities(true));
+    recv_request(&client, "client/registerCapability");
+
+    did_open(&client, &uri_a, "IF (a=b)\nENDIF\n");
+    did_open(&client, &uri_b, "IF (a=b)\nENDIF\n");
+
+    std::fs::write(&config_path, "[format]\ncasing = \"sideways\"\n").unwrap();
+    send_notification(&client, "workspace/didChangeWatchedFiles", watched_file_event(&config_path, 2));
+
+    // Both documents must republish -- order not guaranteed, so collect two
+    // publishDiagnostics notifications and confirm both URIs are present
+    // with the expected diagnostic.
+    let mut seen = std::collections::HashSet::new();
+    for _ in 0..2 {
+        let note = recv_notification(&client, "textDocument/publishDiagnostics");
+        let uri = note.params["uri"].as_str().unwrap().to_string();
+        let diagnostics = note.params["diagnostics"].as_array().unwrap();
+        assert_eq!(diagnostics.len(), 1, "expected one diagnostic for {uri}, got: {diagnostics:?}");
+        seen.insert(uri);
+    }
+    assert_eq!(seen, std::collections::HashSet::from([uri_a, uri_b]), "both open documents must have refreshed");
+
+    shutdown(&client);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn editing_drut_toml_from_valid_to_invalid_adds_a_diagnostic_with_no_action_on_the_script() {
+    // T011 / US1 Acceptance Scenario 3.
+    let dir = temp_config_project("valid_to_invalid");
+    let config_path = dir.join("drut.toml");
+    std::fs::write(&config_path, "[format]\ncasing = \"upper\"\n").unwrap();
+    let script = dir.join("a.s");
+    let uri = file_uri_str(&script);
+
+    let (client, _handle) = spawn_server();
+    initialize_with_capabilities(&client, watched_files_capabilities(true));
+    recv_request(&client, "client/registerCapability");
+
+    let note = did_open(&client, &uri, "IF (a=b)\nENDIF\n");
+    assert!(note.params["diagnostics"].as_array().unwrap().is_empty(), "valid config -- expected zero diagnostics");
+
+    std::fs::write(&config_path, "[format]\ncasing = \"sideways\"\n").unwrap();
+    send_notification(&client, "workspace/didChangeWatchedFiles", watched_file_event(&config_path, 2));
+
+    let note = recv_notification(&client, "textDocument/publishDiagnostics");
+    assert_eq!(note.params["diagnostics"].as_array().unwrap().len(), 1, "expected a new diagnostic to appear");
+
+    shutdown(&client);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn editing_drut_toml_from_invalid_to_valid_clears_the_diagnostic_with_no_action_on_the_script() {
+    // T011 / US1 Acceptance Scenario 4.
+    let dir = temp_config_project("invalid_to_valid");
+    let config_path = dir.join("drut.toml");
+    std::fs::write(&config_path, "[format]\ncasing = \"sideways\"\n").unwrap();
+    let script = dir.join("a.s");
+    let uri = file_uri_str(&script);
+
+    let (client, _handle) = spawn_server();
+    initialize_with_capabilities(&client, watched_files_capabilities(true));
+    recv_request(&client, "client/registerCapability");
+
+    let note = did_open(&client, &uri, "IF (a=b)\nENDIF\n");
+    assert_eq!(note.params["diagnostics"].as_array().unwrap().len(), 1, "invalid config -- expected one diagnostic");
+
+    std::fs::write(&config_path, "[format]\ncasing = \"upper\"\n").unwrap();
+    send_notification(&client, "workspace/didChangeWatchedFiles", watched_file_event(&config_path, 2));
+
+    let note = recv_notification(&client, "textDocument/publishDiagnostics");
+    assert!(
+        note.params["diagnostics"].as_array().unwrap().is_empty(),
+        "expected the diagnostic to clear, got: {:?}",
+        note.params["diagnostics"]
+    );
+
+    shutdown(&client);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_config_change_that_does_not_affect_a_document_produces_no_visible_diagnostic_change() {
+    // T012 / FR-007 (broad detection still triggers a re-check) + FR-008
+    // (an unaffected document's re-check is invisible) in one scenario.
+    let dir = temp_config_project("unaffected_document");
+    let script = dir.join("a.s");
+    let uri = file_uri_str(&script);
+    // No drut.toml near this script at all -- it resolves to built-in
+    // defaults regardless of what changes elsewhere in the workspace.
+    let unrelated_dir = dir.join("unrelated");
+    std::fs::create_dir_all(&unrelated_dir).unwrap();
+    let unrelated_config = unrelated_dir.join("drut.toml");
+    std::fs::write(&unrelated_config, "[format]\ncasing = \"upper\"\n").unwrap();
+
+    let (client, _handle) = spawn_server();
+    initialize_with_capabilities(&client, watched_files_capabilities(true));
+    recv_request(&client, "client/registerCapability");
+
+    let note = did_open(&client, &uri, "IF (a=b)\nENDIF\n");
+    assert!(note.params["diagnostics"].as_array().unwrap().is_empty());
+
+    std::fs::write(&unrelated_config, "[format]\ncasing = \"sideways\"\n").unwrap();
+    send_notification(&client, "workspace/didChangeWatchedFiles", watched_file_event(&unrelated_config, 2));
+
+    // The re-check happens for this document too (broad scope, FR-007 --
+    // the implementation republishes for every open document unconditionally,
+    // it does not try to guess relevance up front), but produces no visible
+    // change (FR-008): the republished diagnostics list is still empty,
+    // identical to before the unrelated change.
+    let note = recv_notification(&client, "textDocument/publishDiagnostics");
+    assert_eq!(note.params["uri"], json!(uri));
+    assert!(
+        note.params["diagnostics"].as_array().unwrap().is_empty(),
+        "an edit to a drut.toml outside this document's own resolution must not \
+         introduce a diagnostic that wasn't there before, got: {:?}",
+        note.params["diagnostics"]
+    );
+
+    shutdown(&client);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_registration_request_that_never_receives_a_response_does_not_block_other_requests() {
+    // T015 -- FR-010's own dedicated test. Registration IS sent (capability
+    // supported), but this test deliberately never responds to it.
+    let (client, _handle) = spawn_server();
+    initialize_with_capabilities(&client, watched_files_capabilities(true));
+    recv_request(&client, "client/registerCapability"); // consumed, never answered.
+
+    did_open(&client, "file:///unrelated.s", "IF (a=b)\nENDIF\n");
+    send_request(
+        &client,
+        2,
+        "textDocument/hover",
+        json!({
+            "textDocument": {"uri": "file:///unrelated.s"},
+            "position": {"line": 0, "character": 1}
+        }),
+    );
+    let response = recv_response(&client);
+    assert!(
+        response.response_result.is_ok(),
+        "an unrelated request must still receive its own response promptly, \
+         unaffected by the never-answered registration request"
+    );
+
+    shutdown(&client);
+}
+
+#[test]
+fn a_registration_request_that_receives_an_error_response_is_logged_and_does_not_block() {
+    // T016.
+    let (client, _handle) = spawn_server();
+    initialize_with_capabilities(&client, watched_files_capabilities(true));
+    let req = recv_request(&client, "client/registerCapability");
+
+    client
+        .sender
+        .send(Message::Response(Response::new_err(
+            req.id,
+            lsp_server::ErrorCode::InternalError as i32,
+            "simulated client-side registration failure".to_string(),
+        )))
+        .unwrap();
+
+    let log = recv_notification(&client, "window/logMessage");
+    assert_eq!(log.params["type"], json!(2), "expected MessageType::WARNING (2)");
+    assert!(log.params["message"].as_str().unwrap().contains("registration failed"));
+
+    // Still fully functional afterward.
+    did_open(&client, "file:///unrelated.s", "IF (a=b)\nENDIF\n");
+    send_request(
+        &client,
+        2,
+        "textDocument/hover",
+        json!({
+            "textDocument": {"uri": "file:///unrelated.s"},
+            "position": {"line": 0, "character": 1}
+        }),
+    );
+    let response = recv_response(&client);
+    assert!(response.response_result.is_ok());
 
     shutdown(&client);
 }

@@ -33,6 +33,12 @@ pub const SHORT_IF_TOKEN_TYPE: &str = "shortIf";
 pub const STATEMENT_TOKEN_TYPE: &str = "statement";
 pub const UNREACHABLE_TOKEN_MODIFIER: &str = "unreachable";
 
+/// Fixed registration ID for the one and only request this server ever
+/// sends (013-lsp-config-file-watch) — safe as a single fixed constant
+/// since there is only ever one outstanding server-initiated request kind;
+/// a second one would need real per-request ID generation.
+const DRUT_TOML_WATCHER_ID: &str = "drut-toml-watcher";
+
 /// Builds the `ServerCapabilities` this server declares at `initialize`
 /// (`contracts/lsp-capabilities.md`).
 fn server_capabilities() -> lsp_types::ServerCapabilities {
@@ -98,7 +104,7 @@ fn server_capabilities() -> lsp_types::ServerCapabilities {
 /// research.md §9) call — no LSP protocol logic lives in `drut-cli` itself.
 pub fn run(connection: Connection) {
     let caps = serde_json::to_value(server_capabilities()).expect("ServerCapabilities always serializes");
-    let init_params = match connection.initialize(caps) {
+    let init_params_raw = match connection.initialize(caps) {
         Ok(params) => params,
         Err(_) => {
             // Client disconnected before completing the handshake — nothing
@@ -109,8 +115,21 @@ pub fn run(connection: Connection) {
 
     log_startup_info(&connection);
 
+    // Parsed once (013-lsp-config-file-watch/research.md §3), reused for both
+    // the workspace-root fallback (012) and the file-watch capability check
+    // (013) — `None` for a client whose params fail to parse, treated the
+    // same as "supports nothing extra," not a startup failure.
+    let init_params: Option<lsp_types::InitializeParams> = serde_json::from_value(init_params_raw).ok();
+
     let mut state = ServerState::new();
-    state.set_workspace_root(workspace_root_from_initialize_params(init_params));
+    state.set_workspace_root(workspace_root_from_initialize_params(init_params.as_ref()));
+
+    if did_change_watched_files_supported(init_params.as_ref()) {
+        register_drut_toml_watcher(&connection);
+    }
+    // No wait for a response here, by design (FR-010, research.md §1) — the
+    // main loop below never blocks on any single message, so an unconfirmed
+    // registration can never stall anything else.
 
     for msg in &connection.receiver {
         match msg {
@@ -125,30 +144,96 @@ pub fn run(connection: Connection) {
             Message::Notification(note) => {
                 handle_notification(&connection, note, &mut state);
             }
-            Message::Response(_) => {
-                // This server never sends requests of its own, so it never
-                // expects a response back — nothing to do.
+            Message::Response(response) => {
+                handle_response(&connection, response);
             }
         }
     }
 }
 
-/// Extracts the client's workspace root from the raw `initialize` params
-/// JSON, for the untitled-buffer `drut.toml` discovery fallback
+/// Extracts the client's workspace root from the already-parsed `initialize`
+/// params, for the untitled-buffer `drut.toml` discovery fallback
 /// (012-toml-configuration/research.md §5). `rootUri` wins when present
 /// (the LSP spec's own note: "If both rootPath and rootUri are set, rootUri
 /// wins" — and `workspaceFolders` is the modern replacement specifically
 /// for `rootUri`, so it's the fallback here, not the primary), falling back
 /// to the first `workspaceFolders` entry. `None` for a client that sends
-/// neither, or params that fail to parse — not a startup failure either
+/// neither, or params that failed to parse — not a startup failure either
 /// way.
 #[allow(deprecated)]
-fn workspace_root_from_initialize_params(params: serde_json::Value) -> Option<std::path::PathBuf> {
-    let params: lsp_types::InitializeParams = serde_json::from_value(params).ok()?;
+fn workspace_root_from_initialize_params(params: Option<&lsp_types::InitializeParams>) -> Option<std::path::PathBuf> {
+    let params = params?;
     let uri = params
         .root_uri
-        .or_else(|| params.workspace_folders?.into_iter().next().map(|f| f.uri))?;
+        .clone()
+        .or_else(|| params.workspace_folders.as_ref()?.first().map(|f| f.uri.clone()))?;
     workspace::uri_to_path(&uri)
+}
+
+/// Whether the client advertised support for asking it to report file
+/// changes on this server's behalf (013-lsp-config-file-watch, research.md
+/// §2) — the *only* mechanism that exists for this at all; there is no
+/// static-capability alternative (confirmed directly against `lsp-types`'
+/// own `DidChangeWatchedFilesClientCapabilities` doc comment). `false` for
+/// a client that omits this, doesn't support it, or whose params failed to
+/// parse — registration is then never attempted (FR-004).
+fn did_change_watched_files_supported(params: Option<&lsp_types::InitializeParams>) -> bool {
+    params
+        .and_then(|p| p.capabilities.workspace.as_ref())
+        .and_then(|w| w.did_change_watched_files.as_ref())
+        .and_then(|d| d.dynamic_registration)
+        .unwrap_or(false)
+}
+
+/// Sends the one and only request this server ever initiates: asking the
+/// client to report `drut.toml` changes anywhere in the workspace
+/// (013-lsp-config-file-watch, research.md §4, `contracts/
+/// config-watch-api.md`). Only called when `did_change_watched_files_
+/// supported` already returned `true` — never attempted against a client
+/// that hasn't advertised support (FR-004). Fire-and-forget: does not wait
+/// for a response (FR-010) — the eventual response, if any, is handled
+/// generically by `handle_response` whenever it arrives on the main loop.
+fn register_drut_toml_watcher(connection: &Connection) {
+    use lsp_types::request::{RegisterCapability, Request as _};
+
+    let watcher = lsp_types::FileSystemWatcher {
+        glob_pattern: lsp_types::GlobPattern::String("**/drut.toml".to_string()),
+        kind: None, // defaults to Create | Change | Delete (lsp-types' own doc comment).
+    };
+    let registration = lsp_types::Registration {
+        id: DRUT_TOML_WATCHER_ID.to_string(),
+        method: lsp_types::notification::DidChangeWatchedFiles::METHOD.to_string(),
+        register_options: Some(
+            serde_json::to_value(lsp_types::DidChangeWatchedFilesRegistrationOptions { watchers: vec![watcher] })
+                .expect("DidChangeWatchedFilesRegistrationOptions always serializes"),
+        ),
+    };
+    let request = lsp_server::Request::new(
+        lsp_server::RequestId::from(DRUT_TOML_WATCHER_ID.to_string()),
+        RegisterCapability::METHOD.to_string(),
+        lsp_types::RegistrationParams { registrations: vec![registration] },
+    );
+    let _ = connection.sender.send(Message::Request(request));
+}
+
+/// Handles a response to the one request this server ever sends
+/// (013-lsp-config-file-watch, research.md §1/FR-010). Never blocks
+/// anything — called generically from the main loop's own unified message
+/// dispatch, which has no per-message-type blocking wait of any kind; a
+/// response that never arrives simply means this is never called for that
+/// ID, and every other message continues to be handled normally regardless.
+/// An error result is logged (never silent, matching `010`/`011`/`012`'s
+/// own precedent) but otherwise changes nothing about how the session
+/// continues.
+fn handle_response(connection: &Connection, response: Response) {
+    if let Err(error) = response.response_result {
+        let params = lsp_types::LogMessageParams {
+            typ: lsp_types::MessageType::WARNING,
+            message: format!("drut.toml watcher registration failed: {error:?}"),
+        };
+        let note = lsp_server::Notification::new(lsp_types::notification::LogMessage::METHOD.to_string(), params);
+        let _ = connection.sender.send(Message::Notification(note));
+    }
 }
 
 /// Reports exactly which binary/build is running, directly from inside the
@@ -185,7 +270,7 @@ fn log_startup_info(connection: &Connection) {
 }
 
 fn handle_notification(connection: &Connection, note: ServerNotification, state: &mut ServerState) {
-    use lsp_types::notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument};
+    use lsp_types::notification::{DidChangeTextDocument, DidChangeWatchedFiles, DidCloseTextDocument, DidOpenTextDocument};
 
     let note = match note.extract::<lsp_types::DidOpenTextDocumentParams>(DidOpenTextDocument::METHOD) {
         Ok(params) => {
@@ -214,9 +299,28 @@ fn handle_notification(connection: &Connection, note: ServerNotification, state:
         Err(lsp_server::ExtractError::JsonError { .. }) => return,
     };
 
-    if let Ok(params) = note.extract::<lsp_types::DidCloseTextDocumentParams>(DidCloseTextDocument::METHOD) {
-        state.did_close(&params.text_document.uri);
-        diagnostics::publish_empty(connection, &params.text_document.uri);
+    let note = match note.extract::<lsp_types::DidCloseTextDocumentParams>(DidCloseTextDocument::METHOD) {
+        Ok(params) => {
+            state.did_close(&params.text_document.uri);
+            diagnostics::publish_empty(connection, &params.text_document.uri);
+            return;
+        }
+        Err(lsp_server::ExtractError::MethodMismatch(note)) => note,
+        Err(lsp_server::ExtractError::JsonError { .. }) => return,
+    };
+
+    // 013-lsp-config-file-watch FR-001/FR-002: a `drut.toml` changed
+    // somewhere in the workspace -- re-publish diagnostics for every
+    // currently-open document, not just one. `diagnostics::publish` is
+    // unmodified; it already re-resolves `drut-config` fresh internally
+    // (research.md §5). Every `FileEvent` in `changes` is treated
+    // identically regardless of its own `typ` (Created/Changed/Deleted) --
+    // deliberate, per spec.md's Edge Cases.
+    if note.extract::<lsp_types::DidChangeWatchedFilesParams>(DidChangeWatchedFiles::METHOD).is_ok() {
+        let uris: Vec<lsp_types::Uri> = state.open_uris().cloned().collect();
+        for uri in &uris {
+            diagnostics::publish(connection, state, uri);
+        }
     }
 }
 
