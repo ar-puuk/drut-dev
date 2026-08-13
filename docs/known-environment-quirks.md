@@ -70,3 +70,79 @@ reason gets recognized on sight instead of re-diagnosed from scratch.
 
 If this fires for a third, unrelated crate, that's expected — don't add a new
 research.md entry for it; just add a row to the table above and move on.
+
+## `git checkout` back to the real branch reverts real, uncommitted work after a disposable-tag test
+
+**Symptom**: real feature work (files that were sitting uncommitted, ready
+for review) appears to have vanished from the working tree after switching
+back from a throwaway branch used to live-test tag-triggered CI
+(`.github/workflows/release.yml`'s `preflight`/`build`/`release`/
+`verify-bootstrap` jobs). Nothing reports an error — `git checkout` and
+`git branch -D` both succeed silently. The files are just gone on disk.
+
+**Root cause**: not data loss, not a git bug — `git checkout <branch>` does
+exactly what it's documented to do: it makes the working tree match that
+branch's own last commit, full stop. The trigger condition, stated plainly
+so it's recognized on sight rather than re-diagnosed:
+
+> **Real work is sitting uncommitted in the working tree, AND a disposable
+> branch gets created and committed from that same dirty tree** (the
+> standard technique this project uses to live-test `release.yml`: bump
+> `Cargo.toml` versions to a throwaway value, commit, tag, push the tag
+> only, watch the run, clean up).
+
+Git has no concept of "this uncommitted file is the real feature work,
+that one's just the disposable version bump" — `git add`/`git commit` on
+the throwaway branch commits *everything* currently uncommitted, real work
+included, as a single indistinguishable unit. The real work's only
+surviving home is now that throwaway branch's commit. The moment you
+`git checkout` back to the real branch — to resume work or to discard the
+version-bump-only parts — the working tree reverts to the real branch's
+own (real-work-free) history, and the just-committed real work disappears
+from disk along with the throwaway scaffolding.
+
+**Why this isn't data loss, and how to recover if it already happened**:
+the commit still exists in git's object database as long as *something*
+still points at it — the pushed disposable tag counts. Before deleting
+the throwaway branch/tag, recover the real files with:
+
+```powershell
+git checkout <throwaway-commit-sha> -- <path> <path> ...
+```
+
+then verify (build/test) before proceeding with cleanup. This works, but
+depends on catching the problem before every reference to that commit is
+gone — a recovery move, not a safe procedure.
+
+**Standing procedure, adopted 2026-08-13**: before creating a throwaway
+branch for a disposable tag-triggered CI test, stash the real work first
+so the throwaway branch/commit never contains it at all:
+
+```powershell
+git stash push -u                        # -u: include untracked new files too
+git checkout -b tmp-<whatever>-test
+# ... bump versions, commit, tag, push the tag, watch the run, clean up ...
+git checkout <real-branch>
+git branch -D tmp-<whatever>-test
+git stash pop                             # real work is back, never touched
+```
+
+**Alternative**, when a disposable test needs to run *concurrently* with
+active editing on the real branch (not just held aside): use
+`git worktree add <path> -b tmp-<whatever>-test` instead of `git checkout
+-b`. A worktree is a genuinely separate working directory sharing the same
+repository — the real branch's own working tree is never switched away
+from at all, so there's nothing to revert. Higher setup cost than a stash,
+worth it only when stashing would actually block other in-progress work.
+
+**Instances observed so far**:
+
+| Date | Feature | What was recovered | Notes |
+|---|---|---|---|
+| 2026-08-13 | D2 (`.github/workflows/release.yml`, the cross-platform release binary pipeline) live tag test | `.github/workflows/release.yml` itself | First occurrence — recovered via `git checkout <sha> -- .github/workflows/release.yml` after noticing the file was gone post-checkout. |
+| 2026-08-13 | `015-extension-binary-bootstrap`'s `verify-bootstrap` CI job live tag test | The full 015 feature set (`extension.ts`, `binaryBootstrap.ts`, its test file, `scripts/verify-bootstrap.ts`, all of `specs/015-extension-binary-bootstrap/`) | Second occurrence, same session, same technique — same recovery approach, this time with every affected path recovered in one `git checkout <sha> -- <paths...>` call immediately after switching back, before deleting the throwaway branch. |
+
+If this fires again despite the stash procedure above, that means the
+procedure itself was skipped under time pressure, not that the procedure
+is wrong — don't re-diagnose the mechanism, just check whether `git stash
+push -u` actually ran before the throwaway branch was created.

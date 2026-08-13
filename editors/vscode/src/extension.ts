@@ -8,6 +8,8 @@
 // anything below. Everything in this file is the LanguageClient bootstrap
 // (FR-024) and its FR-025/FR-026 degrade-gracefully behavior.
 
+import { spawnSync } from "child_process";
+import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import {
@@ -19,6 +21,21 @@ import {
   LanguageClientOptions,
   ServerOptions,
 } from "vscode-languageclient/node";
+import {
+  archiveExtensionFor,
+  findReleaseAssetMatch,
+  GitHubRelease,
+  isUpdateCheckDue,
+  mapPlatformToTarget,
+  parseGitHubSlug,
+  pickResolutionTier,
+  ResolutionSource,
+  ResolvedBinary,
+  shouldOfferUpdate,
+  TargetTriple,
+  verifyChecksum,
+} from "./binaryBootstrap";
+import { downloadToFile, extractArchive, fetchLatestRelease, sha256File } from "./bootstrapIO";
 import { shouldInjectFormatOnSave } from "./formatOnSaveDecision";
 
 let client: LanguageClient | undefined;
@@ -36,14 +53,199 @@ function notifyOnce(kind: string, message: string): void {
   vscode.window.showWarningMessage(message);
 }
 
-/// Resolves the `drut` binary via `PATH` — relying on Node's own
-/// `child_process` PATH search, which already accounts for platform
-/// PATH/`.exe` conventions correctly (spec.md Edge Cases), no bespoke
-/// per-platform logic needed here. No settings-based override: spec.md's
-/// Assumptions rule out any configuration surface this phase ("the server
-/// and extension behave the same way across every workspace").
-function resolveDrutCommand(): string {
-  return "drut";
+// --- 015-extension-binary-bootstrap ("batteries included") ----------------
+//
+// resolveDrutBinary() replaces the old synchronous, PATH-only
+// resolveDrutCommand(). See specs/015-extension-binary-bootstrap/contracts/
+// binary-bootstrap-api.md for the normative three-tier algorithm this
+// implements. Every pure decision (platform->target-triple mapping,
+// asset-list matching, checksum comparison, update-check throttle/offer
+// logic) lives in binaryBootstrap.ts, imported below -- this file only
+// contains the VS-Code-API-touching orchestration.
+
+const UPDATE_CHECK_THROTTLE_MS = 24 * 60 * 60 * 1000; // spec.md FR-014
+const GITHUB_USER_AGENT = "drut-vscode-extension"; // required by GitHub's REST API (research.md §1)
+
+function storedBinaryFileName(): string {
+  return process.platform === "win32" ? "drut.exe" : "drut";
+}
+
+/// Tier 1 (spec.md FR-002): a genuine pre-flight check using the exact
+/// same primitive `vscode-languageclient` itself uses internally to spawn
+/// the server (research.md §4) -- never a different resolution mechanism
+/// that could disagree with what the real launch would do.
+function isOnPath(command: string): boolean {
+  // "--help", not "--version" -- confirmed directly against a real build
+  // (015-extension-binary-bootstrap's own CI verification run, T023):
+  // `drut` is subcommand-only (clap's auto `--version` flag isn't enabled
+  // here) and rejects a bare `--version` with a non-zero exit. That
+  // doesn't actually break this check (spawnSync only sets `.error` on a
+  // genuine ENOENT, never on the child process merely exiting non-zero),
+  // but "--help" is the flag that's actually guaranteed to succeed, so
+  // it's the clearer probe to use.
+  const result = spawnSync(command, ["--help"], { stdio: "ignore" });
+  return result.error === undefined || (result.error as NodeJS.ErrnoException).code !== "ENOENT";
+}
+
+function readPackageRepositoryUrl(context: vscode.ExtensionContext): string {
+  const raw = fs.readFileSync(path.join(context.extensionPath, "package.json"), "utf8");
+  const parsed = JSON.parse(raw) as { repository?: { url?: string } };
+  return parsed.repository?.url ?? "";
+}
+
+/// Tier 3 (spec.md FR-004-FR-010): download, verify, extract, install.
+/// Throws on any failure -- callers (resolveDrutBinary, the update-accept
+/// path) are responsible for translating that into the right
+/// user-observable outcome (FR-011/FR-012, or the update flow's own
+/// re-run of this same sequence, FR-017).
+async function downloadAndInstall(
+  context: vscode.ExtensionContext,
+  target: TargetTriple
+): Promise<{ command: string; version: string }> {
+  const slug = parseGitHubSlug(readPackageRepositoryUrl(context));
+  if (!slug) {
+    throw new Error("could not determine the GitHub repository from package.json");
+  }
+  const release = await fetchLatestRelease(slug.owner, slug.repo, GITHUB_USER_AGENT);
+  const ext = archiveExtensionFor(target);
+  const match = findReleaseAssetMatch(release.assets, target, ext);
+  if (!match) {
+    throw new Error(`release ${release.tag_name} has no asset for ${target}`);
+  }
+
+  const tmpDir = path.join(context.globalStorageUri.fsPath, ".tmp");
+  fs.mkdirSync(tmpDir, { recursive: true });
+  const archivePath = path.join(tmpDir, match.binary.name);
+  const checksumPath = path.join(tmpDir, match.checksum.name);
+
+  await downloadToFile(match.binary.browser_download_url, archivePath, GITHUB_USER_AGENT);
+  await downloadToFile(match.checksum.browser_download_url, checksumPath, GITHUB_USER_AGENT);
+
+  const digest = sha256File(archivePath);
+  const expected = fs.readFileSync(checksumPath, "utf8");
+  if (!verifyChecksum(digest, expected)) {
+    throw new Error("checksum verification failed for downloaded binary");
+  }
+
+  const extractedTmpPath = path.join(tmpDir, storedBinaryFileName());
+  await extractArchive(archivePath, extractedTmpPath, target);
+
+  const finalPath = path.join(context.globalStorageUri.fsPath, storedBinaryFileName());
+  fs.renameSync(extractedTmpPath, finalPath); // atomic within globalStorageUri (research.md §6)
+
+  await context.globalState.update("drutInstalledVersion", release.tag_name);
+  await context.globalState.update("drutInstalledPlatformArch", `${process.platform}-${process.arch}`);
+
+  return { command: finalPath, version: release.tag_name };
+}
+
+/// The full three-tier resolution algorithm (spec.md FR-001). Returns
+/// `undefined` when every tier fails or is inapplicable -- the caller's
+/// job is then exactly today's degrade-to-highlighting-only path, not a
+/// new error shape (data-model.md).
+async function resolveDrutBinary(context: vscode.ExtensionContext): Promise<ResolvedBinary | undefined> {
+  // Compute every tier's raw input *before* deciding -- the decision
+  // itself is delegated to pickResolutionTier (binaryBootstrap.ts), the
+  // same pure function User Story 2's own dedicated test exercises. This
+  // is deliberate: the tested decision function is the *actual* decision
+  // function used at runtime, not a parallel copy that could drift from
+  // what's really wired up.
+  const pathFound = isOnPath("drut");
+  const target = mapPlatformToTarget(process.platform, process.arch);
+  const storedPath = path.join(context.globalStorageUri.fsPath, storedBinaryFileName());
+  const storedPlatformArch = context.globalState.get<string>("drutInstalledPlatformArch");
+  const storedBinaryValid =
+    fs.existsSync(storedPath) && storedPlatformArch === `${process.platform}-${process.arch}`;
+
+  const tier = pickResolutionTier(pathFound, storedBinaryValid, target);
+
+  if (tier === "path") {
+    return { command: "drut", source: "path" };
+  }
+  if (tier === "storage") {
+    return { command: storedPath, source: "storage" };
+  }
+  if (tier === "unsupported") {
+    notifyOnce(
+      "unsupported-platform",
+      `Drut doesn't publish a prebuilt language server binary for your platform (${process.platform}/${process.arch}) — syntax highlighting still works, but diagnostics/hover/completion/formatting are unavailable.`
+    );
+    return undefined;
+  }
+
+  // tier === "download". `target` is guaranteed non-null here -- the only
+  // way pickResolutionTier returns "download" instead of "unsupported".
+  try {
+    fs.mkdirSync(context.globalStorageUri.fsPath, { recursive: true });
+    const { command } = await downloadAndInstall(context, target as TargetTriple);
+    return { command, source: "downloaded" };
+  } catch (err) {
+    notifyOnce(
+      "download-failed",
+      `Drut couldn't download the language server binary (${
+        err instanceof Error ? err.message : String(err)
+      }) — syntax highlighting still works; this will be retried the next time you open VS Code.`
+    );
+    return undefined;
+  }
+}
+
+/// User Story 4 (spec.md FR-013-FR-017): throttled, storage-only-scoped,
+/// non-blocking background update check. Fire-and-forget -- called after
+/// client.start(), never before (FR-014).
+async function checkForUpdateInBackground(context: vscode.ExtensionContext, source: ResolutionSource): Promise<void> {
+  if (source !== "storage") return; // never second-guesses a PATH install (FR-013)
+
+  const lastChecked = context.globalState.get<number>("drutLastUpdateCheckMs");
+  if (!isUpdateCheckDue(lastChecked, Date.now(), UPDATE_CHECK_THROTTLE_MS)) return;
+  await context.globalState.update("drutLastUpdateCheckMs", Date.now());
+
+  const slug = parseGitHubSlug(readPackageRepositoryUrl(context));
+  if (!slug) return;
+
+  let release: GitHubRelease;
+  try {
+    release = await fetchLatestRelease(slug.owner, slug.repo, GITHUB_USER_AGENT);
+  } catch {
+    // Best-effort background check -- a failure here changes nothing
+    // about the user's already-working setup, so it's silent by design
+    // (spec.md Assumptions), unlike an initial-resolution failure.
+    return;
+  }
+
+  const installed = context.globalState.get<string>("drutInstalledVersion");
+  const declined = context.globalState.get<string>("drutDeclinedUpdateVersion");
+  if (!shouldOfferUpdate(installed, release.tag_name, declined)) return;
+
+  const choice = await vscode.window.showInformationMessage(
+    `Drut ${release.tag_name} is available (you have ${installed}).`,
+    "Update",
+    "Later"
+  );
+
+  if (choice === "Update") {
+    const target = mapPlatformToTarget(process.platform, process.arch);
+    if (target === null) return; // shouldn't happen if we got this far, but never trust it silently
+    // Stop first: serverOptions is fixed at LanguageClient construction
+    // time (no setter, no restart(newOptions) -- verified against the
+    // real vscode-languageclient API), and a running process locks its
+    // own executable on Windows, so the binary must not be touched while
+    // the old server is still alive (spec.md, /speckit-analyze finding).
+    await client?.stop();
+    try {
+      const { command } = await downloadAndInstall(context, target);
+      startLanguageClient(command);
+    } catch (err) {
+      notifyOnce(
+        "download-failed",
+        `Drut couldn't install the update (${
+          err instanceof Error ? err.message : String(err)
+        }) — the previous version is no longer running; reload the window to retry.`
+      );
+    }
+  } else {
+    await context.globalState.update("drutDeclinedUpdateVersion", release.tag_name);
+  }
 }
 
 /// FR-026: allow exactly one automatic restart per crash occurrence, then
@@ -179,12 +381,14 @@ async function ensureFormatOnSaveEnabled(context: vscode.ExtensionContext): Prom
   await context.workspaceState.update(FORMAT_ON_SAVE_INJECTED_KEY, true);
 }
 
-export function activate(context: vscode.ExtensionContext): void {
-  void ensureVariableColorCustomization(context);
-  void ensureFormatOnSaveEnabled(context);
-
-  const command = resolveDrutCommand();
-
+/// Builds and starts the LanguageClient against `command`. Extracted so
+/// the update-accept path (checkForUpdateInBackground) can construct a
+/// genuinely new client pointed at a new binary — `serverOptions` is fixed
+/// at LanguageClient construction time with no setter, so "restarting
+/// against a new binary" means calling this again, not mutating anything
+/// on the existing instance (015-extension-binary-bootstrap,
+/// /speckit-analyze finding).
+function startLanguageClient(command: string): void {
   // No `transport` field here (deliberately, found the hard way
   // 2026-08-10 during manual VS Code verification): `vscode-languageclient`
   // treats `TransportKind.stdio` as a signal to append a `--stdio` flag to
@@ -221,6 +425,26 @@ export function activate(context: vscode.ExtensionContext): void {
       }`
     );
   });
+}
+
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  void ensureVariableColorCustomization(context);
+  void ensureFormatOnSaveEnabled(context);
+
+  const resolved = await resolveDrutBinary(context);
+  if (resolved === undefined) {
+    // Every tier failed or was inapplicable (spec.md FR-011) — the
+    // appropriate notification was already fired inside
+    // resolveDrutBinary itself. Static highlighting remains fully
+    // functional; there is nothing further to do here.
+    return;
+  }
+
+  startLanguageClient(resolved.command);
+
+  // Fire-and-forget, after start() — never blocks/delays activation
+  // (spec.md FR-014).
+  void checkForUpdateInBackground(context, resolved.source);
 }
 
 export function deactivate(): Thenable<void> | undefined {

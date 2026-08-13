@@ -76,7 +76,7 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "ts-node test/grammar.test.ts && ts-node test/formatOnSave.test.ts"
+    "test": "ts-node test/grammar.test.ts && ts-node test/formatOnSave.test.ts && ts-node test/binaryBootstrap.test.ts"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

@@ -173,3 +173,78 @@ jobs:
             --repo "${{ github.repository }}" \
             --title "${{ github.ref_name }}" \
             --notes-file release-notes.md
+
+  verify-bootstrap:
+    name: Verify extension bootstrap (${{ matrix.target }})
+    # 015-extension-binary-bootstrap tasks.md T023. Real, automated proof
+    # of the download/verify/extract/chmod/execute sequence, on real
+    # GitHub-hosted runners for all three OS families -- a permanent
+    # regression guard for every future real release, not a one-time
+    # pre-publish check. Windows added 2026-08-13 after T022's real manual
+    # verification found a genuine bug in extractArchive's Windows branch
+    # (guessed the extracted filename instead of discovering it -- see
+    # bootstrapIO.ts's own comment) that had zero automated coverage until
+    # a human ran the real download flow in real VS Code. This job now
+    # covers the download/verify/extract/execute *sequence* on all three
+    # platforms; the full real VS Code integration (PATH-check, storage-
+    # check, notification wording, the update-offer UI, ...) remains
+    # manual-only (quickstart.md steps 3-6) -- the two are complementary,
+    # not redundant.
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            execute: true # native to this runner -- full functional proof
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            execute: true # native to this runner -- full functional proof
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            execute: true # native (arm64) to this runner -- full functional proof
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            execute: false # not native to this arm64 runner -- would need
+                            # Rosetta (not guaranteed present); extraction/
+                            # checksum are still verified, execution is not
+                            # attempted rather than silently skipped
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+
+      - name: Install dependencies
+        working-directory: editors/vscode
+        run: npm ci
+
+      - name: Verify download/checksum/extract(/execute)
+        # GitHub-hosted Windows runners still ship Git Bash, so `shell:
+        # bash` here keeps this one script identical across all three
+        # matrix OSes rather than needing a separate pwsh branch.
+        #
+        # GITHUB_TOKEN: authenticates the GitHub API lookup in
+        # verify-bootstrap.ts (releases/tags/<tag>) so it gets the
+        # 5000/hour authenticated rate limit instead of the 60/hour-per-IP
+        # unauthenticated one -- shared macos-latest runner IPs were
+        # observed 403'ing on this call under the unauthenticated limit.
+        # `permissions: contents: write` at the top of this workflow
+        # already covers read access. The real, shipped extension never
+        # sets this env var and never sends this header -- see
+        # bootstrapIO.ts's fetchLatestRelease/fetchReleaseByTag comments.
+        shell: bash
+        working-directory: editors/vscode
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ matrix.execute }}" = "true" ]; then
+            npx ts-node scripts/verify-bootstrap.ts "${{ matrix.target }}" "${{ github.ref_name }}" --execute
+          else
+            npx ts-node scripts/verify-bootstrap.ts "${{ matrix.target }}" "${{ github.ref_name }}"
+          fi
