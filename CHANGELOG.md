@@ -11,8 +11,9 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
-Everything below shipped to `main` prior to any tagged release, so it's
-grouped here rather than under invented retroactive version numbers.
+## [0.1.0] - 2026-08-13
+
+First tagged release.
 
 ### Added
 

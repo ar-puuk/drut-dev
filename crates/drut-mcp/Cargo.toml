@@ -11,8 +11,8 @@ license = "MIT OR Apache-2.0"
 # (research.md §1) -- but it stops here: voyager-core, drut-cli's other
 # subcommands, and drut-lsp remain fully synchronous (T004 verifies this).
 [dependencies]
-voyager-core = { path = "../voyager-core" }
-drut-config = { path = "../drut-config" }
+voyager-core = { path = "../voyager-core", version = "0.1.0" }
+drut-config = { path = "../drut-config", version = "0.1.0" }
 # schemars pinned to "1" (not "0.8") deliberately -- rmcp 3.1.2 itself
 # depends on schemars 1.2.2 for its own #[tool] macro's schema generation,
 # confirmed via `cargo tree -i schemars@1.2.2`; deriving JsonSchema from a

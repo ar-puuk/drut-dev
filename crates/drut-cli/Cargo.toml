@@ -13,10 +13,10 @@ path = "src/main.rs"
 # to the core crate specifically — see 002-cli-check-format/spec.md
 # Assumptions). Versions pinned per research.md §6.
 [dependencies]
-voyager-core = { path = "../voyager-core" }
-drut-config = { path = "../drut-config" }
-drut-lsp = { path = "../drut-lsp" }
-drut-mcp = { path = "../drut-mcp" }
+voyager-core = { path = "../voyager-core", version = "0.1.0" }
+drut-config = { path = "../drut-config", version = "0.1.0" }
+drut-lsp = { path = "../drut-lsp", version = "0.1.0" }
+drut-mcp = { path = "../drut-mcp", version = "0.1.0" }
 clap = { version = "4.6.6", features = ["derive"] }
 ignore = "0.4.33"
 serde = { version = "1.0.229", features = ["derive"] }

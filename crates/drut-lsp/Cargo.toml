@@ -8,8 +8,8 @@ license = "MIT OR Apache-2.0"
 # Not bound by voyager-core's zero-dependency rule (scoped to the core crate
 # specifically). Versions pinned per research.md §11.
 [dependencies]
-voyager-core = { path = "../voyager-core" }
-drut-config = { path = "../drut-config" }
+voyager-core = { path = "../voyager-core", version = "0.1.0" }
+drut-config = { path = "../drut-config", version = "0.1.0" }
 lsp-server = "0.10.0"
 lsp-types = "0.97.0"
 serde = "1.0.229"

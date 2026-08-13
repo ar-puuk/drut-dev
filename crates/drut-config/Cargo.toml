@@ -12,7 +12,7 @@ license = "MIT OR Apache-2.0"
 # crate never derives `Deserialize` (per-field fallback parsing walks
 # `toml::Value` by hand instead, research.md §4).
 [dependencies]
-voyager-core = { path = "../voyager-core" }
+voyager-core = { path = "../voyager-core", version = "0.1.0" }
 toml = "1"
 
 [dev-dependencies]
