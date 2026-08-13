@@ -20,7 +20,7 @@ pub mod statement;
 pub mod token;
 
 pub use block::{Block, BlockKind};
-pub use block_resolution::{block_at, BlockInfo, BlockKindName};
+pub use block_resolution::{all_blocks, block_at, BlockFold, BlockInfo, BlockKindName};
 pub use diagnostic::{Diagnostic, DiagnosticKind};
 pub use format::{
     format, format_bytes, unclosed_fmt_off_markers, CasingConvention, EncodingFidelity, FormatOptions, FormatResult,

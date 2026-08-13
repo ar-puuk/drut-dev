@@ -7,6 +7,7 @@
 mod common;
 
 use common::*;
+use lsp_server::Connection;
 use serde_json::json;
 
 #[test]
@@ -238,6 +239,158 @@ fn did_open_publishes_zero_fmt_off_hints_for_a_clean_document() {
     let note = did_open(&client, "file:///clean_markers.s", "IF (X=1)\n; FMT: OFF\nY = 1\n; FMT: ON\nENDIF\n");
     let diagnostics = note.params["diagnostics"].as_array().unwrap();
     assert!(diagnostics.is_empty(), "every marker matched -- expected zero diagnostics, got: {diagnostics:?}");
+
+    shutdown(&client);
+}
+
+fn folding_ranges(client: &Connection, id: i32, uri: &str) -> Vec<serde_json::Value> {
+    send_request(client, id, "textDocument/foldingRange", json!({"textDocument": {"uri": uri}}));
+    let response = recv_response(client);
+    let result = response.response_result.expect("foldingRange must succeed");
+    result.as_array().expect("folding ranges array").clone()
+}
+
+#[test]
+fn initialize_handshake_declares_folding_range_support() {
+    let (client, _handle) = spawn_server();
+    send_request(&client, 1, "initialize", json!({"capabilities": {}}));
+    let response = recv_response(&client);
+    let result = response.response_result.expect("initialize must succeed");
+    assert_eq!(result["capabilities"]["foldingRangeProvider"], json!(true));
+    send_notification(&client, "initialized", json!({}));
+    shutdown(&client);
+}
+
+#[test]
+fn folding_range_us1_scenario_1_if_block_hides_exactly_the_lines_between() {
+    // spec.md US1 Acceptance Scenario 1.
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+    did_open(&client, "file:///a.s", "IF (a=b)\nX = 1\nY = 2\nENDIF\n");
+
+    let ranges = folding_ranges(&client, 2, "file:///a.s");
+    assert_eq!(ranges.len(), 1, "got {ranges:?}");
+    assert_eq!(ranges[0]["startLine"], json!(0));
+    assert_eq!(ranges[0]["endLine"], json!(3));
+    assert_eq!(ranges[0]["kind"], json!("region"));
+
+    shutdown(&client);
+}
+
+#[test]
+fn folding_range_us1_scenario_2_nested_loop_inside_if_produces_two_independent_ranges() {
+    // spec.md US1 Acceptance Scenario 2.
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+    did_open(&client, "file:///a.s", "IF (a=b)\nLOOP i=1,5\nX = 1\nENDLOOP\nENDIF\n");
+
+    let ranges = folding_ranges(&client, 2, "file:///a.s");
+    assert_eq!(ranges.len(), 2, "got {ranges:?}");
+    let outer = ranges.iter().find(|r| r["startLine"] == json!(0)).expect("outer IF range");
+    assert_eq!(outer["endLine"], json!(4));
+    let inner = ranges.iter().find(|r| r["startLine"] == json!(1)).expect("inner LOOP range");
+    assert_eq!(inner["endLine"], json!(3));
+    // The inner range is fully contained within the outer's line span.
+    assert!(inner["startLine"].as_u64().unwrap() > outer["startLine"].as_u64().unwrap());
+    assert!(inner["endLine"].as_u64().unwrap() < outer["endLine"].as_u64().unwrap());
+
+    shutdown(&client);
+}
+
+#[test]
+fn folding_range_us1_scenario_3_block_comment_folds_from_open_to_close() {
+    // spec.md US1 Acceptance Scenario 3.
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+    did_open(&client, "file:///a.s", "/* first line\n   second line\n   third line */\nX = 1\n");
+
+    let ranges = folding_ranges(&client, 2, "file:///a.s");
+    assert_eq!(ranges.len(), 1, "got {ranges:?}");
+    assert_eq!(ranges[0]["kind"], json!("comment"));
+    assert_eq!(ranges[0]["startLine"], json!(0));
+    assert_eq!(ranges[0]["endLine"], json!(2));
+
+    shutdown(&client);
+}
+
+#[test]
+fn folding_range_us2_scenario_1_live_edit_extends_the_range() {
+    // spec.md US2 Acceptance Scenario 1 / FR-010: a folding-range request
+    // after a didChange reflects the document's current text, not a stale
+    // parse.
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+    did_open(&client, "file:///a.s", "LOOP i=1,5\nX = 1\nENDLOOP\n");
+
+    let before = folding_ranges(&client, 2, "file:///a.s");
+    assert_eq!(before[0]["endLine"], json!(2));
+
+    send_notification(
+        &client,
+        "textDocument/didChange",
+        json!({
+            "textDocument": {"uri": "file:///a.s", "version": 2},
+            "contentChanges": [{"text": "LOOP i=1,5\nX = 1\nY = 2\nENDLOOP\n"}]
+        }),
+    );
+    recv_notification(&client, "textDocument/publishDiagnostics");
+
+    let after = folding_ranges(&client, 3, "file:///a.s");
+    assert_eq!(
+        after[0]["endLine"],
+        json!(3),
+        "the added line must shift ENDLOOP's line, and the range must reflect it, got {after:?}"
+    );
+
+    shutdown(&client);
+}
+
+#[test]
+fn folding_range_us2_scenario_2_deleting_the_closer_removes_the_range() {
+    // spec.md US2 Acceptance Scenario 2 / FR-005, proven as a live-edit
+    // scenario specifically (distinct from the static-document unmatched-
+    // block coverage in folding.rs's own unit tests).
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+    did_open(&client, "file:///a.s", "IF (a=b)\nX = 1\nENDIF\n");
+
+    let before = folding_ranges(&client, 2, "file:///a.s");
+    assert_eq!(before.len(), 1);
+
+    send_notification(
+        &client,
+        "textDocument/didChange",
+        json!({
+            "textDocument": {"uri": "file:///a.s", "version": 2},
+            "contentChanges": [{"text": "IF (a=b)\nX = 1\n"}]
+        }),
+    );
+    recv_notification(&client, "textDocument/publishDiagnostics");
+
+    let after = folding_ranges(&client, 3, "file:///a.s");
+    assert!(after.is_empty(), "an IF with no ENDIF must offer no fold range, got {after:?}");
+
+    shutdown(&client);
+}
+
+#[test]
+fn folding_range_us3_fold_all_coverage_matches_every_foldable_construct_exactly() {
+    // spec.md US3 / SC-002: one of every block kind, a nested block, and a
+    // block comment -- the returned set must match exactly, with no
+    // omission beyond FR-004/FR-005/FR-007/FR-008's documented exceptions.
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+    let source = "/* header comment */\nIF (a=b)\nLOOP i=1,5\nJLOOP\nX = 1\nENDJLOOP\nENDLOOP\nENDIF\nRUN PGM=MATRIX\nZONES=5\nENDRUN\nPROCESS PHASE=INPUT\nFILEI=ni.1\nENDPROCESS\nDISTRIBUTEMULTISTEP PROCESSNUM=4\nX = 1\nENDDISTRIBUTEMULTISTEP\nIF (a=b) PRINT LIST=1\n";
+    // header comment is a single line -> excluded (FR-008); short-IF on the
+    // last line -> excluded (FR-004). Every other construct is foldable.
+    did_open(&client, "file:///a.s", source);
+
+    let ranges = folding_ranges(&client, 2, "file:///a.s");
+    let regions = ranges.iter().filter(|r| r["kind"] == json!("region")).count();
+    let comments = ranges.iter().filter(|r| r["kind"] == json!("comment")).count();
+    assert_eq!(regions, 6, "IF, LOOP, JLOOP, RUN, PROCESS, DISTRIBUTEMULTISTEP -- got {ranges:?}");
+    assert_eq!(comments, 0, "the header comment is single-line, correctly excluded -- got {ranges:?}");
+    assert_eq!(ranges.len(), 6, "total must match exactly, got {ranges:?}");
 
     shutdown(&client);
 }

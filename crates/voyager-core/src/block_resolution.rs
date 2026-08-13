@@ -180,6 +180,52 @@ pub fn block_at(nodes: &[Node], diagnostics: &[Diagnostic], pos: Position) -> Op
     })
 }
 
-// Unit tests for `block_at` live in `tests/block_resolution.rs` (an
-// integration test, exercising only this module's public surface) rather
-// than an inline `#[cfg(test)]` module here (T019's specified location).
+/// One block's fold-relevant facts: its own opener location plus everything
+/// [`block_at`] would already report about it ([`BlockInfo`]) — reused
+/// unchanged (`011-code-folding/research.md` §1). `BlockInfo` alone doesn't
+/// carry the opener location, since `block_at`'s caller already knows the
+/// position they queried; `all_blocks`' callers don't have that luxury.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BlockFold {
+    pub opener: Position,
+    pub info: BlockInfo,
+}
+
+fn collect_blocks(nodes: &[Node], diagnostics: &[Diagnostic], out: &mut Vec<BlockFold>) {
+    for node in nodes {
+        if let Node::Block(block) = node {
+            collect_blocks(&block.children, diagnostics, out);
+            if let BlockKind::If { branches } = &block.kind {
+                for branch in branches {
+                    collect_blocks(&branch.children, diagnostics, out);
+                }
+            }
+            out.push(BlockFold {
+                opener: block.span.start,
+                info: BlockInfo {
+                    kind: block_kind_name(&block.kind),
+                    is_short_if: matches!(block.kind, BlockKind::If { .. }) && is_short_if(block, diagnostics),
+                    counterpart: counterpart_for(block, diagnostics),
+                },
+            });
+        }
+    }
+}
+
+/// Enumerates every block anywhere in `nodes` (including nested blocks and
+/// blocks nested inside an `If`'s branches), each resolved exactly as
+/// [`block_at`] would resolve it at that block's own opener position —
+/// `counterpart_for`/`is_short_if`/`block_kind_name` are reused completely
+/// unchanged (`011-code-folding/research.md` §1, `contracts/
+/// folding-range-api.md`). Order is not contractually meaningful. Never
+/// panics on any input, including an empty `nodes` slice.
+pub fn all_blocks(nodes: &[Node], diagnostics: &[Diagnostic]) -> Vec<BlockFold> {
+    let mut out = Vec::new();
+    collect_blocks(nodes, diagnostics, &mut out);
+    out
+}
+
+// Unit tests for `block_at`/`all_blocks` live in `tests/block_resolution.rs`
+// (an integration test, exercising only this module's public surface)
+// rather than an inline `#[cfg(test)]` module here (T019's specified
+// location).

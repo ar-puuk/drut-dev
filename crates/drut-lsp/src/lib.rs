@@ -7,6 +7,7 @@
 pub mod completion;
 pub mod diagnostics;
 pub mod document_store;
+pub mod folding;
 pub mod formatting;
 pub mod hover;
 pub mod position;
@@ -50,6 +51,8 @@ fn server_capabilities() -> lsp_types::ServerCapabilities {
         // serves VS Code's editor.formatOnPaste
         // (specs/005-format-on-save-paste).
         document_range_formatting_provider: Some(lsp_types::OneOf::Left(true)),
+        // Added 2026-08-12 (011-code-folding, folding.rs's own module docs).
+        folding_range_provider: Some(lsp_types::FoldingRangeProviderCapability::Simple(true)),
         completion_provider: Some(lsp_types::CompletionOptions {
             trigger_characters: Some(vec![" ".to_string(), "=".to_string()]),
             ..Default::default()
@@ -195,7 +198,9 @@ fn handle_notification(connection: &Connection, note: ServerNotification, state:
 }
 
 fn handle_request(connection: &Connection, req: ServerRequest, state: &mut ServerState) {
-    use lsp_types::request::{Completion, Formatting, HoverRequest, RangeFormatting, SemanticTokensFullRequest};
+    use lsp_types::request::{
+        Completion, FoldingRangeRequest, Formatting, HoverRequest, RangeFormatting, SemanticTokensFullRequest,
+    };
 
     let id = req.id.clone();
     let method = req.method.clone();
@@ -225,6 +230,10 @@ fn handle_request(connection: &Connection, req: ServerRequest, state: &mut Serve
                 Err(e) => send_err(connection, id, e.to_string()),
             }
         }
+        FoldingRangeRequest::METHOD => match serde_json::from_value::<lsp_types::FoldingRangeParams>(req.params) {
+            Ok(params) => send_ok(connection, id, &folding::handle(state, &params)),
+            Err(e) => send_err(connection, id, e.to_string()),
+        },
         other => send_err(connection, id, format!("unhandled method: {other}")),
     }
 }
