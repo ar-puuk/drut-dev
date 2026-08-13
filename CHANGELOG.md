@@ -16,6 +16,20 @@ grouped here rather than under invented retroactive version numbers.
 
 ### Added
 
+- Batteries-included install for the VS Code extension: on activation, the
+  extension now automatically resolves a working `drut` binary with no
+  manual install step required. It checks `PATH` first — never
+  second-guessing a binary already on it — then its own persistent
+  extension storage from a prior activation, then, if neither is present,
+  downloads the correct binary for your platform from the latest GitHub
+  Release and verifies it against its published SHA-256 checksum before
+  trusting it. If every option is unavailable (offline, an unsupported
+  platform/architecture, or a failed/unverifiable download), the extension
+  degrades gracefully to syntax-highlighting-only rather than failing
+  outright, and says why exactly once. Once installed this way, a
+  throttled (at most once per 24 hours), non-blocking background check
+  offers a dismissible notification when a newer release is available — it
+  never silently replaces a running binary.
 - `drut.toml` project configuration file: a `[format]` table (`casing`,
   `top_level_indent`) discovered by walking up from each file being
   processed, respected identically by the CLI, LSP, and MCP surfaces.
@@ -25,6 +39,10 @@ grouped here rather than under invented retroactive version numbers.
 - `--top-level-indent` option (`preserve`/`normalize`, default `preserve`)
   to control whether top-level (depth-0) statement indentation is left
   exactly as written or normalized to column 0.
+- `--casing=preserve` as an explicit third value alongside `upper`/`lower`:
+  lets one invocation force "leave casing untouched" even when `drut.toml`
+  sets a project-wide casing convention, mirroring `--top-level-indent`'s
+  existing `preserve`/`normalize` shape.
 - `; FMT: OFF` / `; FMT: ON` inline region markers to exclude a specific
   range of a script from formatting entirely. An unclosed `; FMT: OFF` is
   reported (CLI stderr notice, MCP response field, LSP hint diagnostic)
@@ -55,3 +73,7 @@ grouped here rather than under invented retroactive version numbers.
   unmatched/diagnosed block's child statements.
 - An open document's `drut.toml`-driven diagnostic no longer goes stale
   when the config file is edited directly while the document stays open.
+- The VS Code extension now has a proper Marketplace/Open VSX icon and
+  correctly bundles its dual MIT/Apache-2.0 license text in the `.vsix`
+  (previously omitted, since packaging includes only `editors/vscode/` in
+  isolation from the repo-root `LICENSE-MIT`/`LICENSE-APACHE` files).
