@@ -13,14 +13,16 @@ negatives preferred over false positives, vertical phase-gated delivery, and mor
 
 ## Status
 
-Four features shipped, all with passing fixture-corpus test gates (constitution
-Principle V):
+Fourteen features shipped (`001`–`014`; see [`CHANGELOG.md`](CHANGELOG.md) for the
+user-facing summary), all with passing fixture-corpus test gates (constitution
+Principle V). Not yet published anywhere — see [`ROADMAP.md`](ROADMAP.md) for the
+remaining pre-publish sequence.
 
 - **`voyager-core`** (`crates/voyager-core`) — a dependency-free tokenizer and
-  structural parser, plus a whitespace/casing formatter and a keyword-completion/
-  spell-check dictionary built on top of the same structure. See
-  [`specs/001-voyager-script-parser/`](specs/001-voyager-script-parser/) for the
-  parser's spec/plan/data-model/contracts/tasks/checklists,
+  structural parser, plus a whitespace/casing/indentation formatter and a
+  keyword-completion/spell-check dictionary built on top of the same structure.
+  See [`specs/001-voyager-script-parser/`](specs/001-voyager-script-parser/) for
+  the parser's spec/plan/data-model/contracts/tasks/checklists,
   [`specs/002-cli-check-format/`](specs/002-cli-check-format/)'s `research.md`/
   `data-model.md` for the formatter additions (`format`/`format_bytes`,
   `Block.closer`/`opener_pairs`), and
@@ -35,28 +37,69 @@ Principle V):
   `specs/001-voyager-script-parser/spec.md`'s FR-003 amendment, and the
   census re-run against the fix — see the module doc for the fix's effect on
   the dictionary (one entry, `COST`/`PRINT`, dropped as the bug's own
-  artifact; everything else unchanged).
+  artifact; everything else unchanged). Since then, the formatter has grown: a
+  `--top-level-indent` mode (`preserve`, the default, or `normalize` — force
+  every top-level statement to column 0) and a three-valued `casing` convention
+  (`preserve`, the default, `upper`, or `lower`) — see
+  [`specs/009-top-level-indent-toggle/`](specs/009-top-level-indent-toggle/) and
+  [`specs/014-casing-preserve-mode/`](specs/014-casing-preserve-mode/); a
+  `; FMT: OFF`/`; FMT: ON` inline marker pair to exclude a range from
+  formatting entirely, with an unclosed marker surfaced (never silently
+  extended forever without notice) — see
+  [`specs/010-fmt-region-markers/`](specs/010-fmt-region-markers/); a new
+  `UnmatchedProcess` diagnostic for an unclosed `PROCESS`/`PHASE` block,
+  previously unflagged — see
+  [`specs/006-unmatched-process-diagnostic/`](specs/006-unmatched-process-diagnostic/);
+  and a fix so a genuinely unmatched/diagnosed block's children no longer pick up
+  stale indentation.
+- **`drut-config`** (`crates/drut-config`) — `drut.toml` discovery (upward
+  directory walk from the file being processed, stopping at a `.git` boundary or
+  filesystem root), TOML parsing, and per-field resolution
+  (`defaults < drut.toml < explicit CLI-flag/MCP-param`), shared identically by
+  `drut-cli`/`drut-lsp`/`drut-mcp` — the only way an LSP/editor user reaches
+  non-default formatting behavior without a CLI flag. A malformed value in the
+  file never blocks formatting; it warns and falls back to the built-in default
+  for just that field. See the ["Configuration"](#configuration) section below
+  and [`specs/012-toml-configuration/`](specs/012-toml-configuration/) for the
+  full design.
 - **`drut-cli`** (`crates/drut-cli`, binary `drut`) — a thin CLI adapter exposing
-  `check`, `format`, and `server` as subcommands over `voyager-core`/`drut-lsp`, per
-  [`specs/002-cli-check-format/`](specs/002-cli-check-format/) and
-  [`specs/003-lsp-vscode-extension/`](specs/003-lsp-vscode-extension/). `check` is
-  fully wired (plain-text or SARIF 2.1.0 output); `format` supports default/
-  `--write`/`--check`/`--diff` disposition modes and opt-in `--casing=upper|lower`;
-  `server` speaks the Language Server Protocol over stdio.
+  `check`, `format`, `server`, and `mcp` as subcommands over
+  `voyager-core`/`drut-lsp`/`drut-mcp`, per
+  [`specs/002-cli-check-format/`](specs/002-cli-check-format/),
+  [`specs/003-lsp-vscode-extension/`](specs/003-lsp-vscode-extension/), and
+  [`specs/004-mcp-server/`](specs/004-mcp-server/). `check` is fully wired
+  (plain-text or SARIF 2.1.0 output); `format` supports default/`--write`/
+  `--check`/`--diff` disposition modes, opt-in `--casing=preserve|upper|lower`,
+  `--top-level-indent=preserve|normalize`, and `--isolated` (skip `drut.toml`
+  discovery for one run); `server` speaks the Language Server Protocol over
+  stdio; `mcp` speaks the Model Context Protocol over stdio.
 - **`drut-lsp`** (`crates/drut-lsp`) — a thin LSP adapter over `voyager-core`:
-  diagnostics (six of seven `voyager-core` categories — `InvalidEncoding` is
-  unreachable through live editing by construction of the LSP transport itself,
-  see `specs/003-lsp-vscode-extension/research.md` §12), hover (block-kind and
+  diagnostics (seven categories, including `drut.toml`-problem hints and
+  unclosed-`FMT:-OFF` hints — `InvalidEncoding` is unreachable through live
+  editing by construction of the LSP transport itself, see
+  `specs/003-lsp-vscode-extension/research.md` §12), hover (block-kind and
   matched-counterpart info, including through `Run`/`Process`'s implicit-close
   quirk), control-word-scoped completion, "did you mean" spell-check (riding on
-  hover), and semantic tokens (short-`IF` vs block-`IF`, unreachable-after-`BREAK`).
-  See [`specs/003-lsp-vscode-extension/`](specs/003-lsp-vscode-extension/) for the
-  full spec/plan/data-model/contracts/tasks.
+  hover), semantic tokens (short-`IF` vs block-`IF`, unreachable-after-`BREAK`),
+  document/range formatting, and folding ranges for every block kind and block
+  comment — see [`specs/011-code-folding/`](specs/011-code-folding/). Since
+  `013-lsp-config-file-watch`, it also registers a
+  `workspace/didChangeWatchedFiles` watcher for `drut.toml` (when the client
+  supports dynamic registration) and live-refreshes every open document's
+  diagnostics on a config change, without requiring the document to be
+  closed/reopened — see
+  [`specs/013-lsp-config-file-watch/`](specs/013-lsp-config-file-watch/). See
+  [`specs/003-lsp-vscode-extension/`](specs/003-lsp-vscode-extension/) for the
+  original spec/plan/data-model/contracts/tasks.
 - **`editors/vscode`** — a VS Code/Open VSX extension: a static TextMate grammar
   (functional with zero dependency on `drut server` running) plus a
   `vscode-languageclient` wrapper spawning `drut server`, with graceful
   degradation (highlighting-only) when the binary is missing and a one-restart
-  crash-recovery policy when the server process dies mid-session.
+  crash-recovery policy when the server process dies mid-session. Since
+  `005-format-on-save-paste`: format-on-save auto-enables itself on first
+  activation (one-time, removal-respecting), and format-on-paste is available
+  opt-in — see ["Editor behavior"](#editor-behavior-format-on-save-and-format-on-paste)
+  below.
 - **`drut-mcp`** (`crates/drut-mcp`) — a thin Model Context Protocol adapter over
   `voyager-core`, the fourth thin adapter the constitution names: four read-only
   tools (`diagnose`, `format`, `query_structure`, `lookup_keyword`), exposed via
@@ -68,7 +111,9 @@ Principle V):
   `tokio`/`rmcp` (this project's first async runtime dependency — every
   actively-maintained Rust MCP SDK is async-only) are scoped entirely to this
   one crate; `voyager-core`, `drut-cli`'s other subcommands, and `drut-lsp`
-  remain fully synchronous. See
+  remain fully synchronous. `format`'s parameters now mirror the CLI's flags
+  (`casing`, `top_level_indent`, `isolated`), plus response fields for unclosed
+  `; FMT: OFF` markers and `drut.toml` warnings. See
   [`specs/004-mcp-server/`](specs/004-mcp-server/) for the full spec/plan/
   data-model/contracts/tasks.
 
@@ -150,12 +195,13 @@ the only way an editor (LSP) user reaches non-default behavior at all.
 
 ```toml
 [format]
-casing = "lower"                 # "upper" | "lower"; omit = leave casing untouched
+casing = "lower"                 # "preserve" | "upper" | "lower"; omit = "preserve"
 top_level_indent = "normalize"   # "preserve" | "normalize"; omit = "preserve"
 ```
 
-Omitting a key means "use the built-in default for that setting" — there is
-no separate "off" value to remember.
+Omitting a key means "use the built-in default for that setting" (`preserve`
+for both settings) — writing `preserve` explicitly is equivalent to omitting
+the key, but is accepted as a recognized value rather than a no-op.
 
 **Discovery**: for any file being formatted, drut searches upward from that
 file's own directory for the nearest `drut.toml`, the same way on every
