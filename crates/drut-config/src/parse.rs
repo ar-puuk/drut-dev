@@ -95,13 +95,14 @@ fn parse_casing(
     warnings: &mut Vec<ConfigWarning>,
 ) -> Option<voyager_core::CasingConvention> {
     match value.as_str() {
+        Some("preserve") => Some(voyager_core::CasingConvention::Preserve),
         Some("upper") => Some(voyager_core::CasingConvention::Upper),
         Some("lower") => Some(voyager_core::CasingConvention::Lower),
         Some(other) => {
             warnings.push(invalid_value(
                 path,
                 "casing",
-                format!("must be \"upper\" or \"lower\", got {other:?}"),
+                format!("must be \"preserve\", \"upper\", or \"lower\", got {other:?}"),
             ));
             None
         }
@@ -109,7 +110,7 @@ fn parse_casing(
             warnings.push(invalid_value(
                 path,
                 "casing",
-                format!("must be a string (\"upper\" or \"lower\"), got {value:?}"),
+                format!("must be a string (\"preserve\", \"upper\", or \"lower\"), got {value:?}"),
             ));
             None
         }

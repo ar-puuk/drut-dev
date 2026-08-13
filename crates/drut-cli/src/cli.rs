@@ -39,8 +39,9 @@ pub enum Command {
         /// Print a unified diff per changed file; write nothing (FR-019).
         #[arg(long, conflicts_with_all = ["write", "check"])]
         diff: bool,
-        /// Opt-in keyword-casing convention — must be `upper` or `lower`
-        /// when given; no bare `--casing` (FR-015).
+        /// Opt-in keyword-casing convention — must be `preserve`, `upper`,
+        /// or `lower` when given; no bare `--casing` (FR-015, amended by
+        /// 014-casing-preserve-mode FR-006).
         #[arg(long, value_enum)]
         casing: Option<CasingArg>,
         /// Top-level (depth-0) indentation policy — `preserve` (default,
@@ -81,6 +82,7 @@ pub enum OutputFormat {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum CasingArg {
+    Preserve,
     Upper,
     Lower,
 }

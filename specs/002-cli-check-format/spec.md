@@ -315,7 +315,16 @@ unchanged from the pre-format parse (behavior preservation).
   keyword's *value* are never casing targets regardless of whether they happen to
   textually match a control word or keyword name — casing normalization only ever
   touches a token already structurally recognized as a control word/keyword name by
-  parsing, never a token classified as something else.
+  parsing, never a token classified as something else. **Amended 2026-08-13
+  (`014-casing-preserve-mode`)**: the underlying representation changes from an
+  optional value (`Option<CasingConvention>`, `None` meaning "off") to a
+  three-valued `CasingConvention` enum (`Preserve`/`#[default]`, `Upper`, `Lower`) —
+  mirroring `TopLevelIndentMode`'s already-shipped shape (FR-026). This is a pure
+  representation change: `Preserve` produces byte-identical output to the old
+  `None` for every input. `--casing` gains a third explicit CLI value, `preserve`,
+  letting a user force casing untouched for one run even when a resolved
+  `drut.toml` specifies `upper`/`lower` — the existing "no bare `--casing`" rule is
+  unchanged; the flag still requires an explicit value whenever given at all.
 - **FR-016**: `format`'s default invocation (no write/check/diff flag) MUST print
   the formatted result to stdout and MUST NOT modify any file on disk.
 - **FR-017**: `format` MUST support a `--write` flag that overwrites each matched
@@ -375,9 +384,19 @@ unchanged from the pre-format parse (behavior preservation).
   not a new, fourth exit-code case.
 - **FR-026**: `format` MUST support a `--top-level-indent` flag accepting `preserve`
   (default) or `normalize`, selecting between FR-012's two top-level indentation
-  behaviors. Unlike FR-015's `--casing` flag, this setting has no "off" state —
-  omitting the flag resolves to the explicit `preserve` default, not an unset/`None`
-  value. Added `2026-08-12` (`009-top-level-indent-toggle`).
+  behaviors. Omitting the flag resolves to the explicit `preserve` default, not an
+  unset/`None` value. Added `2026-08-12` (`009-top-level-indent-toggle`). **Amended
+  2026-08-13 (`014-casing-preserve-mode`)**: as of that feature, `--casing` shares
+  this same shape — both settings resolve to an explicit `preserve`/`Preserve`
+  default at the `FormatOptions` layer, with no distinct "off"/`None` state
+  remaining at that layer (this bullet previously contrasted itself against
+  `--casing` on exactly that point; that contrast no longer holds). The two
+  settings differ only in how many *named* states they carry (`--casing` has
+  three: `preserve`/`upper`/`lower`; `--top-level-indent` has two:
+  `preserve`/`normalize`), not in whether an omitted flag is distinguishable from
+  an explicit value — for both, that distinction is preserved one layer up, in
+  `ExplicitFormatOverride`'s own `Option`-wrapped fields (`drut_config::lib.rs`),
+  not in `FormatOptions` itself.
 - **FR-027**: `format` MUST recognize a `; FMT: OFF`/`; FMT: ON` comment-only-line
   marker pair and leave every line from `; FMT: OFF` (inclusive) through its
   matching `; FMT: ON` (inclusive), or through end-of-file if unmatched, byte-for-

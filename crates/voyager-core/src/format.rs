@@ -38,11 +38,18 @@ use crate::{parse, Node};
 /// (82.4% of real body-indent occurrences; spec.md FR-012).
 const INDENT_WIDTH: usize = 4;
 
-/// The two supported keyword-casing targets (spec.md FR-015 — no hardcoded
-/// default; `FormatOptions.casing` being `None` is how "off" is represented,
-/// not a third variant here).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The three supported keyword-casing targets (spec.md FR-015, amended by
+/// `014-casing-preserve-mode` FR-001). `Preserve` is the `#[default]` —
+/// `format` always either preserves, uppercases, or lowercases
+/// keyword/control-word casing, the same non-optional shape
+/// `TopLevelIndentMode` already uses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CasingConvention {
+    /// Leave existing control-word/pair-keyword casing exactly as written
+    /// — the previous `FormatOptions.casing == None` behavior, now a real
+    /// named variant instead of an absent value.
+    #[default]
+    Preserve,
     Upper,
     Lower,
 }
@@ -65,9 +72,10 @@ pub enum TopLevelIndentMode {
 /// Caller-supplied configuration for one `format`/`format_bytes` call.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct FormatOptions {
-    /// `None` (default) leaves all keyword/control-word casing untouched,
-    /// exactly as the current input has it (FR-015).
-    pub casing: Option<CasingConvention>,
+    /// Defaults to `Preserve` (FR-015, amended by `014-casing-preserve-
+    /// mode` FR-002) via `CasingConvention`'s own `#[default]` — the same
+    /// non-optional shape `top_level_indent` already uses on this struct.
+    pub casing: CasingConvention,
     /// Defaults to `Preserve` (FR-001) via `TopLevelIndentMode`'s own
     /// `#[default]` — every call site is still individually verified
     /// (`009-top-level-indent-toggle`/research.md §2), not trusted
@@ -198,8 +206,8 @@ fn render(source: &str, nodes: &[Node], diagnostics: &[Diagnostic], options: For
     plan_indentation(nodes, &char_lines, &diagnosed_openers, &protected, options.top_level_indent, &mut indent_plan);
 
     let mut casing_edits: Vec<CasingEdit> = Vec::new();
-    if let Some(convention) = options.casing {
-        collect_casing_edits(nodes, &char_lines, &protected, convention, &mut casing_edits);
+    if options.casing != CasingConvention::Preserve {
+        collect_casing_edits(nodes, &char_lines, &protected, options.casing, &mut casing_edits);
     }
     let mut edits_by_line: BTreeMap<u32, Vec<(usize, usize, String)>> = BTreeMap::new();
     for (line, start, end, text) in casing_edits {
@@ -582,6 +590,10 @@ fn edit_for_span(lines: &[Vec<char>], span: Span, convention: CasingConvention) 
     let replacement = match convention {
         CasingConvention::Upper => original.to_ascii_uppercase(),
         CasingConvention::Lower => original.to_ascii_lowercase(),
+        // Exhaustiveness only -- render()'s guard above means this
+        // function's call chain is never actually reached with `Preserve`
+        // (014-casing-preserve-mode research.md §1).
+        CasingConvention::Preserve => original.clone(),
     };
     if replacement == original {
         return None;
@@ -694,14 +706,14 @@ mod tests {
 
     fn upper() -> FormatOptions {
         FormatOptions {
-            casing: Some(CasingConvention::Upper),
+            casing: CasingConvention::Upper,
             top_level_indent: TopLevelIndentMode::default(),
         }
     }
 
     fn normalize() -> FormatOptions {
         FormatOptions {
-            casing: None,
+            casing: CasingConvention::Preserve,
             top_level_indent: TopLevelIndentMode::Normalize,
         }
     }
@@ -935,6 +947,36 @@ mod tests {
     }
 
     #[test]
+    fn casing_convention_default_is_preserve() {
+        // 014-casing-preserve-mode FR-001/SC-003 (point 1 of 3).
+        assert_eq!(CasingConvention::default(), CasingConvention::Preserve);
+    }
+
+    #[test]
+    fn format_options_default_casing_is_preserve() {
+        // 014-casing-preserve-mode FR-002/SC-003 (point 2 of 3) -- the
+        // single most direct confirmation of User Story 3, distinct from
+        // the behavioral tests around it.
+        assert_eq!(FormatOptions::default().casing, CasingConvention::Preserve);
+    }
+
+    #[test]
+    fn casing_explicit_preserve_matches_the_old_none_based_output_exactly() {
+        // 014-casing-preserve-mode FR-003/User Story 2: byte-identical to
+        // what FormatOptions.casing == None produced before this feature --
+        // same fixture as casing_off_by_default_leaves_everything_alone
+        // above, but with Preserve passed explicitly rather than relying on
+        // FormatOptions::default().
+        let src = "if (x=1)\nrun pgm=matrix\nendrun\nendif\n";
+        let options = FormatOptions {
+            casing: CasingConvention::Preserve,
+            top_level_indent: TopLevelIndentMode::default(),
+        };
+        let out = format(src, options).text;
+        assert_eq!(out, "if (x=1)\n    run pgm=matrix\n    endrun\nendif\n");
+    }
+
+    #[test]
     fn casing_upper_rewrites_control_words_and_closers() {
         let src = "if (x=1)\nendif\n";
         let out = format(src, upper()).text;
@@ -982,7 +1024,7 @@ mod tests {
         let out = format(
             src,
             FormatOptions {
-                casing: Some(CasingConvention::Lower),
+                casing: CasingConvention::Lower,
                 top_level_indent: TopLevelIndentMode::default(),
             },
         )

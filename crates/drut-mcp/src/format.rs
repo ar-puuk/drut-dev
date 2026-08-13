@@ -11,9 +11,10 @@ use crate::source::{ResolvedSource, ScriptSource, SourceError};
 pub struct FormatInput {
     #[serde(flatten)]
     pub source: ScriptSource,
-    /// `"upper"` / `"lower"` / absent — absent means "consult the resolved
-    /// `drut.toml`, then the built-in default" (012-toml-configuration),
-    /// same precedence CLI flags follow.
+    /// `"preserve"` / `"upper"` / `"lower"` / absent — absent means
+    /// "consult the resolved `drut.toml`, then the built-in default"
+    /// (012-toml-configuration), same precedence CLI flags follow.
+    /// `"preserve"` added by 014-casing-preserve-mode FR-007.
     pub casing: Option<String>,
     /// `"preserve"` / `"normalize"` / absent — same precedence as `casing`
     /// above. Closes the former CLI/MCP asymmetry (012-toml-configuration
@@ -60,9 +61,14 @@ fn fidelity_name(f: voyager_core::EncodingFidelity) -> &'static str {
 fn explicit_override(input: &FormatInput) -> Result<drut_config::ExplicitFormatOverride, String> {
     let casing = match input.casing.as_deref() {
         None => None,
+        Some("preserve") => Some(voyager_core::CasingConvention::Preserve),
         Some("upper") => Some(voyager_core::CasingConvention::Upper),
         Some("lower") => Some(voyager_core::CasingConvention::Lower),
-        Some(other) => return Err(format!("`casing` must be \"upper\" or \"lower\" if given, got {other:?}")),
+        Some(other) => {
+            return Err(format!(
+                "`casing` must be \"preserve\", \"upper\", or \"lower\" if given, got {other:?}"
+            ))
+        }
     };
     let top_level_indent = match input.top_level_indent.as_deref() {
         None => None,
@@ -158,6 +164,18 @@ mod tests {
         let second = format(&text_input(&first.text, None)).unwrap();
         assert!(!second.changed);
         assert_eq!(second.text, first.text);
+    }
+
+    #[test]
+    fn casing_defaults_to_preserve_not_upper_or_lower() {
+        // 014-casing-preserve-mode FR-008/SC-003 (point 3 of 3)/User Story
+        // 3 -- mirrors top_level_indentation_defaults_to_preserve_not_
+        // normalize's shape for the sibling setting. No casing param, no
+        // governing drut.toml.
+        let text = "if (a=b)\nendif\n";
+        let result = format(&text_input(text, None)).unwrap();
+        assert_eq!(result.text, text, "lowercase control words must be left untouched by default");
+        assert!(!result.changed);
     }
 
     #[test]
@@ -261,6 +279,23 @@ mod tests {
 
         let reverted = format(&path_input(file.to_str().unwrap(), None, None, None)).unwrap();
         assert_eq!(reverted.text, "if (X=1)\nendif\n", "no explicit param -- the file's own setting applies again");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn explicit_casing_preserve_param_overrides_a_present_drut_toml() {
+        // 014-casing-preserve-mode FR-007/FR-009/User Story 1.
+        let dir = temp_project("override_preserve");
+        write_config(&dir, "[format]\ncasing = \"upper\"\n");
+        let file = dir.join("x.s");
+        std::fs::write(&file, "if (x=1)\nendif\n").unwrap();
+
+        let overridden = format(&path_input(file.to_str().unwrap(), Some("preserve"), None, None)).unwrap();
+        assert_eq!(overridden.text, "if (x=1)\nendif\n", "explicit preserve must win over the file's upper setting");
+
+        let reverted = format(&path_input(file.to_str().unwrap(), None, None, None)).unwrap();
+        assert_eq!(reverted.text, "IF (x=1)\nENDIF\n", "no explicit param -- the file's own setting applies again");
 
         let _ = std::fs::remove_dir_all(&dir);
     }

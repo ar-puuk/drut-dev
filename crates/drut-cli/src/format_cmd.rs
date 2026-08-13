@@ -15,6 +15,7 @@ use crate::traverse::{traverse, ReadFailure};
 impl From<CasingArg> for CasingConvention {
     fn from(value: CasingArg) -> Self {
         match value {
+            CasingArg::Preserve => CasingConvention::Preserve,
             CasingArg::Upper => CasingConvention::Upper,
             CasingArg::Lower => CasingConvention::Lower,
         }

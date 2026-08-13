@@ -30,6 +30,19 @@ fn fully_valid_file_parses_both_keys_with_zero_warnings() {
 }
 
 #[test]
+fn casing_preserve_parses_cleanly_with_zero_warnings() {
+    // 014-casing-preserve-mode FR-005/SC-005: "preserve" is a recognized
+    // value, not an unrecognized one that happens to be a no-op.
+    let path = write_config("casing_preserve", "[format]\ncasing = \"preserve\"\n");
+
+    let (config, warnings) = parse(&path);
+    assert_eq!(config.format.casing, Some(CasingConvention::Preserve));
+    assert!(warnings.is_empty(), "expected zero warnings, got {warnings:?}");
+
+    cleanup(&path);
+}
+
+#[test]
 fn invalid_value_for_one_key_falls_back_only_for_that_key() {
     let path = write_config(
         "invalid_value",

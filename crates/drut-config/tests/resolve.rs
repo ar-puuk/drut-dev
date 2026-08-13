@@ -32,7 +32,7 @@ fn explicit_value_wins_over_a_present_valid_config_file_per_field() {
             top_level_indent: None,
         },
     );
-    assert_eq!(options.casing, Some(CasingConvention::Upper), "explicit casing must win");
+    assert_eq!(options.casing, CasingConvention::Upper, "explicit casing must win");
     assert_eq!(
         options.top_level_indent,
         TopLevelIndentMode::Preserve,
@@ -48,7 +48,7 @@ fn config_file_value_wins_over_the_built_in_default_when_no_explicit_value_given
     let target = test_file("file_wins_over_default", "[format]\ncasing = \"lower\"\ntop_level_indent = \"normalize\"\n");
 
     let (options, _warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default());
-    assert_eq!(options.casing, Some(CasingConvention::Lower));
+    assert_eq!(options.casing, CasingConvention::Lower);
     assert_eq!(options.top_level_indent, TopLevelIndentMode::Normalize);
 
     cleanup(&target);
@@ -64,7 +64,7 @@ fn no_file_path_skips_discovery_and_resolves_straight_to_explicit_then_default()
             top_level_indent: None,
         },
     );
-    assert_eq!(options.casing, Some(CasingConvention::Upper));
+    assert_eq!(options.casing, CasingConvention::Upper);
     assert_eq!(options.top_level_indent, TopLevelIndentMode::Preserve, "no file, no explicit -> built-in default");
     assert!(warnings.is_empty());
 }
@@ -74,7 +74,11 @@ fn isolated_skips_discovery_even_with_a_valid_nearby_config_present() {
     let target = test_file("isolated", "[format]\ncasing = \"lower\"\ntop_level_indent = \"normalize\"\n");
 
     let (options, warnings) = resolve_format_options(Some(&target), true, ExplicitFormatOverride::default());
-    assert_eq!(options.casing, None, "isolated must ignore the file entirely, casing stays at built-in default");
+    assert_eq!(
+        options.casing,
+        CasingConvention::Preserve,
+        "isolated must ignore the file entirely, casing stays at built-in default"
+    );
     assert_eq!(options.top_level_indent, TopLevelIndentMode::Preserve, "isolated must ignore the file's top_level_indent too");
     assert!(warnings.is_empty(), "isolated must not even attempt discovery, so no warnings either");
 
@@ -93,8 +97,24 @@ fn isolated_still_honors_an_explicit_override() {
             top_level_indent: Some(TopLevelIndentMode::Normalize),
         },
     );
-    assert_eq!(options.casing, Some(CasingConvention::Upper));
+    assert_eq!(options.casing, CasingConvention::Upper);
     assert_eq!(options.top_level_indent, TopLevelIndentMode::Normalize);
+
+    cleanup(&target);
+}
+
+#[test]
+fn a_present_config_file_that_does_not_mention_casing_resolves_to_preserve() {
+    // 014-casing-preserve-mode FR-004: a drut.toml can set top_level_indent
+    // without ever mentioning casing at all -- the unset field must still
+    // resolve to CasingConvention::Preserve, not panic or leave a stale
+    // value.
+    let target = test_file("casing_unset_in_file", "[format]\ntop_level_indent = \"normalize\"\n");
+
+    let (options, warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default());
+    assert_eq!(options.casing, CasingConvention::Preserve);
+    assert_eq!(options.top_level_indent, TopLevelIndentMode::Normalize);
+    assert!(warnings.is_empty());
 
     cleanup(&target);
 }
@@ -108,7 +128,7 @@ fn a_missing_config_file_resolves_to_explicit_then_default_with_no_warnings() {
     std::fs::write(&target, "IF (a=b)\nENDIF\n").unwrap();
 
     let (options, warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default());
-    assert_eq!(options.casing, None);
+    assert_eq!(options.casing, CasingConvention::Preserve);
     assert_eq!(options.top_level_indent, TopLevelIndentMode::Preserve);
     assert!(warnings.is_empty());
 

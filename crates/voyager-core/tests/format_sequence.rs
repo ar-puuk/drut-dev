@@ -16,7 +16,7 @@
 //! fixed point itself against an independently-derived correct expectation
 //! after a real structural edit, which is the piece that was missing.
 
-use voyager_core::{format, FormatOptions, TopLevelIndentMode};
+use voyager_core::{format, CasingConvention, FormatOptions, TopLevelIndentMode};
 
 /// 009-top-level-indent-toggle: explicit Normalize mode, for the two tests
 /// below whose fixture genuinely needs a non-zero top-level RUN corrected
@@ -25,7 +25,7 @@ use voyager_core::{format, FormatOptions, TopLevelIndentMode};
 /// FormatOptions::default() unchanged.
 fn normalize() -> FormatOptions {
     FormatOptions {
-        casing: None,
+        casing: CasingConvention::Preserve,
         top_level_indent: TopLevelIndentMode::Normalize,
     }
 }

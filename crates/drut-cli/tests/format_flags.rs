@@ -369,6 +369,32 @@ fn explicit_casing_flag_overrides_drut_toml_for_one_run_only() {
 }
 
 #[test]
+fn explicit_casing_preserve_overrides_drut_toml_for_one_run_only() {
+    // 014-casing-preserve-mode FR-006/FR-009/User Story 1: an explicit
+    // preserve override wins over a drut.toml-resolved upper/lower, not
+    // treated as "no override given".
+    let dir = TempDir::new("toml-override-preserve");
+    fs::write(dir.path().join("drut.toml"), "[format]\ncasing = \"upper\"\n").unwrap();
+    let file = dir.path().join("x.s");
+    fs::write(&file, "if (x=1)\nendif\n").unwrap();
+
+    let overridden = drut(&["format", file.to_str().unwrap(), "--casing=preserve"]);
+    assert_eq!(
+        String::from_utf8_lossy(&overridden.stdout),
+        "if (x=1)\nendif\n",
+        "explicit preserve must win, leaving casing untouched despite the file's upper setting"
+    );
+
+    let reverted = drut(&["format", file.to_str().unwrap()]);
+    assert_eq!(
+        String::from_utf8_lossy(&reverted.stdout),
+        "IF (x=1)\nENDIF\n",
+        "the override must be scoped to one invocation -- the file's upper setting applies again \
+         (casing only ever touches control words, never the x variable)"
+    );
+}
+
+#[test]
 fn drut_toml_setting_only_casing_leaves_top_level_indent_at_the_built_in_default() {
     // US2 Acceptance Scenario 3: an unset field falls back independently.
     let dir = TempDir::new("toml-partial");

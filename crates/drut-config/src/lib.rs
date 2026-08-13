@@ -92,7 +92,7 @@ pub fn resolve_format_options(
         None => (DrutConfig::default(), Vec::new()),
     };
 
-    let casing = explicit.casing.or(config.format.casing);
+    let casing = explicit.casing.or(config.format.casing).unwrap_or_default();
     let top_level_indent = explicit
         .top_level_indent
         .or(config.format.top_level_indent)
@@ -103,7 +103,7 @@ pub fn resolve_format_options(
 
 fn default_options(explicit: ExplicitFormatOverride) -> voyager_core::FormatOptions {
     voyager_core::FormatOptions {
-        casing: explicit.casing,
+        casing: explicit.casing.unwrap_or_default(),
         top_level_indent: explicit.top_level_indent.unwrap_or_default(),
     }
 }

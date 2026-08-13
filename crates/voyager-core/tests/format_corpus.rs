@@ -19,7 +19,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use voyager_core::format::{format_bytes, EncodingFidelity, FormatOptions};
+use voyager_core::format::{format_bytes, CasingConvention, EncodingFidelity, FormatOptions};
 use voyager_core::{parse, BlockKind, Node, Statement, StatementKind, TopLevelIndentMode};
 
 const VALID_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/valid");
@@ -39,7 +39,7 @@ const REAL_CORPUS_GOLDEN_NORMALIZE_DIR: &str =
 
 fn normalize_options() -> FormatOptions {
     FormatOptions {
-        casing: None,
+        casing: CasingConvention::Preserve,
         top_level_indent: TopLevelIndentMode::Normalize,
     }
 }
