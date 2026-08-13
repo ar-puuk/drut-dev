@@ -179,16 +179,44 @@ jobs:
         # (which may depend on it via a *registry*, not path, reference)
         # attempts to publish -- cheap insurance against an index-
         # propagation race, not a blind sleep.
+        #
+        # Idempotent by design: each iteration checks whether crate@version
+        # is already live before calling `cargo publish` at all, skipping
+        # straight to the wait if so. Found necessary the hard way, on this
+        # workspace's real first publish -- voyager-core itself published
+        # and propagated within seconds, but the *poll* never observed it:
+        # every curl check here was missing a User-Agent header, and
+        # crates.io deterministically returns 403 for any request without
+        # one (confirmed by hand -- not a rate limit, not intermittent, not
+        # an index-propagation delay as first assumed). The job failed on
+        # the wait, not the publish, and a naive re-dispatch without this
+        # idempotency check would have then failed a second time trying to
+        # re-publish an already-live voyager-core before ever reaching
+        # drut-config. Both are fixed below: a real User-Agent on every
+        # check, and the idempotency skip. Timeout also raised to 300s for
+        # genuine headroom, though the real fix was the header.
         shell: bash
         run: |
           set -euo pipefail
 
+          # crates.io deterministically returns 403 for any request with no
+          # User-Agent header (confirmed by hand: 5/5 failed with none,
+          # 3/3 succeeded with one set) -- not a rate limit, not
+          # intermittent. `cargo publish` itself sets its own User-Agent
+          # internally so it was never affected, but every curl check below
+          # needs one explicitly or it can never observe a real 200.
+          CRATES_IO_UA="drut-dev-publish-workflow (https://github.com/ar-puuk/drut-dev)"
+
+          is_crate_live() {
+            curl -sf -H "User-Agent: ${CRATES_IO_UA}" "https://crates.io/api/v1/crates/$1/$2" > /dev/null
+          }
+
           wait_for_crate() {
             local crate="$1" version="$2" waited=0
-            until curl -sf "https://crates.io/api/v1/crates/${crate}/${version}" > /dev/null; do
+            until is_crate_live "$crate" "$version"; do
               waited=$((waited + 5))
-              if [ "$waited" -ge 120 ]; then
-                echo "::error::Timed out waiting for $crate@$version to appear on crates.io after 120s"
+              if [ "$waited" -ge 300 ]; then
+                echo "::error::Timed out waiting for $crate@$version to appear on crates.io after 300s"
                 exit 1
               fi
               echo "Waiting for $crate@$version to appear on crates.io (${waited}s elapsed)..."
@@ -201,10 +229,14 @@ jobs:
           echo "Publishing version $VERSION"
 
           for crate in voyager-core drut-config drut-lsp drut-mcp drut-cli; do
-            echo "::group::cargo publish -p $crate"
-            cargo publish -p "$crate"
-            wait_for_crate "$crate" "$VERSION"
+            echo "::group::$crate"
+            if is_crate_live "$crate" "$VERSION"; then
+              echo "$crate@$VERSION is already live on crates.io -- skipping cargo publish, this is a resumed run."
+            else
+              cargo publish -p "$crate"
+              wait_for_crate "$crate" "$VERSION"
+            fi
             echo "::endgroup::"
           done
 
-          echo "All 5 crates published successfully: version $VERSION"
+          echo "All 5 crates confirmed live: version $VERSION"
