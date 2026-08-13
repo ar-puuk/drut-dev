@@ -1,0 +1,15 @@
+name: Temporary Unpublish
+
+# One-off, throwaway workflow: unpublishes the orphaned drut-project.drut-voyager
+# VS Code Marketplace listing, abandoned in favor of the arpuuk.drut identity
+# before it had any real installs. Added directly to main only because
+# workflow_dispatch requires a workflow to exist on the default branch to be
+# dispatchable at all -- removed again in the very next commit once confirmed.
+on:
+  workflow_dispatch:
+
+jobs:
+  unpublish:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npx --yes @vscode/vsce unpublish drut-project.drut-voyager --pat "${{ secrets.VSCE_PAT }}" -f
