@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
   "name": "Drut Voyager",
-  "scopeName": "source.drut-voyager",
+  "scopeName": "source.drut",
   "fileTypes": ["s", "block"],
   "patterns": [
     { "include": "#comments" },
@@ -19,14 +19,14 @@
     "comments": {
       "patterns": [
         {
-          "name": "comment.line.semicolon.drut-voyager",
+          "name": "comment.line.semicolon.drut",
           "match": ";.*$"
         },
         { "include": "#block-comment" }
       ]
     },
     "block-comment": {
-      "name": "comment.block.drut-voyager",
+      "name": "comment.block.drut",
       "begin": "/\\*",
       "end": "\\*/",
       "patterns": [{ "include": "#block-comment" }]
@@ -34,13 +34,13 @@
     "strings": {
       "patterns": [
         {
-          "name": "string.quoted.single.drut-voyager",
+          "name": "string.quoted.single.drut",
           "begin": "'",
           "end": "'",
           "patterns": [{ "include": "#variable-ref" }, { "include": "#string-escape" }]
         },
         {
-          "name": "string.quoted.double.drut-voyager",
+          "name": "string.quoted.double.drut",
           "begin": "\"",
           "end": "\"",
           "patterns": [{ "include": "#variable-ref" }, { "include": "#string-escape" }]
@@ -49,56 +49,56 @@
     },
     "string-escape": {
       "comment": "Backslash escapes inside a quoted string (e.g. the \\n seen throughout the real corpus's PRINT LIST='...\\n' values) -- constant.character.escape, the same scope Python/JS/shell grammars all use for this, so it reads distinctly from the surrounding string text under any theme.",
-      "name": "constant.character.escape.drut-voyager",
+      "name": "constant.character.escape.drut",
       "match": "\\\\[nrt\\\\'\"]"
     },
     "variable-ref": {
       "comment": "@name@ substitution. Split into begin/name/end captures using the widely-theme-supported punctuation.definition.variable + variable.other.readwrite scopes (the same convention shell-script grammars use for $VAR) rather than a single custom leaf scope -- a bare variable.other.substitution.<lang> scope (this grammar's own original choice) doesn't match most themes' color rules at all, since theme selectors are scope-chain prefixes and few themes have a rule for the literal segment \"substitution\" (found via real manual VS Code testing, 2026-08-10: @MODE@ rendered with no color whatsoever under a stock dark theme).",
       "match": "(@)([A-Za-z_][A-Za-z0-9_]*)(@)",
       "captures": {
-        "1": { "name": "punctuation.definition.variable.begin.drut-voyager" },
-        "2": { "name": "variable.other.readwrite.drut-voyager" },
-        "3": { "name": "punctuation.definition.variable.end.drut-voyager" }
+        "1": { "name": "punctuation.definition.variable.begin.drut" },
+        "2": { "name": "variable.other.readwrite.drut" },
+        "3": { "name": "punctuation.definition.variable.end.drut" }
       }
     },
     "control-words": {
-      "name": "keyword.control.drut-voyager",
+      "name": "keyword.control.drut",
       "match": "(?i)(?<![A-Za-z0-9_])(IF|ELSEIF|ELSE|ENDIF|LOOP|ENDLOOP|BREAK|!RUN|RUN|ENDRUN|PROCESS|PHASE|ENDPROCESS|ENDPHASE|JLOOP|ENDJLOOP|LINKLOOP|ENDLINKLOOP|DISTRIBUTEMULTISTEP|ENDDISTRIBUTEMULTISTEP)(?![A-Za-z0-9_])"
     },
     "statement-words": {
       "comment": "General (non-block-structural) statement/procedure words -- deliberately a *different* scope (support.function, the conventional TextMate category for a language's built-in commands/procedures, as distinct from true control-flow keywords) so they read visually distinct from control-words above, the same two-tier convention most language grammars use for control-flow vs. builtin-function keywords. Real-usage-evidenced (constitution Principle II: never vendor-doc-copied) -- corpus census against the full 161-file WF-TDM-Official-Releases corpus, 2026-08-10, same distinct_files>=3 threshold 001-voyager-script-parser/003-lsp-vscode-extension's own censuses already established, words already covered by control-words above excluded. Not exhaustive by construction (any word not in this list still parses and functions identically -- FR-003 establishes there's no closed vocabulary -- it just renders unstyled, the same as before this list existed).",
-      "name": "support.function.drut-voyager",
+      "name": "support.function.drut",
       "match": "(?i)(?<![A-Za-z0-9_])(ABORT|ARRAY|DELETE|DISTRIBUTE|DISTRIBUTEINTRASTEP|FILEI|FILEO|FUNCTION|GENERATE|GOTO|LOG|LOOKUP|MERGE|PARAMETERS|PATHLOAD|PRINT|PROMPT|READ|WAIT4FILES|WRITE)(?![A-Za-z0-9_])"
     },
     "pair-keywords": {
       "comment": "A keyword=value pair's keyword name (optionally bracket-subscripted, e.g. VOL[01]=), colored like a Python keyword argument's parameter name (func(param=value)) -- variable.parameter, distinct from control-words/statement-words above. Deliberately structural/generic (matches FR-003's `word[subscript]=` shape from voyager-core's own grammar, not a fixed name list) rather than vendor-sourced, since FR-003 already establishes there's no closed keyword vocabulary. Listed after control-words/statement-words in the top-level patterns array so a word like PHASE (control-words) or PRINT (statement-words) that's *also* immediately followed by = still gets its more specific scope -- TextMate resolves same-position ties by array order.",
       "match": "(?<![A-Za-z0-9_])([A-Za-z_][A-Za-z0-9_]*(?:\\[[^\\]\\n]*\\])?)(?=\\s*=(?!=))",
       "captures": {
-        "1": { "name": "variable.parameter.drut-voyager" }
+        "1": { "name": "variable.parameter.drut" }
       }
     },
     "pair-values": {
       "comment": "A bareword value immediately after = (or <=/>=/<>/==, since the lookbehind only checks for a literal = as the last character of whatever operator preceded it) -- e.g. MATRIX/HWYASSIGN in PGM=MATRIX/PGM=HWYASSIGN, real Cube Voyager program names with no closed enumeration this grammar hand-lists (same FR-003 no-closed-vocabulary stance as #pair-keywords/#statement-words) -- colored generically as constant.other, the same convention many grammars use for an enum-like bareword value distinct from a quoted string or a number. Deliberately does not fire inside a quoted string (this pattern is top-level-only; #strings' own begin/end block has its own separate, short patterns list -- variable-ref and string-escape only -- so string *content* is never reachable from here).",
       "match": "(?<=[=]\\s{0,4})([A-Za-z_][A-Za-z0-9_]*)(?![A-Za-z0-9_])",
-      "name": "constant.other.drut-voyager"
+      "name": "constant.other.drut"
     },
     "numbers": {
       "comment": "A numeric literal, negative sign included only when it can't plausibly be a binary minus (guarded by the same not-preceded-by-alnum-or-closing-bracket lookbehind an operator-precedence-aware tokenizer would use) -- e.g. ZONES=-5's -5 is one number, but 2-2's - is left for #operators to claim as subtraction.",
-      "name": "constant.numeric.drut-voyager",
+      "name": "constant.numeric.drut",
       "match": "(?<![A-Za-z0-9_\\)\\]])-?[0-9]+(\\.[0-9]+)?(?![A-Za-z0-9_])"
     },
     "operators": {
       "comment": "Symbol-only, structural -- no word-shaped logical operators (AND/OR/NOT-style) included, since those would need the same real-corpus evidence standard this grammar already holds keyword lists to, and none has been gathered for them.",
-      "name": "keyword.operator.drut-voyager",
+      "name": "keyword.operator.drut",
       "match": "<>|<=|>=|==|=|<|>|\\+|-|\\*|/"
     },
     "punctuation": {
       "patterns": [
-        { "name": "punctuation.definition.array.begin.drut-voyager", "match": "\\[" },
-        { "name": "punctuation.definition.array.end.drut-voyager", "match": "\\]" },
-        { "name": "punctuation.separator.comma.drut-voyager", "match": "," },
-        { "name": "punctuation.section.group.begin.drut-voyager", "match": "\\(" },
-        { "name": "punctuation.section.group.end.drut-voyager", "match": "\\)" }
+        { "name": "punctuation.definition.array.begin.drut", "match": "\\[" },
+        { "name": "punctuation.definition.array.end.drut", "match": "\\]" },
+        { "name": "punctuation.separator.comma.drut", "match": "," },
+        { "name": "punctuation.section.group.begin.drut", "match": "\\(" },
+        { "name": "punctuation.section.group.end.drut", "match": "\\)" }
       ]
     }
   }

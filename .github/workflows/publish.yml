@@ -10,8 +10,8 @@ name: Publish
 #      This workflow never runs unattended, full stop -- the highest-
 #      consequence automation in the project gets the highest bar.
 #   2. `vsce package`/`publish` here do NOT use `--no-dependencies` --
-#      unlike the reference extension, drut-voyager has a real runtime
-#      dependency (vscode-languageclient) that needs to be bundled in.
+#      unlike the reference extension, drut has a real runtime dependency
+#      (vscode-languageclient) that needs to be bundled in.
 #   3. `concurrency.cancel-in-progress` is false, not true -- killing a
 #      publish workflow mid-sequence (e.g. after voyager-core succeeds but
 #      before drut-config) is worse than making a second dispatch wait.
@@ -139,7 +139,7 @@ jobs:
         # publish steps below succeeding or failing.
         uses: actions/upload-artifact@v4
         with:
-          name: drut-voyager-vsix
+          name: drut-vsix
           path: editors/vscode/*.vsix
 
       - name: Publish to VS Code Marketplace

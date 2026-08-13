@@ -21,7 +21,7 @@
  *   the injection in this workspace, regardless of outcome.
  * - `existingWorkspaceLanguageValue`: the current
  *   `config.inspect("editor.formatOnSave").workspaceLanguageValue` for the
- *   `drut-voyager` language override -- `undefined` iff no such override
+ *   `drut` language override -- `undefined` iff no such override
  *   exists yet, at any value (research.md §3: `inspect`, not `get`, since
  *   `get` would report the merged effective value from some unrelated
  *   scope the extension has no business overriding).

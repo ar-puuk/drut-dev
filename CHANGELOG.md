@@ -11,6 +11,24 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-13
+
+### Added
+
+- A `README.md` for each of the five published crates (`voyager-core`,
+  `drut-config`, `drut-cli`, `drut-lsp`, `drut-mcp`), plus `repository`
+  metadata in every `Cargo.toml` — each crate's crates.io page now shows
+  real, crate-specific documentation instead of just its one-line
+  description.
+
+### Changed
+
+- Renamed the VS Code/Open VSX extension's publisher and identity from
+  `drut-project.drut-voyager` to `arpuuk.drut` — including the internal
+  language ID and TextMate scope name, not just the Marketplace-facing
+  name. The `drut-project.drut-voyager` listing was unpublished from the
+  VS Code Marketplace before it had any real installs.
+
 ## [0.1.0] - 2026-08-13
 
 First tagged release.

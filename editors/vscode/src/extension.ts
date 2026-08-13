@@ -273,7 +273,7 @@ class OneRestartErrorHandler {
 }
 
 /// Workspace-state key tracking whether this workspace has already been
-/// offered the auto-injected `variable:drut-voyager` color rule — checked
+/// offered the auto-injected `variable:drut` color rule — checked
 /// so the injection happens at most once ever per workspace, never
 /// reapplied on a later activation. This is what makes it safe to remove:
 /// a user who deletes the injected setting from `.vscode/settings.json`
@@ -282,10 +282,10 @@ class OneRestartErrorHandler {
 const VARIABLE_COLOR_INJECTED_KEY = "drutVariableColorInjected";
 
 /// The scoped semantic-token-color rule key this function injects —
-/// `variable:drut-voyager` colors only `variable`-typed tokens in Drut
+/// `variable:drut` colors only `variable`-typed tokens in Drut
 /// documents, never touching semantic "variable" coloring in any other
 /// language the user might also have open.
-const VARIABLE_COLOR_RULE_KEY = "variable:drut-voyager";
+const VARIABLE_COLOR_RULE_KEY = "variable:drut";
 const VARIABLE_COLOR_VALUE = "#4EC9B0";
 
 /// Guarantees `@name@` references get a visible color the first time this
@@ -301,7 +301,7 @@ const VARIABLE_COLOR_VALUE = "#4EC9B0";
 /// to remove or override by hand. Merges into any existing customization
 /// object rather than overwriting it (so a user's own unrelated semantic
 /// color rules for other languages are never clobbered), and never
-/// overwrites an existing `variable:drut-voyager` rule if one is already
+/// overwrites an existing `variable:drut` rule if one is already
 /// present — whether the user set it themselves or this function did on
 /// an earlier activation.
 async function ensureVariableColorCustomization(context: vscode.ExtensionContext): Promise<void> {
@@ -349,7 +349,7 @@ const FORMAT_ON_SAVE_INJECTED_KEY = "drutFormatOnSaveInjected";
 /// overrideInLanguage */ true)`, research.md §3), not a value nested inside
 /// one particular setting's own rule-map convention -- the two mechanisms
 /// solve different problems and are not interchangeable (research.md §3's
-/// own rationale for why the `"[drut-voyager]"`-object-merge trick above
+/// own rationale for why the `"[drut]"`-object-merge trick above
 /// doesn't apply here). Deliberately does *not* touch
 /// `editor.formatOnPaste` -- that setting stays opt-in/documented-only,
 /// per the same resolved clarification (contracts/extension-settings.md).
@@ -361,7 +361,7 @@ async function ensureFormatOnSaveEnabled(context: vscode.ExtensionContext): Prom
   const alreadyInjected = context.workspaceState.get<boolean>(FORMAT_ON_SAVE_INJECTED_KEY) ?? false;
 
   try {
-    const config = vscode.workspace.getConfiguration(undefined, { languageId: "drut-voyager" });
+    const config = vscode.workspace.getConfiguration(undefined, { languageId: "drut" });
     const existing = config.inspect<boolean>("editor.formatOnSave");
     // shouldInjectFormatOnSave is the single source of truth for this
     // decision (T002's own unit tests) -- no duplicated guard here.
@@ -408,11 +408,11 @@ function startLanguageClient(command: string): void {
   };
 
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: "file", language: "drut-voyager" }],
+    documentSelector: [{ scheme: "file", language: "drut" }],
     errorHandler: new OneRestartErrorHandler(),
   };
 
-  client = new LanguageClient("drut-voyager", "Drut Language Server", serverOptions, clientOptions);
+  client = new LanguageClient("drut", "Drut Language Server", serverOptions, clientOptions);
 
   // FR-025: if the binary can't be found or fails to start, `start()`
   // rejects — static highlighting (package.json's grammar contribution)

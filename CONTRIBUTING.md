@@ -175,7 +175,7 @@ of the extension's existing "Format Document" command:
 
   ```json
   {
-    "[drut-voyager]": {
+    "[drut]": {
       "editor.formatOnPaste": true
     }
   }
@@ -278,7 +278,7 @@ npx @vscode/vsce publish   # requires a Marketplace publisher token
 npx ovsx publish           # requires an Open VSX access token
 ```
 
-Both under Drut's own publisher identity (`drut-project` in `package.json`) —
+Both under Drut's own publisher identity (`arpuuk` in `package.json`) —
 never a fork or rebrand of any third-party extension (FR-027).
 
 ## Versioning

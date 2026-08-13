@@ -9,7 +9,7 @@ import * as path from "path";
 import * as oniguruma from "vscode-oniguruma";
 import * as vsctm from "vscode-textmate";
 
-const SCOPE_NAME = "source.drut-voyager";
+const SCOPE_NAME = "source.drut";
 const GRAMMAR_PATH = path.join(__dirname, "..", "syntaxes", "drut.tmLanguage.json");
 
 async function loadGrammar(): Promise<vsctm.IGrammar> {

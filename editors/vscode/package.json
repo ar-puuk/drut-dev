@@ -1,9 +1,9 @@
 {
-  "name": "drut-voyager",
+  "name": "drut",
   "displayName": "Drut for Cube Voyager",
   "description": "Syntax highlighting and language support for Cube Voyager control-statement scripts (.s/.block), backed by the Drut language server.",
-  "version": "0.1.0",
-  "publisher": "drut-project",
+  "version": "0.1.1",
+  "publisher": "arpuuk",
   "license": "MIT OR Apache-2.0",
   "icon": "icon.png",
   "repository": {
@@ -18,13 +18,13 @@
     "Programming Languages"
   ],
   "activationEvents": [
-    "onLanguage:drut-voyager"
+    "onLanguage:drut"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "languages": [
       {
-        "id": "drut-voyager",
+        "id": "drut",
         "aliases": [
           "Cube Voyager",
           "Drut Voyager"
@@ -38,8 +38,8 @@
     ],
     "grammars": [
       {
-        "language": "drut-voyager",
-        "scopeName": "source.drut-voyager",
+        "language": "drut",
+        "scopeName": "source.drut",
         "path": "./syntaxes/drut.tmLanguage.json"
       }
     ],
@@ -61,13 +61,13 @@
     ],
     "semanticTokenScopes": [
       {
-        "language": "drut-voyager",
+        "language": "drut",
         "scopes": {
           "shortIf": [
-            "keyword.control.conditional.short.drut-voyager"
+            "keyword.control.conditional.short.drut"
           ],
           "statement.unreachable": [
-            "comment.unreachable.drut-voyager"
+            "comment.unreachable.drut"
           ]
         }
       }
