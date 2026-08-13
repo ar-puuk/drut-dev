@@ -11,6 +11,21 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-13
+
+### Fixed
+
+- The VS Code Marketplace listing's "Overview" tab showed "No overview has
+  been entered by publisher" — `editors/vscode/README.md`, the file `vsce`
+  bundles as the Marketplace-facing overview, had never existed. Added it,
+  distinct from the five crates.io `README.md` files added in 0.1.1 (those
+  cover the Rust crates; this one covers the extension itself, scoped for
+  a Marketplace visitor rather than a crates.io one).
+- The top-level `README.md`'s Install section still said "Not yet
+  published to the VS Code Marketplace, Open VSX, or crates.io," stale
+  since 0.1.1 actually shipped to all three — replaced with real install
+  instructions for each.
+
 ## [0.1.1] - 2026-08-13
 
 ### Added

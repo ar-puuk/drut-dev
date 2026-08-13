@@ -12,23 +12,24 @@ Language Server Protocol.
 
 ## Install
 
-Not yet published to the VS Code Marketplace, Open VSX, or crates.io — see
-[`ROADMAP.md`](ROADMAP.md) for what's left before that's true. For now,
-build from source:
+**VS Code / any VS Code-compatible editor**: install
+[Drut for Cube Voyager](https://marketplace.visualstudio.com/items?itemName=arpuuk.drut)
+from the VS Code Marketplace, or [from Open VSX](https://open-vsx.org/extension/arpuuk/drut)
+on VS Code-compatible editors that use it instead (Cursor, VSCodium, etc.).
+The extension resolves a working `drut` language server automatically on
+first activation — nothing else to install.
 
-```powershell
-# Build the `drut` CLI
-cargo build --release -p drut-cli
-# binary at target/release/drut(.exe) -- put it on PATH
+**Just the CLI**, for scripting or CI:
+
+```sh
+cargo install drut-cli
 ```
 
+Or build from source:
+
 ```powershell
-# Build and package the VS Code extension
-cd editors\vscode
-npm install
-npm run compile
-npx @vscode/vsce package
-# In VS Code: Extensions view -> "..." menu -> Install from VSIX... -> select the generated .vsix
+cargo build --release -p drut-cli
+# binary at target/release/drut(.exe) -- put it on PATH
 ```
 
 ## Features
