@@ -1,23 +1,39 @@
 <!--
 Sync Impact Report
 ===================
-Version change: 1.0.0 → 1.1.0
-Modified principles:
-  - II. No Verbatim Redistribution of Vendor Documentation — resolved the
-    prior-art-extension clause's open condition ("only after confirming the right to
-    reference that source at all") with a concrete, dated record: Bill Hereth
-    (@bhereth) granted permission on 2026-08-08 4:06 PM MT for Phase 3 to reference
-    his language-citilabscubevoyager extension's structure, scoped to
-    structure/behavior reference with credit — not file redistribution or verbatim
-    copying. Binding conditions added (no committing his files, port structure/
-    wording only, README credit required).
+Version change: 1.1.0 → 1.1.1
+Modified principles: none (no semantic change)
 Added sections: none
 Removed sections: none
 Modified sections:
-  - Development Workflow & Quality Gates — extended the existing vendor-doc review
-    gate to explicitly cover the bhereth-extension-reference case.
+  - II. No Verbatim Redistribution of Vendor Documentation (bhereth extension
+    reference) — cross-reference fix only: the Credits section this principle
+    requires now lives in CONTRIBUTING.md, not README.md, following the
+    2026-08-13 README/docs restructure (short, visitor-facing README.md;
+    architecture/credits/etc. moved to CONTRIBUTING.md). The binding
+    requirement itself (credit recorded somewhere in the repo, with name,
+    GitHub handle, and a link to the original extension folder) is unchanged.
+  - Development Workflow & Quality Gates — same cross-reference fix, second
+    occurrence.
 Templates requiring follow-up: none
 Deferred/TODO items: none
+
+Previous Sync Impact Report (1.0.0 → 1.1.0), preserved as historical record:
+  Modified principles:
+    - II. No Verbatim Redistribution of Vendor Documentation — resolved the
+      prior-art-extension clause's open condition ("only after confirming the
+      right to reference that source at all") with a concrete, dated record:
+      Bill Hereth (@bhereth) granted permission on 2026-08-08 4:06 PM MT for
+      Phase 3 to reference his language-citilabscubevoyager extension's
+      structure, scoped to structure/behavior reference with credit — not
+      file redistribution or verbatim copying. Binding conditions added (no
+      committing his files, port structure/wording only, README credit
+      required).
+  Added sections: none
+  Removed sections: none
+  Modified sections:
+    - Development Workflow & Quality Gates — extended the existing vendor-doc
+      review gate to explicitly cover the bhereth-extension-reference case.
 -->
 
 # Drut Constitution
@@ -61,7 +77,7 @@ contribution that draws on his extension:
    MUST be written in Drut's own structure and wording, the same verbatim-copying
    bar this principle already holds vendor documentation to.
 3. Credit — his name, GitHub handle, and a link to the original extension folder —
-   is recorded in `README.md`'s Credits section.
+   is recorded in `CONTRIBUTING.md`'s Credits section.
 
 See also Development Workflow & Quality Gates below, which extends the existing
 vendor-documentation review gate to cover this case explicitly.
@@ -140,7 +156,7 @@ in the contributor's own words (Principle II). That same gate extends to Bill
 Hereth's `language-citilabscubevoyager` extension once Phase 3 work begins:
 reviewers MUST reject any contribution that commits his files (in whole or in part),
 copies his keyword lists, grammar/`.tmLanguage` text, or other source content
-verbatim, or omits the required `README.md` credit — not only contributions that
+verbatim, or omits the required `CONTRIBUTING.md` credit — not only contributions that
 resemble vendor documentation.
 
 ## Governance
@@ -169,4 +185,4 @@ again before merge. Downstream templates and commands (plan, tasks, checklist, e
 read this constitution at runtime; they are not modified by constitution amendments
 and must be checked separately for consistency when principles change materially.
 
-**Version**: 1.1.0 | **Ratified**: 2026-08-08 | **Last Amended**: 2026-08-09
+**Version**: 1.1.1 | **Ratified**: 2026-08-08 | **Last Amended**: 2026-08-13

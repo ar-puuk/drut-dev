@@ -44,7 +44,7 @@ jobs:
         # diagnostics_corpus, structural_query_parity) are #[ignore]'d and
         # gated behind DRUT_CORPUS_PATH, pointing at a private, non-
         # committed corpus (WF-TDM-Official-Releases) this runner has no
-        # access to -- see README's "Full-corpus validation" section.
+        # access to -- see CONTRIBUTING.md's "Full-corpus validation" section.
         # Deliberately not setting DRUT_CORPUS_PATH here: `cargo test`
         # never runs #[ignore]'d tests on its own, so this already skips
         # them exactly as every local run without that env var does. Not a

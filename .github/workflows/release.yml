@@ -1,0 +1,175 @@
+name: Release
+
+# Builds drut-cli release binaries for Windows/macOS(x64+arm64)/Linux and
+# attaches them to a GitHub Release, triggered by pushing a version tag
+# (e.g. v0.1.0). Asset naming (drut-<target-triple>.<ext> + .sha256,
+# no version in the filename) mirrors rust-analyzer's own release assets --
+# the direct architectural precedent for the future extension-side
+# download-on-activation logic this feeds (ROADMAP.md item 7).
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  preflight:
+    name: Verify tag version and extract release notes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare tag against every crate's Cargo.toml version
+        # Fails in seconds, before any of the 4 matrix builds start --
+        # lockstep versioning (CONTRIBUTING.md's "Versioning" section) means all
+        # five packages share one version number; a tag pushed without
+        # bumping every Cargo.toml together is a real, realistic mistake
+        # worth catching immediately rather than after several minutes of
+        # parallel builds each independently hit the same problem.
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "Tag version: $TAG_VERSION"
+          FAILED=0
+          for manifest in crates/*/Cargo.toml; do
+            CRATE_VERSION=$(grep -m1 '^version' "$manifest" | sed -E 's/version *= *"([^"]+)"/\1/')
+            echo "$manifest: $CRATE_VERSION"
+            if [ "$CRATE_VERSION" != "$TAG_VERSION" ]; then
+              echo "::error file=$manifest::version $CRATE_VERSION does not match tag version $TAG_VERSION"
+              FAILED=1
+            fi
+          done
+          if [ "$FAILED" -ne 0 ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match every workspace crate's version. Lockstep versioning requires voyager-core, drut-config, drut-cli, drut-lsp, drut-mcp, and the VS Code extension to all share one version number before tagging a release."
+            exit 1
+          fi
+
+      - name: Extract this version's section from CHANGELOG.md
+        # Lockstep versioning means every release maps to exactly one
+        # CHANGELOG.md section (## [X.Y.Z] - date), so the release body is
+        # sourced from there rather than --generate-notes' PR-based
+        # summary (this project doesn't use PRs day-to-day, and a
+        # PR-derived summary would drift from what CHANGELOG.md actually
+        # says about the same release). Fails the same way and at the same
+        # point as the version check above: before any build starts, not
+        # after.
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          MARKER="[$TAG_VERSION]"
+          awk -v marker="$MARKER" '
+            /^## / {
+              if (in_section) exit
+              if (index($0, marker) > 0) { in_section = 1; next }
+              next
+            }
+            in_section { print }
+          ' CHANGELOG.md > /tmp/notes-raw.md
+          # Trim leading/trailing blank lines for a clean release body.
+          awk 'NF{p=1} p' /tmp/notes-raw.md | tac | awk 'NF{p=1} p' | tac > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error file=CHANGELOG.md::No section found for version $TAG_VERSION (looked for a heading containing \"$MARKER\"). Rename CHANGELOG.md's [Unreleased] section to ## $MARKER - $(date +%F) before tagging a release."
+            exit 1
+          fi
+          echo "Extracted release notes:"
+          cat release-notes.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+
+  build:
+    name: Build (${{ matrix.target }})
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            ext: zip
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            ext: gz
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            ext: gz
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            ext: gz
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release -p drut-cli --target ${{ matrix.target }}
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd target/${{ matrix.target }}/release
+          gzip -c drut > drut-${{ matrix.target }}.gz
+          sha256sum drut-${{ matrix.target }}.gz > drut-${{ matrix.target }}.gz.sha256
+          mv drut-${{ matrix.target }}.gz drut-${{ matrix.target }}.gz.sha256 "$GITHUB_WORKSPACE"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $binary = "target/${{ matrix.target }}/release/drut.exe"
+          $zip = "drut-${{ matrix.target }}.zip"
+          Compress-Archive -Path $binary -DestinationPath $zip
+          $hash = Get-FileHash -Path $zip -Algorithm SHA256
+          "$($hash.Hash.ToLower())  $zip" | Out-File -Encoding ascii -NoNewline "$zip.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: drut-${{ matrix.target }}
+          path: |
+            drut-${{ matrix.target }}.${{ matrix.ext }}
+            drut-${{ matrix.target }}.${{ matrix.ext }}.sha256
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: drut-*
+          path: dist
+          merge-multiple: true
+
+      # Produced by preflight; safe to download without an explicit
+      # `needs: preflight` edge here -- build already depends on preflight,
+      # so by the time this job runs preflight has necessarily completed.
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: .
+
+      - name: Create release and upload assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "${{ github.ref_name }}" dist/* \
+            --repo "${{ github.repository }}" \
+            --title "${{ github.ref_name }}" \
+            --notes-file release-notes.md

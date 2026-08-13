@@ -7,7 +7,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 once a first version is actually tagged — `voyager-core`, `drut-config`,
 `drut-cli`, `drut-lsp`, `drut-mcp`, and the VS Code/Open VSX extension move
 together in lockstep at the same version number on every release (see
-README's "Versioning" section).
+CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 

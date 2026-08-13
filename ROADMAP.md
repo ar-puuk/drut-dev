@@ -27,8 +27,8 @@ already been researched or partially unblocked; see the note per item.
    internally, line-diffed, filtered to the requested range; verified
    against real block-boundary fixtures (a paste that opens or closes a
    block, shifting indentation outside its own range), not just simple
-   cases. Ships opt-in — see README's "Editor behavior" section for the
-   setting. Code complete, automated-tested, and the real-VS-Code smoke
+   cases. Ships opt-in — see CONTRIBUTING.md's "Editor behavior" section for
+   the setting. Code complete, automated-tested, and the real-VS-Code smoke
    test (quickstart.md step 6) manually confirmed.
 3. **TOML-based configuration** — ✅ *done, merged 2026-08-13 as
    `012-toml-configuration`*. `drut.toml` (`casing`/`top_level_indent` under a
@@ -50,53 +50,120 @@ already been researched or partially unblocked; see the note per item.
      no-crash fallback to prior behavior otherwise) and re-publishes
      diagnostics for every open document on a matching change. See
      `specs/013-lsp-config-file-watch/`.
-4. **`casing` gains an explicit third `Preserve` mode** — *not started,
-   starting now* (added 2026-08-13, as part of the pre-publish audit). Mirrors
-   `TopLevelIndentMode`'s existing shape (`Preserve`/`#[default]`, `Upper`,
-   `Lower`) instead of today's `Option<CasingConvention>` (`None` standing in
-   for "leave untouched"). Full spec-kit cycle, same rigor as `009`. Not to be
-   confused with the still-deferred `--casing auto` mode below (resolved
-   queued item 4) — this is a representation/API change with no formatting
-   *behavior* change for any existing input, not a new casing philosophy.
-5. **README/docs overhaul** — *not started*. Features, install steps, usage,
-   brought up to date with everything shipped through `013` (currently only
-   covers through `004` in the Status section) — plus a second pass after
-   item 8 below to add install-from-Marketplace/crates.io instructions once
-   those are live.
-6. **CI + release pipeline** — *not started*. Blocking prerequisite for both
-   item 7 and item 8 below — no CI exists in this repo yet (`.github/
-   workflows/` doesn't exist). Needs to produce per-platform (Windows/macOS/
-   Linux) `drut` binaries at minimum.
+4. **`casing` gains an explicit third `Preserve` mode** — ✅ *done, merged
+   2026-08-13 as `014-casing-preserve-mode`*. Mirrors `TopLevelIndentMode`'s
+   shape (`Preserve`/`#[default]`, `Upper`, `Lower`) instead of the previous
+   `Option<CasingConvention>` (`None` standing in for "leave untouched") — a
+   pure representation change, byte-identical output to before for every
+   existing input. Not to be confused with the still-deferred `--casing auto`
+   mode below (resolved queued item 4). See `specs/014-casing-preserve-mode/`.
+5. **README/docs overhaul** — ✅ *done, 2026-08-13*. Split into a short,
+   visitor/Marketplace-facing `README.md` (what Drut is, why it exists, quick
+   install, feature list, links out) and `CONTRIBUTING.md` (architecture,
+   per-crate status, configuration design, build/test commands, versioning,
+   credits — the prior README's full content, relocated largely as-is). A
+   second pass to add real install-from-Marketplace/crates.io instructions to
+   `README.md`'s Install section is still needed once item 8 is live.
+6. **CI + release pipeline** — ✅ *done, 2026-08-13*. `.github/workflows/
+   ci.yml`: build/test/clippy gate on push/PR to `main` and any `NNN-*`
+   feature branch, two jobs (Rust, VS Code extension), no publishing, no
+   secrets — live and green on `main`. `.github/workflows/release.yml`:
+   tag-triggered (`v*.*.*`) cross-platform `drut-cli` release pipeline
+   (Windows x64, macOS x64+arm64, Linux x64 — native GitHub-hosted runners
+   per OS, no cross-compilation; Linux/Windows arm64 deliberately deferred,
+   low real demand for this project's Windows-centric domain), asset naming
+   (`drut-<target-triple>.<ext>` + `.sha256`, no version in the filename)
+   mirrors rust-analyzer's own release assets, release notes sourced from
+   `CHANGELOG.md`'s matching version section (not `--generate-notes`, to
+   avoid two independently-drifting descriptions of the same release). A
+   `preflight` job fails fast (before any of the 4 builds start) if the
+   pushed tag doesn't match every workspace crate's lockstep version, or if
+   `CHANGELOG.md` has no section for it. Verified live via a disposable test
+   tag end-to-end (all jobs green, one asset downloaded/checksum-verified/
+   confirmed a real executable), then fully cleaned up (no trace in the real
+   release history).
 7. **Extension auto-install/update ("out of the box" binary experience)** —
-   *not started, researched only* (2026-08-10). Two real patterns compared:
-   rust-analyzer's (binary downloaded from GitHub Releases on first activation —
-   small `.vsix`, decoupled from binary rebuilds) vs. ruff's (binary bundled
-   directly into the `.vsix`/npm package — no network call needed, but requires
-   a full per-platform build matrix upfront). Both are blocked on item 6. This
-   item must land **before** item 8's extension publish goes live, not after —
-   publishing an extension that isn't yet "batteries included" would ship a
-   v1 that fails the project's own stated bar the moment someone installs it.
+   *not started, researched only* (2026-08-10; unblocked as of item 6 above).
+   Two real patterns compared: rust-analyzer's (binary downloaded from GitHub
+   Releases on first activation — small `.vsix`, decoupled from binary
+   rebuilds) vs. ruff's (binary bundled directly into the `.vsix`/npm package
+   — no network call needed, but requires a full per-platform build matrix
+   upfront, which item 6 now provides regardless). This item must land
+   **before** item 8's extension publish goes live, not after — publishing an
+   extension that isn't yet "batteries included" would ship a v1 that fails
+   the project's own stated bar the moment someone installs it.
 8. **Actual publish** (VS Code Marketplace + Open VSX + crates.io) — *not
    started*. Two independent sub-parts: the extension (Marketplace + Open
    VSX, blocked on item 7 per above) and the Rust crates (`crates.io`,
    independent of item 7 — blocked only on adding `version` fields to every
    internal path dependency, which `cargo publish` requires and which are
    currently absent from all five `Cargo.toml`s).
-   - Known gap, confirmed still open 2026-08-13 (verified directly against a
-     freshly rebuilt `.vsix`'s actual contents): `vsce` packages
-     `editors/vscode/` in isolation, so the repo-root `LICENSE-MIT`/
-     `LICENSE-APACHE` files (added in `0ad5500`) do **not** automatically
-     land inside the `.vsix` (third-party dependencies' own bundled licenses
-     do land correctly — this is specifically Drut's own two license files) —
-     needs a copy step, or a `files`/`.vscodeignore` adjustment in
-     `editors/vscode/`, before this step.
-   - **Icon — owner-blocked, needed before this item's extension half**:
-     the extension needs a simple icon (`package.json`'s `"icon"` field)
-     before a first Marketplace/Open VSX listing. Not something to be
-     generated automatically — the owner will handle this separately.
-     Neither publish is truly blocked without one (both platforms allow
-     publishing with no icon, showing a generic placeholder), but it should
-     be in place before this step for a clean first listing.
+   - ✅ *Fixed 2026-08-13*: `vsce` packaging `editors/vscode/` in isolation
+     meant the repo-root `LICENSE-MIT`/`LICENSE-APACHE` files never made it
+     into the `.vsix`. Both are now copied into `editors/vscode/` directly,
+     plus a short `LICENSE` pointer file (vsce's own expected filename,
+     explaining the dual-license split) — verified by unzipping the rebuilt
+     `.vsix` and confirming byte-identical content for all three files, not
+     just that vsce's own warning went away.
+   - ✅ *Fixed 2026-08-13*: extension icon. `editors/vscode/icon.png`
+     (1600×1600, square — well above the 128×128 minimum both platforms
+     require) wired via `package.json`'s `"icon"` field; `icon.svg` kept
+     alongside as a source file for regenerating other sizes later. Verified
+     bundled and correctly declared in the rebuilt `.vsix`'s own manifest.
+   - **Screenshots/GIFs — still open, real gap, not something to generate
+     synthetically.** Added 2026-08-13. The Marketplace/Open VSX listing has
+     no visual content at all yet (highlighting, hover, live diagnostics,
+     folding in action) — this matters a lot for Marketplace conversion and
+     needs real captures from the actual running extension, not a mockup.
+     Owner-scoped, same as the icon was.
+9. **`indent_width` becomes a configurable `[format]` setting** — *queued,
+   not started* (added 2026-08-13). **Explicitly a deliberate owner decision,
+   not an evidence-driven one** — recorded honestly as such, the same way
+   `008`'s default-reversal and `009`'s later correction of it were both
+   recorded rather than smoothed over. Immediately before this was queued, a
+   findings-only investigation (no code changed) re-confirmed the corpus
+   evidence actually argues *against* this: 4-space-per-nesting-level
+   indentation is dominant at 82.4% of 30,652 real body-indent occurrences
+   corpus-wide (87.5% of files with nested content have 4 as their own
+   per-file dominant value; 67% are internally ≥90% consistent on one
+   value) — a materially stronger signal than either `casing` or
+   `top_level_indent` had when *they* were made configurable, and
+   `002-cli-check-format/contracts/formatting-api.md` had already, from the
+   very first formatter contract, explicitly and deliberately excluded
+   indentation width from configurability on exactly that evidence ("casing
+   is the only configurable axis"). No evidence of anyone ever requesting a
+   different width was found anywhere in this project's specs, docs, or git
+   history. The owner reviewed these findings and chose to proceed anyway —
+   overriding the recommendation is the owner's prerogative and this item
+   exists to build it, not to relitigate the decision.
+   - **Scope**: `indent_width` added to `drut.toml`'s `[format]` table
+     (integer, default `4` — the corpus-confirmed value, now overridable
+     rather than fixed); threaded through the same shape `009` built for
+     `top_level_indent` — `FormatOptions` gains an `indent_width` field,
+     `drut-cli` gains `--indent-width=<N>`, `drut-mcp`'s `format` tool gains
+     a matching parameter, `drut-config`'s discovery/parse/resolve logic
+     covers it with the same per-field precedence already established
+     (`explicit flag > drut.toml > built-in default`).
+   - **Contract update required, not optional**: `formatting-api.md`'s "No
+     configurable indentation width/style beyond the one canonical form..."
+     exclusion statement must be corrected to reflect the reversal when this
+     ships — not left standing while the code contradicts it — with the
+     update stating plainly that this was a deliberate decision made against
+     the corpus evidence, not a response to a data gap or a user request.
+   - **Validation question, to be decided during the spec-kit cycle, not
+     deferred past it**: does an invalid value (`0`, or something absurd
+     like `500`) get rejected, or is any positive integer accepted as-is?
+     Current recommendation carried into that cycle: a sane bound (e.g.
+     1–16), using the same non-blocking-warning-and-fallback pattern already
+     established for every other malformed `drut.toml` value, not a hard
+     failure.
+   - **Sequencing**: full spec-kit cycle when started, same rigor as
+     `009`/`012`/`014` (touches `drut-config`, all three adapters, and
+     `format.rs`'s core indentation math). **Held, not started**, until the
+     owner finishes reviewing and committing the in-flight README/
+     CONTRIBUTING.md restructure and constitution amendment — not a
+     technical dependency, an explicit sequencing choice to avoid
+     interleaving unrelated in-flight work.
 
 ## Resolved queued items (historical log, not part of the pre-publish sequence)
 

@@ -6,8 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Drut is a tokenizer, structural parser, and (eventually) linter/formatter/LSP+MCP
 tooling suite for Cube Voyager control-statement scripts (`.s` / `.block` files),
-targeting Cube Voyager 6.5 as the grammar baseline. See `README.md` for the repo
-layout and `.specify/memory/constitution.md` for the full governing principles —
+targeting Cube Voyager 6.5 as the grammar baseline. See `CONTRIBUTING.md` for the
+repo layout and `.specify/memory/constitution.md` for the full governing principles —
 read the constitution before making architectural decisions; it is binding, not
 advisory.
 
