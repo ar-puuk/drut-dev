@@ -1,0 +1,80 @@
+name: CI
+
+# Basic build/test/clippy gate -- no publishing, no release artifacts, no
+# secrets. That's the future publish workflow's job (VSCE_PAT/OVSX_PAT are
+# reserved exclusively for it and never referenced here).
+on:
+  push:
+    branches:
+      - main
+      # This project's feature branches all follow the NNN-kebab-case
+      # convention (.specify/init-options.json's feature_numbering:
+      # "sequential"; every branch this session -- 005-format-on-save-paste
+      # through 014-casing-preserve-mode -- matched it). None were actually
+      # pushed to a remote this session (local branch -> fast-forward into
+      # main -> push main directly, every time), but this still catches the
+      # case where one is, without needing to be told again later.
+      - '[0-9][0-9][0-9]-*'
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: Rust (build, test, clippy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --workspace
+
+      - name: Test
+        # The 161-file real-corpus tests (fixture_corpus_e2e,
+        # diagnostics_corpus, structural_query_parity) are #[ignore]'d and
+        # gated behind DRUT_CORPUS_PATH, pointing at a private, non-
+        # committed corpus (WF-TDM-Official-Releases) this runner has no
+        # access to -- see README's "Full-corpus validation" section.
+        # Deliberately not setting DRUT_CORPUS_PATH here: `cargo test`
+        # never runs #[ignore]'d tests on its own, so this already skips
+        # them exactly as every local run without that env var does. Not a
+        # coverage gap in this workflow -- those tests were never in scope
+        # for CI to run at all.
+        run: cargo test --release --workspace
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  extension:
+    name: VS Code extension (compile, test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: editors/vscode
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile
+        run: npm run compile
+
+      - name: Test
+        run: npm test
