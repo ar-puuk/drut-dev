@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+    <!-- Clean, minimal icon, no background rect or shadow for full transparency -->
+    
+    <!-- The "//" Slashes, positioned exactly as before -->
+    <g fill="#1E3A5F">
+        <polygon points="120,56 152,56 96,200 64,200" />
+        <polygon points="176,56 208,56 152,200 120,200" />
+    </g>
+    
+    <!-- The "*" Asterisks with sharp caps for cleaner geometric look, trapped in margins -->
+    <g stroke="#D4883A" stroke-width="10">
+        <!-- Top Left Asterisk (Center 82, 74, Radius 18) -->
+        <g transform="translate(82, 74)">
+            <line x1="0" y1="-18" x2="0" y2="18" />
+            <line x1="-15.59" y1="-9" x2="15.59" y2="9" />
+            <line x1="-15.59" y1="9" x2="15.59" y2="-9" />
+        </g>
+        
+        <!-- Bottom Right Asterisk (Center 190, 182, Radius 18) -->
+        <g transform="translate(190, 182)">
+            <line x1="0" y1="-18" x2="0" y2="18" />
+            <line x1="-15.59" y1="-9" x2="15.59" y2="9" />
+            <line x1="-15.59" y1="9" x2="15.59" y2="-9" />
+        </g>
+    </g>
+</svg>
