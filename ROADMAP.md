@@ -30,25 +30,73 @@ already been researched or partially unblocked; see the note per item.
    cases. Ships opt-in — see README's "Editor behavior" section for the
    setting. Code complete, automated-tested, and the real-VS-Code smoke
    test (quickstart.md step 6) manually confirmed.
-3. **TOML-based configuration** — *not started*. Let users control settings via
-   a TOML file (preferred over `settings.json`).
-4. **README/docs overhaul** — *not started*. Features, install steps, usage,
-   brought up to date with everything shipped through 004.
-5. **CI + release pipeline** — *not started*. Blocking prerequisite for both
-   item 6 and item 7 below — no CI exists in this repo yet. Needs to produce
-   per-platform (Windows/macOS/Linux) `drut` binaries at minimum.
-6. **Extension auto-install/update ("out of the box" binary experience)** —
+3. **TOML-based configuration** — ✅ *done, merged 2026-08-13 as
+   `012-toml-configuration`*. `drut.toml` (`casing`/`top_level_indent` under a
+   `[format]` table) is discovered via per-file upward directory walk-up
+   (stopping at a `.git` boundary or filesystem root), respected identically
+   by the CLI, LSP, and MCP adapters (`crates/drut-config`), with
+   `defaults < drut.toml < explicit CLI-flag/MCP-param` precedence, a
+   `--isolated` CLI escape hatch, and non-fatal per-field fallback on a
+   malformed value (never hard-fails — constitution Principle IV). See
+   `specs/012-toml-configuration/`.
+   - **Same-day follow-on, folded in here rather than getting its own
+     sequence slot**: ✅ *done, merged 2026-08-13 as
+     `013-lsp-config-file-watch`*. Fixes a real bug found during 012's own
+     manual verification — an open `.s`/`.block` document's config-warning
+     diagnostic went stale when `drut.toml` was edited directly, without the
+     document itself being closed/reopened. `drut-lsp` now registers a
+     `workspace/didChangeWatchedFiles` watcher for `**/drut.toml` (gated on
+     the client advertising dynamic-registration support; graceful,
+     no-crash fallback to prior behavior otherwise) and re-publishes
+     diagnostics for every open document on a matching change. See
+     `specs/013-lsp-config-file-watch/`.
+4. **`casing` gains an explicit third `Preserve` mode** — *not started,
+   starting now* (added 2026-08-13, as part of the pre-publish audit). Mirrors
+   `TopLevelIndentMode`'s existing shape (`Preserve`/`#[default]`, `Upper`,
+   `Lower`) instead of today's `Option<CasingConvention>` (`None` standing in
+   for "leave untouched"). Full spec-kit cycle, same rigor as `009`. Not to be
+   confused with the still-deferred `--casing auto` mode below (resolved
+   queued item 4) — this is a representation/API change with no formatting
+   *behavior* change for any existing input, not a new casing philosophy.
+5. **README/docs overhaul** — *not started*. Features, install steps, usage,
+   brought up to date with everything shipped through `013` (currently only
+   covers through `004` in the Status section) — plus a second pass after
+   item 8 below to add install-from-Marketplace/crates.io instructions once
+   those are live.
+6. **CI + release pipeline** — *not started*. Blocking prerequisite for both
+   item 7 and item 8 below — no CI exists in this repo yet (`.github/
+   workflows/` doesn't exist). Needs to produce per-platform (Windows/macOS/
+   Linux) `drut` binaries at minimum.
+7. **Extension auto-install/update ("out of the box" binary experience)** —
    *not started, researched only* (2026-08-10). Two real patterns compared:
    rust-analyzer's (binary downloaded from GitHub Releases on first activation —
    small `.vsix`, decoupled from binary rebuilds) vs. ruff's (binary bundled
    directly into the `.vsix`/npm package — no network call needed, but requires
-   a full per-platform build matrix upfront). Both are blocked on item 5.
-7. **Actual publish** (VS Code Marketplace + Open VSX + crates.io) — *not
-   started*. Known gap already flagged and not yet fixed: `vsce` packages
-   `editors/vscode/` in isolation, so the repo-root `LICENSE-MIT`/`LICENSE-APACHE`
-   files (added in `0ad5500`) will **not** automatically land inside the
-   `.vsix` — needs a copy step, or a `files`/`.vscodeignore` adjustment in
-   `editors/vscode/`, before this step.
+   a full per-platform build matrix upfront). Both are blocked on item 6. This
+   item must land **before** item 8's extension publish goes live, not after —
+   publishing an extension that isn't yet "batteries included" would ship a
+   v1 that fails the project's own stated bar the moment someone installs it.
+8. **Actual publish** (VS Code Marketplace + Open VSX + crates.io) — *not
+   started*. Two independent sub-parts: the extension (Marketplace + Open
+   VSX, blocked on item 7 per above) and the Rust crates (`crates.io`,
+   independent of item 7 — blocked only on adding `version` fields to every
+   internal path dependency, which `cargo publish` requires and which are
+   currently absent from all five `Cargo.toml`s).
+   - Known gap, confirmed still open 2026-08-13 (verified directly against a
+     freshly rebuilt `.vsix`'s actual contents): `vsce` packages
+     `editors/vscode/` in isolation, so the repo-root `LICENSE-MIT`/
+     `LICENSE-APACHE` files (added in `0ad5500`) do **not** automatically
+     land inside the `.vsix` (third-party dependencies' own bundled licenses
+     do land correctly — this is specifically Drut's own two license files) —
+     needs a copy step, or a `files`/`.vscodeignore` adjustment in
+     `editors/vscode/`, before this step.
+   - **Icon — owner-blocked, needed before this item's extension half**:
+     the extension needs a simple icon (`package.json`'s `"icon"` field)
+     before a first Marketplace/Open VSX listing. Not something to be
+     generated automatically — the owner will handle this separately.
+     Neither publish is truly blocked without one (both platforms allow
+     publishing with no icon, showing a generic placeholder), but it should
+     be in place before this step for a clean first listing.
 
 ## Resolved queued items (historical log, not part of the pre-publish sequence)
 

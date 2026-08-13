@@ -234,6 +234,18 @@ npx ovsx publish           # requires an Open VSX access token
 Both under Drut's own publisher identity (`drut-project` in `package.json`) —
 never a fork or rebrand of any third-party extension (FR-027).
 
+## Versioning
+
+`voyager-core`, `drut-config`, `drut-cli`, `drut-lsp`, `drut-mcp`, and the
+VS Code/Open VSX extension are versioned in **lockstep**: every release bumps
+all six to the same version number together, never independently — there is
+no scenario where, say, `drut-lsp` is at a different version than `drut-cli`
+or the extension. The first publish uses `0.1.0`, not `1.0.0` — this is a
+genuine first release, and semver's own convention for a pre-stable public
+API fits that honestly. See [`CHANGELOG.md`](CHANGELOG.md) for what's shipped so far (grouped under
+"Unreleased" until a version is actually tagged, at which point that section
+becomes that version's own dated entry).
+
 ## Dependency auditing
 
 `voyager-core` has zero runtime dependencies by design (constitution Principle I,
