@@ -1,0 +1,18 @@
+[package]
+name = "drut-config"
+version = "0.1.0"
+edition = "2021"
+description = "Drut project configuration: drut.toml discovery, parsing, and resolution"
+license = "MIT OR Apache-2.0"
+
+# Not bound by voyager-core's zero-dependency rule (that constraint is scoped
+# to the core crate specifically -- see 012-toml-configuration/research.md
+# §3). `toml::Value`/`Table` parse directly via the toml crate's own
+# `FromStr` impls -- no direct `serde` dependency needed here, since this
+# crate never derives `Deserialize` (per-field fallback parsing walks
+# `toml::Value` by hand instead, research.md §4).
+[dependencies]
+voyager-core = { path = "../voyager-core" }
+toml = "1"
+
+[dev-dependencies]

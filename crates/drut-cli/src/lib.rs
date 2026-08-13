@@ -30,7 +30,8 @@ pub fn run() -> i32 {
             diff,
             casing,
             top_level_indent,
-        } => format_cmd::run(&path, write, check, diff, casing, top_level_indent),
+            isolated,
+        } => format_cmd::run(&path, write, check, diff, casing, top_level_indent, isolated),
         Command::Server => return server_cmd::run(),
         Command::Mcp => return mcp_cmd::run(),
     };

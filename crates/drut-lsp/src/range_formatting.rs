@@ -11,6 +11,7 @@
 
 use crate::document_store::ServerState;
 use crate::position::to_lsp_range;
+use crate::workspace::resolve_path;
 
 /// One line whose content `voyager_core::format` changed, relative to the
 /// original document (data-model.md §1). Deliberately local to this
@@ -92,10 +93,12 @@ fn line_content_span(text: &str, line_index: u32) -> voyager_core::Span {
 
 /// Handles a `textDocument/rangeFormatting` request.
 ///
-/// Casing is deliberately left untouched (`FormatOptions::default()`),
-/// same rationale as `formatting.rs`'s whole-document handler: no
-/// configuration surface exists yet for LSP-triggered formatting (spec.md
-/// Assumptions).
+/// Casing/top-level-indent settings are resolved via `drut_config::
+/// resolve_format_options` (012-toml-configuration), same as
+/// `formatting.rs`'s whole-document handler — a `drut.toml` found from the
+/// document's own real path (falling back to the client's workspace root)
+/// drives these settings; with no `drut.toml` anywhere, behavior is
+/// unchanged from before that feature.
 pub fn handle(
     state: &ServerState,
     params: &lsp_types::DocumentRangeFormattingParams,
@@ -103,7 +106,12 @@ pub fn handle(
     let uri = &params.text_document.uri;
     let doc = state.get(uri)?;
 
-    let result = voyager_core::format(&doc.text, voyager_core::FormatOptions::default());
+    let (options, _warnings) = drut_config::resolve_format_options(
+        resolve_path(uri, state).as_deref(),
+        false,
+        drut_config::ExplicitFormatOverride::default(),
+    );
+    let result = voyager_core::format(&doc.text, options);
     if !result.changed {
         // Already formatted -- an empty edit list, not `None` (`None`
         // would mean "this document has no formatter opinion at all",
@@ -176,6 +184,33 @@ mod tests {
     fn unopened_document_returns_none() {
         let state = ServerState::new();
         assert!(handle(&state, &params("file:///never-opened.s", 0, 0)).is_none());
+    }
+
+    // -- 012-toml-configuration (T021) ---------------------------------------
+
+    fn file_uri_str(path: &std::path::Path) -> String {
+        let s = path.to_string_lossy().replace('\\', "/");
+        let s = if s.starts_with('/') { s } else { format!("/{s}") };
+        format!("file://{s}")
+    }
+
+    #[test]
+    fn document_under_a_drut_toml_governed_directory_picks_up_its_settings() {
+        let dir = std::env::temp_dir().join(format!("drut_lsp_range_formatting_test_{}_governed", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("drut.toml"), "[format]\ncasing = \"upper\"\n").unwrap();
+        let file = dir.join("a.s");
+        let uri_str = file_uri_str(&file);
+
+        let mut state = ServerState::new();
+        state.did_open(lsp_types::Uri::from_str(&uri_str).unwrap(), "if (a=b)\nendif\n".to_string(), 1);
+        let edits = handle(&state, &params(&uri_str, 0, 1)).unwrap();
+        assert_eq!(edits.len(), 2, "both the IF and ENDIF lines change casing");
+        assert_eq!(edits[0].new_text, "IF (a=b)");
+        assert_eq!(edits[1].new_text, "ENDIF");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

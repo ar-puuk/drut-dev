@@ -14,6 +14,7 @@ use voyager_core::{Position, Span};
 
 use crate::document_store::ServerState;
 use crate::position::to_lsp_range;
+use crate::workspace::resolve_path;
 
 fn kind_name(kind: voyager_core::DiagnosticKind) -> &'static str {
     use voyager_core::DiagnosticKind::*;
@@ -74,7 +75,34 @@ pub fn publish(connection: &Connection, state: &ServerState, uri: &Uri) {
                 data: None,
             });
 
-    let diagnostics = structural_diagnostics.chain(fmt_marker_diagnostics).collect();
+    // 012-toml-configuration FR-011: a third, independently-sourced stream
+    // for a malformed drut.toml governing this document — same "additive,
+    // non-Diagnostic-kind, distinct source/severity" treatment 010's own
+    // fmt-marker stream above established. Never blocks: the document still
+    // formats/parses normally regardless of this stream's contents
+    // (research.md §6).
+    let config_warnings: Vec<lsp_types::Diagnostic> = resolve_path(uri, state)
+        .and_then(|path| drut_config::discover(&path))
+        .map(|config_path| drut_config::parse::parse(&config_path).1)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|warning| lsp_types::Diagnostic {
+            range: to_lsp_range(&doc.text, Span::new(Position::new(1, 1), Position::new(1, u32::MAX))),
+            severity: Some(DiagnosticSeverity::HINT),
+            code: Some(lsp_types::NumberOrString::String("DrutTomlProblem".to_string())),
+            code_description: None,
+            source: Some("drut-config".to_string()),
+            message: warning.to_string(),
+            related_information: None,
+            tags: None,
+            data: None,
+        })
+        .collect();
+
+    let diagnostics = structural_diagnostics
+        .chain(fmt_marker_diagnostics)
+        .chain(config_warnings)
+        .collect();
 
     send(connection, uri.clone(), diagnostics, Some(doc.version));
 }

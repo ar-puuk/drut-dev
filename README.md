@@ -139,6 +139,55 @@ of the extension's existing "Format Document" command:
   reindents it to match its new surrounding structure immediately after
   the paste.
 
+## Configuration
+
+`012-toml-configuration` lets a project set shared defaults for drut's
+formatting behavior once, in a `drut.toml` file, instead of every user
+having to pass the same flags every time — and, unlike CLI flags, this is
+the only way an editor (LSP) user reaches non-default behavior at all.
+
+**Schema** — a `[format]` table, currently the only table:
+
+```toml
+[format]
+casing = "lower"                 # "upper" | "lower"; omit = leave casing untouched
+top_level_indent = "normalize"   # "preserve" | "normalize"; omit = "preserve"
+```
+
+Omitting a key means "use the built-in default for that setting" — there is
+no separate "off" value to remember.
+
+**Discovery**: for any file being formatted, drut searches upward from that
+file's own directory for the nearest `drut.toml`, the same way on every
+surface (CLI, editor, MCP). The search stops at the first `drut.toml`
+found, at a `.git` boundary (so a config file from an unrelated parent
+project is never picked up by accident), or at the filesystem root —
+whichever comes first. A project with no `drut.toml` anywhere behaves
+identically to every version of drut before this feature existed.
+
+**Precedence**, per setting, independently: an explicit value passed for
+one call (a CLI flag, or an MCP tool parameter) always wins; otherwise the
+resolved `drut.toml`'s value applies, if it sets that key; otherwise the
+built-in default applies.
+
+**Isolation**: pass `--isolated` (CLI) or `isolated: true` (the MCP
+`format` tool) to skip `drut.toml` discovery entirely for one run, using
+built-in defaults plus any other explicit flags/parameters — useful for CI
+reproducibility or a one-off sanity check.
+
+**A malformed `drut.toml` never blocks formatting.** A problem with one
+setting (an unrecognized key, or an invalid value) only affects that one
+setting — every other valid setting in the same file still applies, and
+formatting completes normally using the built-in default for whatever
+couldn't be resolved. The problem is always surfaced, never silent: a
+notice on stderr (CLI), a `HINT`-severity diagnostic with a distinct
+`drut-config` source (editor/LSP), or a `config_warnings` field in the
+response (MCP's `format` tool) — never a change to the CLI's exit code, and
+never a reason a file fails to format.
+
+See [`specs/012-toml-configuration/`](specs/012-toml-configuration/) for
+the full design rationale.
+
 ## Repository layout
 
 ```text
@@ -148,6 +197,8 @@ crates/
   voyager-core/    Tokenizer, structural parser, formatter, and keyword
                    dictionary — zero runtime dependencies (constitution
                    Principle I, FR-027)
+  drut-config/     drut.toml discovery, parsing, and per-field resolution —
+                   shared by drut-cli/drut-lsp/drut-mcp (012-toml-configuration)
   drut-cli/        `drut` binary: check/format/server subcommands, thin
                    adapter over voyager-core/drut-lsp (traversal, I/O,
                    output rendering, stdio transport only)

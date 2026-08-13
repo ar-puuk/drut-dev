@@ -40,6 +40,8 @@ fn every_tool_survives_every_edge_case_document_without_panicking() {
         let format_result = format(&FormatInput {
             source: source(text),
             casing: None,
+            top_level_indent: None,
+            isolated: None,
         });
         assert!(format_result.is_ok(), "case {name:?}: format must not error on malformed-but-valid text");
 

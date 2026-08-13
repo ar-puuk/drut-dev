@@ -12,6 +12,8 @@ fn text_input(text: &str) -> FormatInput {
             path: None,
         },
         casing: None,
+        top_level_indent: None,
+        isolated: None,
     }
 }
 

@@ -9,6 +9,7 @@ license = "MIT OR Apache-2.0"
 # specifically). Versions pinned per research.md §11.
 [dependencies]
 voyager-core = { path = "../voyager-core" }
+drut-config = { path = "../drut-config" }
 lsp-server = "0.10.0"
 lsp-types = "0.97.0"
 serde = "1.0.229"

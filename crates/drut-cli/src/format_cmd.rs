@@ -2,8 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
+use drut_config::{resolve_format_options, ConfigWarning, ExplicitFormatOverride};
 use similar::TextDiff;
-use voyager_core::format::{format_bytes, CasingConvention, EncodingFidelity, FormatOptions, TopLevelIndentMode};
+use voyager_core::format::{format_bytes, CasingConvention, EncodingFidelity, TopLevelIndentMode};
 use voyager_core::Position;
 
 use crate::cli::{CasingArg, TopLevelIndentArg};
@@ -53,6 +54,12 @@ pub struct FormatReport {
     /// own treatment, not `unsafe_encoding_files`', since an unclosed marker
     /// is not an error, just a fact worth surfacing).
     pub unclosed_fmt_off_files: Vec<(PathBuf, Vec<Position>)>,
+    /// Populated in every mode — 012-toml-configuration FR-011. A malformed
+    /// `drut.toml` never blocks formatting (per-field fallback still
+    /// applies); this is purely informational, same treatment as
+    /// `unclosed_fmt_off_files` above — never affects the exit code
+    /// (research.md §6, confirmed directly against `exit.rs`).
+    pub config_warnings: Vec<(PathBuf, Vec<ConfigWarning>)>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,7 +76,8 @@ pub fn run(
     check: bool,
     diff: bool,
     casing: Option<CasingArg>,
-    top_level_indent: TopLevelIndentArg,
+    top_level_indent: Option<TopLevelIndentArg>,
+    isolated: bool,
 ) -> ExitOutcome {
     let mode = if write {
         Mode::Write
@@ -80,9 +88,9 @@ pub fn run(
     } else {
         Mode::Default
     };
-    let options = FormatOptions {
+    let explicit = ExplicitFormatOverride {
         casing: casing.map(CasingConvention::from),
-        top_level_indent: TopLevelIndentMode::from(top_level_indent),
+        top_level_indent: top_level_indent.map(TopLevelIndentMode::from),
     };
 
     let traversal = traverse(path);
@@ -102,9 +110,14 @@ pub fn run(
         unsafe_encoding_files: Vec::new(),
         recovered_encoding_files: Vec::new(),
         unclosed_fmt_off_files: Vec::new(),
+        config_warnings: Vec::new(),
     };
 
     for file in &traversal.matched_files {
+        let (options, warnings) = resolve_format_options(Some(&file.path), isolated, explicit);
+        if !warnings.is_empty() {
+            report.config_warnings.push((file.path.clone(), warnings));
+        }
         let result = format_bytes(&file.bytes, options);
 
         match result.encoding_fidelity {
@@ -243,6 +256,18 @@ fn print_report(report: &FormatReport, mode: Mode) {
         for (path, positions) in &report.unclosed_fmt_off_files {
             let lines: Vec<String> = positions.iter().map(|p| format!("line {}", p.line)).collect();
             eprintln!("  {} ({})", path.display(), lines.join(", "));
+        }
+    }
+    if !report.config_warnings.is_empty() {
+        eprintln!(
+            "{} file(s) have a drut.toml problem (built-in defaults used for the affected setting(s)):",
+            report.config_warnings.len()
+        );
+        for (path, warnings) in &report.config_warnings {
+            eprintln!("  {}:", path.display());
+            for warning in warnings {
+                eprintln!("    {warning}");
+            }
         }
     }
 }

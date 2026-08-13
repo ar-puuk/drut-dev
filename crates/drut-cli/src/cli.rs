@@ -46,11 +46,19 @@ pub enum Command {
         /// Top-level (depth-0) indentation policy — `preserve` (default,
         /// FR-001) leaves it exactly as written; `normalize` forces every
         /// top-level line to column 0 (FR-002/FR-003,
-        /// 009-top-level-indent-toggle). Unlike `--casing`, always has a
-        /// value — omitting the flag is not a third "off" state
-        /// (research.md §4).
-        #[arg(long, value_enum, default_value_t = TopLevelIndentArg::Preserve)]
-        top_level_indent: TopLevelIndentArg,
+        /// 009-top-level-indent-toggle). As of 012-toml-configuration,
+        /// `Option`-typed like `--casing` — omitting the flag means "consult
+        /// `drut.toml`, then the built-in default," which requires
+        /// distinguishing "not passed" from "explicitly `preserve`"
+        /// (research.md §1). Behavior with no `drut.toml` anywhere is
+        /// unchanged: absent still resolves to `Preserve`.
+        #[arg(long, value_enum)]
+        top_level_indent: Option<TopLevelIndentArg>,
+        /// Skip `drut.toml` discovery entirely for this run, using built-in
+        /// defaults plus any other explicit flags (012-toml-configuration
+        /// US3, mirroring Ruff's `--isolated`).
+        #[arg(long)]
+        isolated: bool,
     },
     /// Speak the Language Server Protocol over stdio (003-lsp-vscode-extension
     /// FR-001) — no flags; launchable by an LSP client with no configuration

@@ -415,3 +415,51 @@ fn did_change_reparses_and_republishes() {
 
     shutdown(&client);
 }
+
+fn file_uri_str(path: &std::path::Path) -> String {
+    let s = path.to_string_lossy().replace('\\', "/");
+    let s = if s.starts_with('/') { s } else { format!("/{s}") };
+    format!("file://{s}")
+}
+
+#[test]
+fn did_open_publishes_a_drut_config_hint_for_a_malformed_drut_toml_additive_to_structural_diagnostics() {
+    // 012-toml-configuration T022/T017: a third, independently-sourced
+    // diagnostics stream (010's own "drut-fmt" pattern, reused with a
+    // distinct "drut-config" source) -- additive, never blocking; the
+    // document's own structural diagnostics (there are none here) are
+    // unaffected.
+    let dir = std::env::temp_dir().join(format!("drut_lsp_protocol_smoke_test_{}_malformed_config", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("drut.toml"), "[format]\ncasing = \"sideways\"\n").unwrap();
+    let file = dir.join("a.s");
+    let uri = file_uri_str(&file);
+
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+
+    let note = did_open(&client, &uri, "IF (a=b)\nENDIF\n");
+    let diagnostics = note.params["diagnostics"].as_array().unwrap();
+    assert_eq!(diagnostics.len(), 1, "expected exactly one diagnostic (the config hint), got: {diagnostics:?}");
+    assert_eq!(diagnostics[0]["code"], json!("DrutTomlProblem"));
+    assert_eq!(diagnostics[0]["source"], json!("drut-config"));
+    assert_eq!(diagnostics[0]["severity"], json!(4), "HINT is severity 4 in the LSP spec");
+    let message = diagnostics[0]["message"].as_str().unwrap();
+    assert!(message.contains("casing"), "expected the message to name the specific bad key, got: {message}");
+
+    shutdown(&client);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn did_open_publishes_zero_drut_config_hints_for_a_document_with_no_drut_toml() {
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+
+    let note = did_open(&client, "file:///no_config_here.s", "IF (a=b)\nENDIF\n");
+    let diagnostics = note.params["diagnostics"].as_array().unwrap();
+    assert!(diagnostics.is_empty(), "no drut.toml anywhere -- expected zero diagnostics, got: {diagnostics:?}");
+
+    shutdown(&client);
+}

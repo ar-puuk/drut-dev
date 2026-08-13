@@ -16,15 +16,17 @@
 
 use crate::document_store::ServerState;
 use crate::position::to_lsp_range;
+use crate::workspace::resolve_path;
 
 /// Handles a `textDocument/formatting` request.
 ///
-/// Casing is deliberately left untouched (`FormatOptions::default()`,
-/// `casing: None`) — this phase wires up whitespace/structure formatting
-/// only; an opt-in casing setting is a `drut-cli`-only concern today (FR-015)
-/// and out of scope for LSP-triggered formatting until a real settings
-/// surface exists for it (spec.md Assumptions rules out any configuration
-/// surface this phase, `003`'s own precedent).
+/// Casing/top-level-indent settings are resolved via `drut_config::
+/// resolve_format_options` (012-toml-configuration) — a `drut.toml` found
+/// from the document's own real path (falling back to the client's
+/// workspace root) drives these settings; with no `drut.toml` anywhere,
+/// behavior is unchanged from before that feature (built-in defaults).
+/// `isolated` is always `false` here — no per-request LSP isolation
+/// mechanism exists (contracts/toml-config-api.md's explicit non-goal).
 pub fn handle(
     state: &ServerState,
     params: &lsp_types::DocumentFormattingParams,
@@ -32,7 +34,12 @@ pub fn handle(
     let uri = &params.text_document.uri;
     let doc = state.get(uri)?;
 
-    let result = voyager_core::format(&doc.text, voyager_core::FormatOptions::default());
+    let (options, _warnings) = drut_config::resolve_format_options(
+        resolve_path(uri, state).as_deref(),
+        false,
+        drut_config::ExplicitFormatOverride::default(),
+    );
+    let result = voyager_core::format(&doc.text, options);
     if !result.changed {
         // Already formatted -- an empty edit list, not `None` (`None` would
         // mean "this document has no formatter opinion at all", which isn't
@@ -155,6 +162,69 @@ mod tests {
     fn unopened_document_returns_none() {
         let state = ServerState::new();
         assert!(handle(&state, &params("file:///never-opened.s")).is_none());
+    }
+
+    // -- 012-toml-configuration (T021) ---------------------------------------
+
+    fn file_uri(path: &std::path::Path) -> lsp_types::Uri {
+        let s = path.to_string_lossy().replace('\\', "/");
+        let s = if s.starts_with('/') { s } else { format!("/{s}") };
+        lsp_types::Uri::from_str(&format!("file://{s}")).unwrap()
+    }
+
+    fn temp_project(label: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("drut_lsp_formatting_test_{}_{label}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn document_under_a_drut_toml_governed_directory_picks_up_its_settings() {
+        let dir = temp_project("governed");
+        std::fs::write(dir.join("drut.toml"), "[format]\ncasing = \"upper\"\n").unwrap();
+        let file = dir.join("a.s");
+        let uri = file_uri(&file);
+        let uri_str = uri.as_str().to_string();
+
+        let mut state = ServerState::new();
+        state.did_open(uri, "if (a=b)\nendif\n".to_string(), 1);
+        let edits = handle(&state, &params(&uri_str)).unwrap();
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].new_text, "IF (a=b)\nENDIF\n");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn untitled_document_with_no_workspace_root_uses_built_in_defaults() {
+        let mut state = ServerState::new();
+        state.did_open(
+            lsp_types::Uri::from_str("untitled:Untitled-1").unwrap(),
+            "if (a=b)\nendif\n".to_string(),
+            1,
+        );
+        let edits = handle(&state, &params("untitled:Untitled-1")).unwrap();
+        assert!(edits.is_empty(), "no real path, no workspace root -- must resolve to built-in defaults (unchanged)");
+    }
+
+    #[test]
+    fn untitled_document_falls_back_to_the_workspace_root_s_drut_toml() {
+        let dir = temp_project("workspace-root-fallback");
+        std::fs::write(dir.join("drut.toml"), "[format]\ncasing = \"upper\"\n").unwrap();
+
+        let mut state = ServerState::new();
+        state.set_workspace_root(Some(dir.clone()));
+        state.did_open(
+            lsp_types::Uri::from_str("untitled:Untitled-1").unwrap(),
+            "if (a=b)\nendif\n".to_string(),
+            1,
+        );
+        let edits = handle(&state, &params("untitled:Untitled-1")).unwrap();
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].new_text, "IF (a=b)\nENDIF\n");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

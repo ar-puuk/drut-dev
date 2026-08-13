@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/voyager-core", "crates/drut-cli", "crates/drut-lsp", "crates/drut-mcp"]
+members = ["crates/voyager-core", "crates/drut-config", "crates/drut-cli", "crates/drut-lsp", "crates/drut-mcp"]
 
 # Future members: formatter/ — added in a later phase, depending on
 # crates/voyager-core per constitution Principle I (single source of truth

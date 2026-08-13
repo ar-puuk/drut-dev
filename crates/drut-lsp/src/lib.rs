@@ -14,6 +14,7 @@ pub mod position;
 pub mod range_formatting;
 pub mod semantic_tokens;
 pub mod spellcheck;
+pub mod workspace;
 
 use lsp_server::{Connection, Message, Notification as ServerNotification, Request as ServerRequest, Response};
 use lsp_types::notification::Notification as _;
@@ -97,15 +98,19 @@ fn server_capabilities() -> lsp_types::ServerCapabilities {
 /// research.md §9) call — no LSP protocol logic lives in `drut-cli` itself.
 pub fn run(connection: Connection) {
     let caps = serde_json::to_value(server_capabilities()).expect("ServerCapabilities always serializes");
-    if connection.initialize(caps).is_err() {
-        // Client disconnected before completing the handshake — nothing more
-        // to do (FR-004: never panic).
-        return;
-    }
+    let init_params = match connection.initialize(caps) {
+        Ok(params) => params,
+        Err(_) => {
+            // Client disconnected before completing the handshake — nothing
+            // more to do (FR-004: never panic).
+            return;
+        }
+    };
 
     log_startup_info(&connection);
 
     let mut state = ServerState::new();
+    state.set_workspace_root(workspace_root_from_initialize_params(init_params));
 
     for msg in &connection.receiver {
         match msg {
@@ -126,6 +131,24 @@ pub fn run(connection: Connection) {
             }
         }
     }
+}
+
+/// Extracts the client's workspace root from the raw `initialize` params
+/// JSON, for the untitled-buffer `drut.toml` discovery fallback
+/// (012-toml-configuration/research.md §5). `rootUri` wins when present
+/// (the LSP spec's own note: "If both rootPath and rootUri are set, rootUri
+/// wins" — and `workspaceFolders` is the modern replacement specifically
+/// for `rootUri`, so it's the fallback here, not the primary), falling back
+/// to the first `workspaceFolders` entry. `None` for a client that sends
+/// neither, or params that fail to parse — not a startup failure either
+/// way.
+#[allow(deprecated)]
+fn workspace_root_from_initialize_params(params: serde_json::Value) -> Option<std::path::PathBuf> {
+    let params: lsp_types::InitializeParams = serde_json::from_value(params).ok()?;
+    let uri = params
+        .root_uri
+        .or_else(|| params.workspace_folders?.into_iter().next().map(|f| f.uri))?;
+    workspace::uri_to_path(&uri)
 }
 
 /// Reports exactly which binary/build is running, directly from inside the

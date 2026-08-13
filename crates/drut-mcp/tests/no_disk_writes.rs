@@ -59,6 +59,8 @@ fn every_tool_succeeds_against_a_read_only_fixture_and_leaves_it_unchanged() {
             path: Some(path_str.clone()),
         },
         casing: None,
+        top_level_indent: None,
+        isolated: None,
     };
     let format_result = format(&format_input);
     assert!(

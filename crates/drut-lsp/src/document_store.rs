@@ -47,11 +47,26 @@ impl OpenDocument {
 #[derive(Debug, Default)]
 pub struct ServerState {
     documents: HashMap<Uri, OpenDocument>,
+    /// The client's workspace root, captured once at `initialize` time
+    /// (012-toml-configuration/research.md §5) — used only as a `drut.toml`
+    /// discovery fallback for a document with no real on-disk location
+    /// (e.g. an unsaved buffer). `None` for a client that sends neither
+    /// `rootUri` nor `workspaceFolders`, or before `initialize` completes —
+    /// not a startup failure either way.
+    workspace_root: Option<std::path::PathBuf>,
 }
 
 impl ServerState {
     pub fn new() -> Self {
         ServerState::default()
+    }
+
+    pub fn set_workspace_root(&mut self, root: Option<std::path::PathBuf>) {
+        self.workspace_root = root;
+    }
+
+    pub fn workspace_root(&self) -> Option<&std::path::Path> {
+        self.workspace_root.as_deref()
     }
 
     /// `textDocument/didOpen`: inserts (or replaces) the document.

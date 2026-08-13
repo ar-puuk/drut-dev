@@ -14,6 +14,7 @@ path = "src/main.rs"
 # Assumptions). Versions pinned per research.md §6.
 [dependencies]
 voyager-core = { path = "../voyager-core" }
+drut-config = { path = "../drut-config" }
 drut-lsp = { path = "../drut-lsp" }
 drut-mcp = { path = "../drut-mcp" }
 clap = { version = "4.6.6", features = ["derive"] }
@@ -28,3 +29,7 @@ tokio = { version = "1", features = ["rt-multi-thread"] }
 
 [dev-dependencies]
 jsonschema = "0.49.8"
+# 012-toml-configuration's config_parity.rs three-surface test drives
+# drut-lsp's real handler functions directly, which need lsp-types' request/
+# response shapes -- same version drut-lsp itself pins.
+lsp-types = "0.97.0"
