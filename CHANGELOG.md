@@ -22,6 +22,14 @@ CONTRIBUTING.md's "Versioning" section).
   beyond that first level of inclusion are not resolved; hovering such a
   token falls back to the previous hover behavior rather than guessing.
 
+### Fixed
+
+- `@token@` syntax highlighting now colors the whole reference — both `@`
+  delimiters and the name between them — as a single, uniform color.
+  Previously the delimiters were scoped separately from the name, so most
+  themes rendered the `@`s in a different (often muted) color than the
+  token itself.
+
 ## [0.1.2] - 2026-08-13
 
 ### Fixed
