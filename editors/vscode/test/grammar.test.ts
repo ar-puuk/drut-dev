@@ -112,18 +112,27 @@ async function main(): Promise<void> {
   // same variable.other.readwrite convention shell-script grammars use for
   // $VAR, chosen 2026-08-10 after the original variable.other.substitution
   // leaf scope was found -- via real manual VS Code testing -- to render
-  // with no color under a stock dark theme).
+  // with no color under a stock dark theme). The whole match, delimiters
+  // included, shares this one scope (issue #2) rather than splitting the
+  // @ delimiters into their own punctuation.definition.variable scope --
+  // themes commonly color that differently from the name, which is exactly
+  // the "only the token part is highlighted" bug issue #2 reported.
   {
     const [tokens] = tokenizeAll(grammar, ["RUN PGM=@MY_VAR@"]);
-    const scopes = scopesAt(tokens, 10);
+    const nameScopes = scopesAt(tokens, 10);
     check(
       "@variable@ name scoped as variable.other.readwrite",
-      scopes.some((s) => s.includes("variable.other.readwrite"))
+      nameScopes.some((s) => s.includes("variable.other.readwrite"))
     );
-    const delimScopes = scopesAt(tokens, 8);
+    const openDelimScopes = scopesAt(tokens, 8);
     check(
-      "@variable@ delimiter scoped as punctuation.definition.variable",
-      delimScopes.some((s) => s.includes("punctuation.definition.variable"))
+      "@variable@ opening delimiter scoped as variable.other.readwrite too",
+      openDelimScopes.some((s) => s.includes("variable.other.readwrite"))
+    );
+    const closeDelimScopes = scopesAt(tokens, 15);
+    check(
+      "@variable@ closing delimiter scoped as variable.other.readwrite too",
+      closeDelimScopes.some((s) => s.includes("variable.other.readwrite"))
     );
   }
 
