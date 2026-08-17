@@ -11,6 +11,8 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-08-16
+
 ### Added
 
 - Hovering an `@token@` reference now shows the value it currently resolves
