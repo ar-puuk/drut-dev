@@ -220,43 +220,86 @@ already been researched or partially unblocked; see the note per item.
     item 10 itself was trimmed down to avoid. Revisit once item 10 has
     real usage, or immediately if the owner (or Bill specifically) wants
     it sooner.
-12. **`=`/operator spacing normalization** (`PHASE=ILOOP` / `PHASE =ILOOP`
+12. **Operator spacing normalization** (`PHASE=ILOOP` / `PHASE =ILOOP`
     / `PHASE= ILOOP` / `PHASE = ILOOP` all becoming one canonical form) —
-    *queued, not started, needs more research before it's spec-ready*
+    ✅ *done, implemented 2026-08-17 as `018-operator-spacing`*
     (added 2026-08-17). Confirmed genuinely new scope, not an existing
     gap: `format.rs`/`formatting-api.md` today normalize indentation and
     (optionally) casing only — no existing logic touches spacing around
     `=` or any other operator, and the real corpus shows this is
     genuinely inconsistent even within one file (e.g. `ZONES   = 1` three
-    lines from `ZONES = 1` in the same fixture). Three shapes discussed,
-    none settled yet:
-    - An `auto` mode — one space on each side of `=` — but it's not yet
-      decided how (or whether) this extends to other operators (`+`,
-      `-`, `==`, etc.) inside computed expressions; that's a materially
-      bigger, fuzzier scope than `=`-spacing alone (closer to a
-      line-reflow feature than a spacing tweak) and needs its own
-      research pass before it's folded in, not assumed.
-    - Explicit adoption of the Tidyverse (R) style-guide convention —
-      always one space around `=`, including in named/keyword-argument
-      position, which is where R's own convention deliberately differs
-      from e.g. Python's PEP 8 — needs a deeper read of the full
-      Tidyverse (and/or Air formatter) rule set before committing to it
-      as Voyager's own canonical form, not just the `=` rule in
-      isolation.
-    - A `preserve` mode (default) — leaves existing spacing exactly as
-      written, mirroring this project's own established default-to-
-      `Preserve` pattern for every other formatting axis shipped so far.
-    - **Related cases identified, not yet scoped** (ranked by how directly
-      they follow from `=`-spacing): (1) the same `=` rule applied to
-      `Assignment` statements (`MW[1]=mi.1.1` vs `MW[1] = mi.1.1`) — small,
-      direct extension; (2) comma spacing between multiple pairs on one
-      statement (`MATI=a.mat,MATO=b.mat`, real corpus already shows the
-      no-space form) — small, direct extension; (3) arithmetic/comparison
-      operator spacing inside expressions (`mi.1.1+mi.2.1`, `I==1`) — the
-      "other operators" question above, materially bigger; (4) spacing
-      between a control word and its opening paren (`IF(x)` vs `IF (x)`)
-      — a separate axis; (5) interior padding inside brackets/parens
-      (`MW[ 1 ]` vs `MW[1]`) — another separate axis.
+    lines from `ZONES = 1` in the same fixture).
+
+    **Update 2026-08-17**: scope settled (owner decision) as three modes,
+    default `preserve`, replacing the `auto`/Tidyverse framing sketched
+    above:
+    - `preserve` (default) — leaves existing spacing exactly as written,
+      mirroring every other formatting axis shipped so far.
+    - `fixed` — normalizes every operator occurrence (assignment `=`,
+      comparison `==`/`<>`/`>=`/`<=`/`<`/`>`, and arithmetic `+`/`-`/`*`/
+      `/` inside computed expressions) to exactly one space on each side,
+      independent of neighboring lines. Also normalizes comma spacing
+      between multiple pairs on one statement (`MATI=a.mat,MATO=b.mat` →
+      `MATI = a.mat, MATO = b.mat`) — folding in related case (2) below.
+    - `auto` — `fixed`, plus: consecutive `Assignment` statements (only
+      `Assignment`, not pair-keyword `Control` lines) at the same block
+      nesting depth have their `=` vertically aligned to the column of
+      the longest left-hand side in the run. A run breaks (and
+      realigns fresh) on a blank line, a comment-only line, or an
+      indentation-depth change — closest real precedent is `gofmt`'s
+      automatic alignment of consecutive `const`/`var`/struct-literal
+      lines, which breaks the same way. Note this is the opposite
+      tradeoff Prettier/R's `styler`/Tidyverse guide take (they refuse to
+      align at all, since edits to one line force whitespace-only diffs
+      on unrelated sibling lines) — accepted knowingly, not overlooked,
+      because Drut applies it automatically rather than asking anyone to
+      hand-maintain it.
+    - Explicit Tidyverse-style-guide adoption was considered and dropped
+      in favor of the shape above, which is closer to `gofmt` than to any
+      R-ecosystem formatter.
+    - **Related cases, resolved into the modes above**: (1) the `=` rule
+      applied to `Assignment` statements — folded into `fixed`/`auto`
+      directly; (2) comma spacing between multiple pairs — folded into
+      `fixed`/`auto` per above; (3) arithmetic/comparison operator
+      spacing inside expressions — folded into `fixed`/`auto` (the "all
+      operators" scope decision); (4) spacing between a control word and
+      its opening paren (`IF(x)` vs `IF (x)`) and (5) interior padding
+      inside brackets/parens (`MW[ 1 ]` vs `MW[1]`) — both settled
+      (owner decision) as always no-space-inside under `fixed`/`auto`,
+      folded in rather than kept as separate configurable axes; `preserve`
+      stays untouched, so an unconfigured project sees zero behavior
+      change, matching every other axis shipped so far.
+
+13. **Blank-line-run normalization** — *queued, understanding confirmed,
+    not yet spec'd* (added 2026-08-17, alongside `018-operator-spacing`'s
+    own completion). Well-precedented shape (Python's `black`/JS's
+    `prettier` both cap consecutive blank lines, fewer nested than at
+    module level) — not a novel idea needing its own research pass the way
+    casing/operator-spacing did. Scope settled through direct conversation:
+    - Two independently-configurable positive-integer caps, not one — a
+      top-level cap (default `2`) and a nested cap covering *any* line
+      inside *any* block regardless of depth, uniformly, not scaling
+      further per nesting level (default `1`) — mirroring
+      `top_level_indent`'s existing top-level-vs-everything-else split,
+      not a per-depth-level scheme.
+    - Two modes only, `preserve` (default)/`auto` — no third `fixed` tier
+      the way `operator_spacing` has, since there's only one real
+      non-preserve behavior here (cap at the configured value), not two
+      meaningfully different ones.
+    - `auto` only *contracts* a run of consecutive blank lines down to the
+      applicable cap when it exceeds that cap — never pads a shorter run
+      up. A "blank" line includes a whitespace-only line (spaces/tabs, no
+      visible content), not just a strictly zero-length one.
+    - Both caps validate the same way `indent_width` already does (a
+      sane range, out-of-range degrades to the default with a
+      non-blocking notice, never a hard failure) — exact range TBD at
+      planning time, not fixed by this conversation.
+    - `; FMT: OFF`/`; FMT: ON` regions are left untouched, same as every
+      other formatting axis already shipped.
+    - Exact `drut.toml`/CLI/MCP field names are a planning-phase decision,
+      not fixed here — same additive-only, never-breaking-an-existing-
+      surface discipline every prior formatting axis in this project has
+      followed.
 
 ## Resolved queued items (historical log, not part of the pre-publish sequence)
 

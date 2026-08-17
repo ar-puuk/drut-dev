@@ -34,6 +34,7 @@ pub fn run() -> i32 {
             data_references_casing,
             indent_width,
             top_level_indent,
+            operator_spacing,
             isolated,
         } => format_cmd::run(
             &path,
@@ -46,6 +47,7 @@ pub fn run() -> i32 {
             data_references_casing,
             indent_width,
             top_level_indent,
+            operator_spacing,
             isolated,
         ),
         Command::Server => return server_cmd::run(),

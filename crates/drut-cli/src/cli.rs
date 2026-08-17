@@ -82,6 +82,16 @@ pub enum Command {
         /// unchanged: absent still resolves to `Preserve`.
         #[arg(long, value_enum)]
         top_level_indent: Option<TopLevelIndentArg>,
+        /// Whitespace normalization around operators/commas/bracket-paren
+        /// interiors (018-operator-spacing) — `preserve` (default) leaves it
+        /// exactly as written; `fixed` normalizes to one space each side of
+        /// every recognized operator; `auto` does everything `fixed` does
+        /// plus vertically aligns consecutive `Assignment` statements'
+        /// `=`. Same `Option`-typed shape as `--casing`/`--top-level-indent`
+        /// — omitting the flag means "consult `drut.toml`, then the
+        /// built-in default (preserve)."
+        #[arg(long, value_enum)]
+        operator_spacing: Option<OperatorSpacingArg>,
         /// Skip `drut.toml` discovery entirely for this run, using built-in
         /// defaults plus any other explicit flags (012-toml-configuration
         /// US3, mirroring Ruff's `--isolated`).
@@ -118,6 +128,13 @@ pub enum CasingArg {
 pub enum TopLevelIndentArg {
     Preserve,
     Normalize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum OperatorSpacingArg {
+    Preserve,
+    Fixed,
+    Auto,
 }
 
 // The CasingArg -> voyager_core::CasingConvention and TopLevelIndentArg ->

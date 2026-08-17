@@ -43,6 +43,13 @@ pub struct FormatInput {
     /// FR-010): this tool previously had no way to reach `top_level_indent`
     /// at all.
     pub top_level_indent: Option<String>,
+    /// `"preserve"` / `"fixed"` / `"auto"` / absent — same absent-means-
+    /// "consult drut.toml, then default (preserve)" precedence as `casing`/
+    /// `top_level_indent` above (018-operator-spacing). `"preserve"` leaves
+    /// operator/comma/bracket-paren spacing exactly as written; `"fixed"`
+    /// normalizes it; `"auto"` does everything `"fixed"` does plus aligning
+    /// consecutive `Assignment` statements' `=`.
+    pub operator_spacing: Option<String>,
     /// Skip `drut.toml` discovery entirely for this call, using built-in
     /// defaults plus `casing`/`top_level_indent` above if given
     /// (012-toml-configuration US3, mirroring the CLI's `--isolated`).
@@ -116,6 +123,17 @@ fn explicit_override(input: &FormatInput) -> Result<drut_config::ExplicitFormatO
             ))
         }
     };
+    let operator_spacing = match input.operator_spacing.as_deref() {
+        None => None,
+        Some("preserve") => Some(voyager_core::OperatorSpacing::Preserve),
+        Some("fixed") => Some(voyager_core::OperatorSpacing::Fixed),
+        Some("auto") => Some(voyager_core::OperatorSpacing::Auto),
+        Some(other) => {
+            return Err(format!(
+                "`operator_spacing` must be \"preserve\", \"fixed\", or \"auto\" if given, got {other:?}"
+            ))
+        }
+    };
     Ok(drut_config::ExplicitFormatOverride {
         casing,
         control_words_casing,
@@ -123,6 +141,7 @@ fn explicit_override(input: &FormatInput) -> Result<drut_config::ExplicitFormatO
         data_references_casing,
         top_level_indent,
         indent_width: input.indent_width,
+        operator_spacing,
     })
 }
 
@@ -173,6 +192,7 @@ mod tests {
             data_references_casing: None,
             indent_width: None,
             top_level_indent: None,
+            operator_spacing: None,
             isolated: None,
         }
     }
@@ -189,6 +209,7 @@ mod tests {
             data_references_casing: None,
             indent_width: None,
             top_level_indent: top_level_indent.map(str::to_string),
+            operator_spacing: None,
             isolated,
         }
     }
@@ -211,6 +232,7 @@ mod tests {
             data_references_casing: data_references_casing.map(str::to_string),
             indent_width,
             top_level_indent: None,
+            operator_spacing: None,
             isolated: None,
         }
     }
@@ -468,4 +490,32 @@ mod tests {
 
     const MESSY_FOR_CONFIG_TEST: &str = "IF (X=1)\nY = 2\nENDIF\n";
     const CLEAN_FOR_CONFIG_TEST: &str = "IF (X=1)\n    Y = 2\nENDIF\n";
+
+    // -- 018-operator-spacing (tasks.md T018, T021) --
+
+    #[test]
+    fn operator_spacing_param_overrides_a_drut_toml_resolved_value() {
+        let dir = temp_project("operator_spacing");
+        write_config(&dir, "[format]\noperator_spacing = \"preserve\"\n");
+        let file = dir.join("x.s");
+        std::fs::write(&file, "ZONES   = 1\n").unwrap();
+
+        let mut overridden = path_input(file.to_str().unwrap(), None, None, None);
+        overridden.operator_spacing = Some("fixed".to_string());
+        let result = format(&overridden).unwrap();
+        assert_eq!(result.text, "ZONES = 1\n");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn operator_spacing_invalid_value_is_a_clean_error() {
+        // FR-011/SC-004: same closed-set shape as casing/top_level_indent --
+        // an invalid value is a clean tool-call error, not a silent
+        // fallback (that softer behavior is drut.toml-only).
+        let mut input = text_input("ZONES   = 1\n", None);
+        input.operator_spacing = Some("tight".to_string());
+        let err = format(&input).unwrap_err();
+        assert!(err.contains("operator_spacing"), "expected an error naming the field, got: {err}");
+    }
 }

@@ -20,7 +20,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use voyager_core::format::{format_bytes, CasingConvention, CasingSettings, EncodingFidelity, FormatOptions};
-use voyager_core::{parse, BlockKind, Node, Statement, StatementKind, TopLevelIndentMode};
+use voyager_core::{parse, BlockKind, Node, OperatorSpacing, Statement, StatementKind, TopLevelIndentMode};
 
 const VALID_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/valid");
 const GOLDEN_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/golden");
@@ -53,6 +53,33 @@ fn data_references_upper_indent_2_options() -> FormatOptions {
         },
         top_level_indent: TopLevelIndentMode::default(),
         indent_width: 2,
+        operator_spacing: OperatorSpacing::default(),
+    }
+}
+
+// -- 018-operator-spacing, T031: two more variants, same golden-directory
+// pattern golden_normalize/ and golden_data_references/ already established
+// -- applied only to the 9 already-reviewed real_corpus fixtures.
+const REAL_CORPUS_GOLDEN_OPERATOR_SPACING_FIXED_DIR: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/golden_operator_spacing_fixed/real_corpus");
+const REAL_CORPUS_GOLDEN_OPERATOR_SPACING_AUTO_DIR: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/golden_operator_spacing_auto/real_corpus");
+
+fn operator_spacing_fixed_options() -> FormatOptions {
+    FormatOptions {
+        casing: CasingSettings::default(),
+        top_level_indent: TopLevelIndentMode::default(),
+        indent_width: 4,
+        operator_spacing: OperatorSpacing::Fixed,
+    }
+}
+
+fn operator_spacing_auto_options() -> FormatOptions {
+    FormatOptions {
+        casing: CasingSettings::default(),
+        top_level_indent: TopLevelIndentMode::default(),
+        indent_width: 4,
+        operator_spacing: OperatorSpacing::Auto,
     }
 }
 
@@ -61,6 +88,7 @@ fn normalize_options() -> FormatOptions {
         casing: CasingSettings::default(),
         top_level_indent: TopLevelIndentMode::Normalize,
         indent_width: 4,
+        operator_spacing: OperatorSpacing::default(),
     }
 }
 
@@ -322,6 +350,62 @@ fn real_corpus_fixtures_are_idempotent_under_data_references_upper_indent_2() {
 #[test]
 fn real_corpus_fixtures_preserve_structure_and_diagnostics_under_data_references_upper_indent_2() {
     check_structure_and_diagnostics_preserved(real_corpus_fixtures(), data_references_upper_indent_2_options());
+}
+
+// -- 018-operator-spacing, T031 --
+
+fn golden_operator_spacing_fixed_path_for_real_corpus(fixture: &Path) -> PathBuf {
+    let rel = fixture
+        .strip_prefix(REAL_CORPUS_DIR)
+        .expect("real_corpus_fixtures() only returns paths under REAL_CORPUS_DIR");
+    Path::new(REAL_CORPUS_GOLDEN_OPERATOR_SPACING_FIXED_DIR).join(rel)
+}
+
+#[test]
+fn real_corpus_fixtures_match_golden_output_under_operator_spacing_fixed() {
+    check_golden(
+        real_corpus_fixtures(),
+        Path::new(REAL_CORPUS_GOLDEN_OPERATOR_SPACING_FIXED_DIR),
+        golden_operator_spacing_fixed_path_for_real_corpus,
+        operator_spacing_fixed_options(),
+    );
+}
+
+#[test]
+fn real_corpus_fixtures_are_idempotent_under_operator_spacing_fixed() {
+    check_idempotent(real_corpus_fixtures(), operator_spacing_fixed_options());
+}
+
+#[test]
+fn real_corpus_fixtures_preserve_structure_and_diagnostics_under_operator_spacing_fixed() {
+    check_structure_and_diagnostics_preserved(real_corpus_fixtures(), operator_spacing_fixed_options());
+}
+
+fn golden_operator_spacing_auto_path_for_real_corpus(fixture: &Path) -> PathBuf {
+    let rel = fixture
+        .strip_prefix(REAL_CORPUS_DIR)
+        .expect("real_corpus_fixtures() only returns paths under REAL_CORPUS_DIR");
+    Path::new(REAL_CORPUS_GOLDEN_OPERATOR_SPACING_AUTO_DIR).join(rel)
+}
+
+#[test]
+fn real_corpus_fixtures_match_golden_output_under_operator_spacing_auto() {
+    check_golden(
+        real_corpus_fixtures(),
+        Path::new(REAL_CORPUS_GOLDEN_OPERATOR_SPACING_AUTO_DIR),
+        golden_operator_spacing_auto_path_for_real_corpus,
+        operator_spacing_auto_options(),
+    );
+}
+
+#[test]
+fn real_corpus_fixtures_are_idempotent_under_operator_spacing_auto() {
+    check_idempotent(real_corpus_fixtures(), operator_spacing_auto_options());
+}
+
+#[test]
+fn real_corpus_fixtures_preserve_structure_and_diagnostics_under_operator_spacing_auto() {
+    check_structure_and_diagnostics_preserved(real_corpus_fixtures(), operator_spacing_auto_options());
 }
 
 /// A structural "shape" — statement kinds/words/pair-keys and block

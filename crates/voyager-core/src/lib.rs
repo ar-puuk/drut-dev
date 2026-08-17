@@ -16,6 +16,7 @@ pub mod format;
 pub mod grammar_notes;
 pub mod keywords;
 pub mod lexer;
+pub mod operator_spacing;
 pub mod span;
 pub mod statement;
 pub mod token;
@@ -27,7 +28,7 @@ pub use data_reference::{data_reference_entries, data_reference_occurrences, Dat
 pub use diagnostic::{Diagnostic, DiagnosticKind};
 pub use format::{
     format, format_bytes, unclosed_fmt_off_markers, CasingConvention, CasingSettings, EncodingFidelity, FormatOptions,
-    FormatResult, TopLevelIndentMode,
+    FormatResult, OperatorSpacing, TopLevelIndentMode,
 };
 pub use keywords::{completion_candidates, did_you_mean, CompletionContext, KeywordEntry, KeywordRole};
 pub use span::{Position, Span};

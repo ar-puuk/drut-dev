@@ -80,6 +80,7 @@ fn cli_lsp_and_mcp_resolve_the_same_drut_toml_identically() {
         data_references_casing: None,
         indent_width: None,
         top_level_indent: None,
+        operator_spacing: None,
         isolated: None,
     })
     .unwrap();
@@ -152,6 +153,7 @@ fn cli_lsp_and_mcp_resolve_the_new_granular_settings_identically() {
         data_references_casing: None,
         indent_width: None,
         top_level_indent: None,
+        operator_spacing: None,
         isolated: None,
     })
     .unwrap();

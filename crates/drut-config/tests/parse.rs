@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use drut_config::{parse::parse, ConfigWarning};
-use voyager_core::{CasingConvention, TopLevelIndentMode};
+use voyager_core::{CasingConvention, OperatorSpacing, TopLevelIndentMode};
 
 fn write_config(name: &str, content: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("drut_config_parse_test_{}_{name}", std::process::id()));
@@ -225,6 +225,37 @@ fn indent_width_that_does_not_even_fit_in_a_u8_is_an_invalid_value_at_parse_time
     assert_eq!(config.format.indent_width, None);
     assert_eq!(warnings.len(), 1);
     assert!(matches!(&warnings[0], ConfigWarning::InvalidValue { key, .. } if key == "indent_width"));
+
+    cleanup(&path);
+}
+
+// -- 018-operator-spacing: operator_spacing (tasks.md T015) --
+
+#[test]
+fn operator_spacing_parses_each_of_the_three_accepted_values_with_zero_warnings() {
+    for (value, expected) in [
+        ("preserve", OperatorSpacing::Preserve),
+        ("fixed", OperatorSpacing::Fixed),
+        ("auto", OperatorSpacing::Auto),
+    ] {
+        let path = write_config(&format!("operator_spacing_{value}"), &format!("[format]\noperator_spacing = \"{value}\"\n"));
+
+        let (config, warnings) = parse(&path);
+        assert_eq!(config.format.operator_spacing, Some(expected), "value: {value}");
+        assert!(warnings.is_empty(), "expected zero warnings for {value:?}, got {warnings:?}");
+
+        cleanup(&path);
+    }
+}
+
+#[test]
+fn operator_spacing_malformed_value_warns_and_falls_back_to_none() {
+    let path = write_config("operator_spacing_malformed", "[format]\noperator_spacing = \"tight\"\n");
+
+    let (config, warnings) = parse(&path);
+    assert_eq!(config.format.operator_spacing, None);
+    assert_eq!(warnings.len(), 1);
+    assert!(matches!(&warnings[0], ConfigWarning::InvalidValue { key, .. } if key == "operator_spacing"));
 
     cleanup(&path);
 }

@@ -17,6 +17,7 @@ fn text_input(text: &str) -> FormatInput {
         data_references_casing: None,
         indent_width: None,
         top_level_indent: None,
+        operator_spacing: None,
         isolated: None,
     }
 }

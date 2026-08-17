@@ -27,6 +27,26 @@ CONTRIBUTING.md's "Versioning" section).
   every value comes from a project's own configuration.
 - `indent_width` is now a configurable `[format]` setting (default `4`,
   matching prior behavior), alongside `casing`/`top_level_indent`.
+- A new `operator_spacing` `[format]` setting (`preserve`/`fixed`/`auto`,
+  default `preserve`) normalizes whitespace around operators. `fixed`
+  brings every occurrence of `=`, the comparison operators (`==`, `<>`,
+  `>=`, `<=`, `<`, `>`), and binary arithmetic (`+`, `-`, `*`, `/`) to
+  exactly one space on each side; normalizes comma spacing between
+  multiple `keyword=value` pairs on one statement; and removes interior
+  padding inside `[...]`/`(...)` and the space between a control word and
+  its opening `(` (e.g. `IF (x==1)` → `IF(x == 1)`). A unary `+`/`-` (a
+  signed literal, or one immediately following another operator) is never
+  spaced apart from its operand. `auto` does everything `fixed` does, plus
+  vertically aligns the `=` of consecutive `Assignment` statements to the
+  column of the longest left-hand side in the run — resetting
+  independently at a blank line, a comment-only line, a nesting-depth
+  change, or a non-`Assignment` statement (a pair-keyword `Control`
+  statement's own `=` is spaced but never joins or extends an alignment
+  run). `; FMT: OFF`/`; FMT: ON` regions and string/quoted-literal content
+  are never touched by either mode. Exposed identically via `drut.toml`,
+  the CLI (`--operator-spacing`), and the MCP `format` tool
+  (`operator_spacing`); `preserve` remains the default, so a project with
+  nothing configured sees zero behavior change.
 
 ### Fixed
 

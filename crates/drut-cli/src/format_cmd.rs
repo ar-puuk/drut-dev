@@ -4,10 +4,10 @@ use std::path::{Path, PathBuf};
 
 use drut_config::{resolve_format_options, ConfigWarning, ExplicitFormatOverride};
 use similar::TextDiff;
-use voyager_core::format::{format_bytes, CasingConvention, EncodingFidelity, TopLevelIndentMode};
+use voyager_core::format::{format_bytes, CasingConvention, EncodingFidelity, OperatorSpacing, TopLevelIndentMode};
 use voyager_core::Position;
 
-use crate::cli::{CasingArg, TopLevelIndentArg};
+use crate::cli::{CasingArg, OperatorSpacingArg, TopLevelIndentArg};
 use crate::exit::ExitOutcome;
 use crate::io_util::{write_stdout, write_stdout_line};
 use crate::traverse::{traverse, ReadFailure};
@@ -27,6 +27,16 @@ impl From<TopLevelIndentArg> for TopLevelIndentMode {
         match value {
             TopLevelIndentArg::Preserve => TopLevelIndentMode::Preserve,
             TopLevelIndentArg::Normalize => TopLevelIndentMode::Normalize,
+        }
+    }
+}
+
+impl From<OperatorSpacingArg> for OperatorSpacing {
+    fn from(value: OperatorSpacingArg) -> Self {
+        match value {
+            OperatorSpacingArg::Preserve => OperatorSpacing::Preserve,
+            OperatorSpacingArg::Fixed => OperatorSpacing::Fixed,
+            OperatorSpacingArg::Auto => OperatorSpacing::Auto,
         }
     }
 }
@@ -83,6 +93,7 @@ pub fn run(
     data_references_casing: Option<CasingArg>,
     indent_width: Option<u8>,
     top_level_indent: Option<TopLevelIndentArg>,
+    operator_spacing: Option<OperatorSpacingArg>,
     isolated: bool,
 ) -> ExitOutcome {
     let mode = if write {
@@ -101,6 +112,7 @@ pub fn run(
         data_references_casing: data_references_casing.map(CasingConvention::from),
         top_level_indent: top_level_indent.map(TopLevelIndentMode::from),
         indent_width,
+        operator_spacing: operator_spacing.map(OperatorSpacing::from),
     };
 
     let traversal = traverse(path);

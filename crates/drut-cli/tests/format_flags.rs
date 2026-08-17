@@ -578,3 +578,31 @@ fn drut_toml_indent_width_governs_output_with_no_flag_passed() {
     assert_eq!(out.status.code(), Some(0));
     assert_eq!(String::from_utf8_lossy(&out.stdout), "IF (X=1)\n  Y = 2\nENDIF\n");
 }
+
+// -- 018-operator-spacing (tasks.md T017, T021) --
+
+#[test]
+fn operator_spacing_flag_overrides_a_drut_toml_resolved_preserve() {
+    let dir = TempDir::new("operator-spacing-flag");
+    fs::write(dir.path().join("drut.toml"), "[format]\noperator_spacing = \"preserve\"\n").unwrap();
+    let file = dir.path().join("x.s");
+    fs::write(&file, "ZONES   = 1\n").unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--operator-spacing=fixed"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "ZONES = 1\n");
+}
+
+#[test]
+fn operator_spacing_invalid_value_is_a_usage_error_not_a_silent_fallback() {
+    // FR-011/SC-004: operator_spacing is a closed ValueEnum, same shape as
+    // --casing -- an out-of-set CLI value is rejected outright, not
+    // silently degraded to preserve the way a malformed drut.toml value is.
+    let dir = TempDir::new("operator-spacing-invalid");
+    let file = dir.path().join("x.s");
+    fs::write(&file, MESSY).unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--operator-spacing=tight"]);
+    assert_ne!(out.status.code(), Some(0));
+    assert_eq!(fs::read_to_string(&file).unwrap(), MESSY);
+}

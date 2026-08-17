@@ -79,6 +79,7 @@ fn parse_format_table(path: &Path, table: &toml::Table, warnings: &mut Vec<Confi
             }
             "top_level_indent" => format.top_level_indent = parse_top_level_indent(path, value, warnings),
             "indent_width" => format.indent_width = parse_indent_width(path, value, warnings),
+            "operator_spacing" => format.operator_spacing = parse_operator_spacing(path, value, warnings),
             other => warnings.push(ConfigWarning::UnrecognizedKey {
                 path: path.to_path_buf(),
                 table: "format".to_string(),
@@ -158,6 +159,41 @@ fn parse_indent_width(path: &Path, value: &toml::Value, warnings: &mut Vec<Confi
                 path,
                 "indent_width",
                 format!("must be an integer between 1 and 16, got {value:?}"),
+            ));
+            None
+        }
+    }
+}
+
+/// `018-operator-spacing`. Same exact-lowercase-string shape `casing`/
+/// `top_level_indent` already use (both are, on inspection, case-sensitive
+/// today — an exact match against "preserve"/"upper"/"lower" and
+/// "preserve"/"normalize" respectively, not the case-insensitive behavior
+/// this feature's own design docs assumed of them; matched here for
+/// consistency with the real existing behavior rather than introducing a
+/// one-off case-insensitive exception).
+fn parse_operator_spacing(
+    path: &Path,
+    value: &toml::Value,
+    warnings: &mut Vec<ConfigWarning>,
+) -> Option<voyager_core::OperatorSpacing> {
+    match value.as_str() {
+        Some("preserve") => Some(voyager_core::OperatorSpacing::Preserve),
+        Some("fixed") => Some(voyager_core::OperatorSpacing::Fixed),
+        Some("auto") => Some(voyager_core::OperatorSpacing::Auto),
+        Some(other) => {
+            warnings.push(invalid_value(
+                path,
+                "operator_spacing",
+                format!("must be \"preserve\", \"fixed\", or \"auto\", got {other:?}"),
+            ));
+            None
+        }
+        None => {
+            warnings.push(invalid_value(
+                path,
+                "operator_spacing",
+                format!("must be a string (\"preserve\", \"fixed\", or \"auto\"), got {value:?}"),
             ));
             None
         }

@@ -4,15 +4,23 @@
 //! — this module renders already-parsed structure, it does not change how
 //! anything is recognized.
 //!
-//! **Scope, precisely** (see spec.md FR-012's seven concrete rules): this
-//! renderer only ever touches (a) each line's *leading* whitespace, for
-//! lines identified as the first line of a top-level-nested statement/block/
+//! **Scope, precisely, under `operator_spacing: Preserve`** (see spec.md
+//! FR-012's seven concrete rules — still exactly true for `Preserve`, the
+//! default and every existing configuration's own behavior): this renderer
+//! only ever touches (a) each line's *leading* whitespace, for lines
+//! identified as the first line of a top-level-nested statement/block/
 //! closer/branch, and (b) — only when `options.casing` is `Some` — the exact
 //! character range of a recognized control-word/keyword-name token. Every
 //! other byte of the input — continuation lines, comment-only lines, blank
 //! lines, intra-line spacing between tokens, *trailing* whitespace on every
 //! line (touched or not), line-ending style — is copied through unchanged.
-//! Trailing whitespace is deliberately never stripped, even on a
+//! **`Fixed`/`Auto` (018-operator-spacing) widen this deliberately**: when
+//! `options.operator_spacing` is `Fixed` or `Auto`, intra-line spacing
+//! around recognized operators/commas/bracket-paren interiors is also
+//! normalized — see `operator_spacing.rs` for exactly what that covers, and
+//! FR-012 (in that feature's spec) for what still doesn't (comment content,
+//! string/quoted-literal content, everything else this paragraph already
+//! excludes). Trailing whitespace is deliberately never stripped, even on a
 //! re-indented line: an inline comment's own trailing padding is
 //! indistinguishable from "trailing whitespace" without re-deriving comment
 //! boundaries here, and FR-012 already requires comment content to be left
@@ -20,7 +28,8 @@
 //! `trailing_whitespace_after_inline_comment_text_is_never_touched` below).
 //! This is a deliberately narrower scope than "whitespace normalization"
 //! might suggest in the abstract — it's exactly what FR-012's corpus-
-//! survey-backed rules specify, no more.
+//! survey-backed rules (plus 018's own FRs, when opted into) specify, no
+//! more.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -29,8 +38,9 @@ use crate::data_reference;
 use crate::decode;
 use crate::diagnostic::{Diagnostic, DiagnosticKind};
 use crate::lexer::tokenize;
+use crate::operator_spacing;
 use crate::span::{Position, Span};
-use crate::statement::{pair_keyword_boundaries, Statement, StatementKind};
+use crate::statement::{build_statements, pair_keyword_boundaries, Statement, StatementKind};
 use crate::token::{Token, TokenKind};
 use crate::{parse, Node};
 
@@ -87,6 +97,29 @@ pub struct CasingSettings {
     pub data_references: CasingConvention,
 }
 
+/// Whether/how `format` normalizes whitespace around operators, commas, and
+/// bracket/paren interiors (spec.md FR-001, `018-operator-spacing`).
+/// `Preserve` is the `#[default]`, same non-optional three-value shape
+/// `CasingConvention`/`TopLevelIndentMode` already use. `Auto` is
+/// implemented as a strict superset of `Fixed` (data-model.md §1) — never a
+/// second, independent spacing decision that could drift from `Fixed`'s.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum OperatorSpacing {
+    /// Leave existing operator/comma/bracket-paren spacing exactly as
+    /// written — the default, and the only behavior when this feature is
+    /// unconfigured (FR-009).
+    #[default]
+    Preserve,
+    /// Normalize every in-scope operator to exactly one space on each side
+    /// (leading-only for a trailing continuation-position operator),
+    /// comma spacing between `Control` pairs, and zero interior padding
+    /// inside brackets/parens (FR-002–FR-005, FR-012).
+    Fixed,
+    /// Everything `Fixed` does, plus vertical alignment of consecutive
+    /// `Assignment` statements' `=` within an alignment run (FR-006–FR-008).
+    Auto,
+}
+
 /// Caller-supplied configuration for one `format`/`format_bytes` call.
 ///
 /// **No longer `#[derive(Default)]`** (`017-casing-categories-indent-width`):
@@ -117,6 +150,11 @@ pub struct FormatOptions {
     /// `drut-config`-layer policy decision, not a fact this crate enforces
     /// (research.md §4).
     pub indent_width: u8,
+    /// Whether/how operator/comma/bracket-paren spacing is normalized
+    /// (spec.md FR-001, `018-operator-spacing`). Defaults to `Preserve`
+    /// (see `impl Default` below) — a project with nothing configured sees
+    /// zero behavior change from before this field existed (FR-009).
+    pub operator_spacing: OperatorSpacing,
 }
 
 impl Default for FormatOptions {
@@ -125,6 +163,7 @@ impl Default for FormatOptions {
             casing: CasingSettings::default(),
             top_level_indent: TopLevelIndentMode::default(),
             indent_width: 4,
+            operator_spacing: OperatorSpacing::default(),
         }
     }
 }
@@ -240,6 +279,13 @@ pub fn unclosed_fmt_off_markers(source: &str) -> Vec<Position> {
 type IndentPlan = BTreeMap<u32, usize>;
 /// (line, 0-based char start, 0-based char end (exclusive), replacement text)
 type CasingEdit = (u32, usize, usize, String);
+/// Same shape as `CasingEdit`, but — unlike `CasingEdit` — `replacement.len()`
+/// is NOT required to equal `end - start` (data-model.md §2, 018-operator-
+/// spacing): this is the edit type that actually needs insertion/removal,
+/// applied via `apply_line_edits`'s left-to-right rebuild rather than
+/// `CasingEdit`'s same-length in-place splice. `pub(crate)` so
+/// `operator_spacing.rs` (a sibling module) can construct these directly.
+pub(crate) type SpacingEdit = (u32, usize, usize, String);
 
 fn render(source: &str, nodes: &[Node], diagnostics: &[Diagnostic], options: FormatOptions) -> (String, Vec<Position>) {
     let raw_lines = split_lines(source);
@@ -278,24 +324,112 @@ fn render(source: &str, nodes: &[Node], diagnostics: &[Diagnostic], options: For
             );
         }
     }
+
+    // Operator-spacing edits (018-operator-spacing) — short-circuited on
+    // `Preserve` (the default), same performance-only gate shape the casing
+    // pass above already uses; `Preserve` does exactly the same work as
+    // before this feature existed (FR-009/SC-003). Uses the *flat* statement
+    // list, not `nodes`, since a block opener's own tokens (e.g. `RUN
+    // PGM=MATRIX ZONES=5`'s pairs, or an `IF(x==1)`'s condition) are only
+    // fully retained there — `Block`'s own `opener_pairs: Vec<Span>` keeps
+    // keyword spans only (research.md §1 in that feature's own research).
+    let mut spacing_edits: Vec<SpacingEdit> = Vec::new();
+    if options.operator_spacing != OperatorSpacing::Preserve {
+        let statements = build_statements(tokens.clone());
+        let mut fixed_edits: Vec<SpacingEdit> = Vec::new();
+        for stmt in &statements {
+            operator_spacing::collect_fixed_edits(stmt, &char_lines, &mut fixed_edits);
+        }
+        // Two independently-recognized operators can legitimately queue an
+        // edit for the exact same zero-width gap (e.g. two adjacent binary
+        // `*`/`/` characters with nothing between them: the first's
+        // "after" edit and the second's "before" edit both target that
+        // same gap) — both always compute the identical replacement for
+        // the same original span, so deduplicating by (line, start, end)
+        // is always safe and never loses a real edit. Without this, both
+        // copies would apply during the per-line rebuild, silently
+        // inserting the padding twice. Done once, here, before this list
+        // is used for anything else (including Auto's rendered-column
+        // delta sum below, which would otherwise double-count too).
+        let fixed_edits: Vec<SpacingEdit> = {
+            let by_key: BTreeMap<(u32, usize, usize), String> =
+                fixed_edits.into_iter().map(|(l, s, e, r)| ((l, s, e), r)).collect();
+            by_key.into_iter().map(|((l, s, e), r)| (l, s, e, r)).collect()
+        };
+        if options.operator_spacing == OperatorSpacing::Auto {
+            // Alignment is always computed on top of Fixed's own edits,
+            // never a divergent spacing decision (contracts/operator-
+            // spacing.md) — merged by exact (line, start, end) key so an
+            // alignment-padded gap replaces (never duplicates) whatever
+            // Fixed alone would have queued for that same gap.
+            let mut alignment_edits: Vec<SpacingEdit> = Vec::new();
+            operator_spacing::collect_alignment_edits(nodes, &protected, &fixed_edits, &mut alignment_edits);
+            let mut by_key: BTreeMap<(u32, usize, usize), String> =
+                fixed_edits.iter().map(|(l, s, e, r)| ((*l, *s, *e), r.clone())).collect();
+            for (l, s, e, r) in alignment_edits {
+                by_key.insert((l, s, e), r);
+            }
+            spacing_edits = by_key.into_iter().map(|((l, s, e), r)| (l, s, e, r)).collect();
+        } else {
+            spacing_edits = fixed_edits;
+        }
+        // Same protected-line funnel every other edit kind already goes
+        // through (`push_if_present`'s pattern) — a protected line never
+        // receives an operator-spacing edit either.
+        spacing_edits.retain(|(line, _, _, _)| !protected.contains(line));
+    }
+
     let mut edits_by_line: BTreeMap<u32, Vec<(usize, usize, String)>> = BTreeMap::new();
     for (line, start, end, text) in casing_edits {
         edits_by_line.entry(line).or_default().push((start, end, text));
+    }
+    let mut spacing_by_line: BTreeMap<u32, Vec<(usize, usize, String)>> = BTreeMap::new();
+    for (line, start, end, text) in spacing_edits {
+        spacing_by_line.entry(line).or_default().push((start, end, text));
     }
 
     let mut out = String::with_capacity(source.len());
     for (idx, (content, terminator)) in raw_lines.iter().enumerate() {
         let line_num = (idx + 1) as u32;
-        let mut chars: Vec<char> = content.chars().collect();
+        let orig_chars: Vec<char> = content.chars().collect();
 
-        if let Some(edits) = edits_by_line.get(&line_num) {
-            for (start, end, replacement) in edits {
-                let repl_chars: Vec<char> = replacement.chars().collect();
-                if *end <= chars.len() && *start <= *end && repl_chars.len() == end - start {
-                    chars[*start..*end].clone_from_slice(&repl_chars);
+        let mut chars: Vec<char> = if let Some(spacing) = spacing_by_line.get(&line_num) {
+            // Variable-length rebuild path (data-model.md §2): merge this
+            // line's casing edits (if any) and spacing edits into one
+            // sorted, left-to-right rebuild — both kinds operate on
+            // disjoint spans (token text vs. the whitespace around it), so
+            // a single merged pass is safe. Only used for lines that
+            // actually have a spacing edit; every other line keeps using
+            // the cheaper same-length splice below, unchanged.
+            let mut combined: Vec<(usize, usize, String)> = edits_by_line.get(&line_num).cloned().unwrap_or_default();
+            combined.extend(spacing.iter().cloned());
+            combined.sort_by_key(|(start, _, _)| *start);
+            let mut rebuilt: Vec<char> = Vec::with_capacity(orig_chars.len());
+            let mut cursor = 0usize;
+            for (start, end, replacement) in &combined {
+                if *start < cursor || *end < *start || *end > orig_chars.len() {
+                    // Malformed/overlapping edit — never panic, just skip
+                    // this one and keep going with the rest of the line.
+                    continue;
+                }
+                rebuilt.extend_from_slice(&orig_chars[cursor..*start]);
+                rebuilt.extend(replacement.chars());
+                cursor = *end;
+            }
+            rebuilt.extend_from_slice(&orig_chars[cursor..]);
+            rebuilt
+        } else {
+            let mut chars = orig_chars.clone();
+            if let Some(edits) = edits_by_line.get(&line_num) {
+                for (start, end, replacement) in edits {
+                    let repl_chars: Vec<char> = replacement.chars().collect();
+                    if *end <= chars.len() && *start <= *end && repl_chars.len() == end - start {
+                        chars[*start..*end].clone_from_slice(&repl_chars);
+                    }
                 }
             }
-        }
+            chars
+        };
 
         if let Some(&target) = indent_plan.get(&line_num) {
             // Leading whitespace only — never trailing. A line's trailing
@@ -810,6 +944,7 @@ mod tests {
             },
             top_level_indent: TopLevelIndentMode::default(),
             indent_width: 4,
+            operator_spacing: OperatorSpacing::default(),
         }
     }
 
@@ -818,6 +953,7 @@ mod tests {
             casing: CasingSettings::default(),
             top_level_indent: TopLevelIndentMode::Normalize,
             indent_width: 4,
+            operator_spacing: OperatorSpacing::default(),
         }
     }
 
@@ -1138,6 +1274,7 @@ mod tests {
             casing: CasingSettings::default(),
             top_level_indent: TopLevelIndentMode::default(),
             indent_width: 4,
+            operator_spacing: OperatorSpacing::default(),
         };
         let out = format(src, options).text;
         assert_eq!(out, "if (x=1)\n    run pgm=matrix\n    endrun\nendif\n");
@@ -1177,6 +1314,7 @@ mod tests {
             },
             top_level_indent: TopLevelIndentMode::default(),
             indent_width: 4,
+            operator_spacing: OperatorSpacing::default(),
         };
         let out = format(src, pair_keywords_only).text;
         assert_eq!(out, "run PGM=matrix zones=5\nendrun\n", "pair_keywords alone must not touch zones: {out}");
@@ -1189,6 +1327,7 @@ mod tests {
             },
             top_level_indent: TopLevelIndentMode::default(),
             indent_width: 4,
+            operator_spacing: OperatorSpacing::default(),
         };
         let out = format(src, data_references_only).text;
         assert_eq!(out, "run pgm=matrix ZONES=5\nendrun\n", "data_references alone must reach zones: {out}");
@@ -1235,6 +1374,7 @@ mod tests {
                 },
                 top_level_indent: TopLevelIndentMode::default(),
                 indent_width: 4,
+                operator_spacing: OperatorSpacing::default(),
             },
         )
         .text;
@@ -1258,6 +1398,7 @@ mod tests {
             },
             top_level_indent: TopLevelIndentMode::default(),
             indent_width: 4,
+            operator_spacing: OperatorSpacing::default(),
         }
     }
 
@@ -1600,5 +1741,114 @@ mod tests {
         assert_eq!(once.text, twice.text);
         assert!(!twice.changed);
         assert_eq!(once.unclosed_fmt_off_markers, twice.unclosed_fmt_off_markers);
+    }
+
+    // -- Operator spacing (018-operator-spacing) ----------------------------
+
+    fn fixed() -> FormatOptions {
+        FormatOptions { operator_spacing: OperatorSpacing::Fixed, ..FormatOptions::default() }
+    }
+
+    fn auto() -> FormatOptions {
+        FormatOptions { operator_spacing: OperatorSpacing::Auto, ..FormatOptions::default() }
+    }
+
+    #[test]
+    fn operator_spacing_default_is_preserve() {
+        assert_eq!(OperatorSpacing::default(), OperatorSpacing::Preserve);
+        assert_eq!(FormatOptions::default().operator_spacing, OperatorSpacing::Preserve);
+    }
+
+    #[test]
+    fn operator_spacing_preserve_is_byte_identical_to_before_this_feature_existed() {
+        // FR-009/SC-003 regression case -- a fixture exercising every
+        // operator kind this feature recognizes, confirmed untouched when
+        // operator_spacing is left at its default. Deliberately flat (no
+        // block nesting) so indentation -- an entirely separate axis --
+        // can't also contribute a change here.
+        let src = "ZONES   = 1\nMATI=a.mat,MATO=b.mat\nMW[ 1 ]=mi.1.1+mi.2.1\n";
+        let result = format(src, FormatOptions::default());
+        assert!(!result.changed);
+        assert_eq!(result.text, src);
+    }
+
+    #[test]
+    fn spacing_rebuild_path_handles_multiple_edits_on_one_line_without_corrupting_offsets() {
+        let src = "IF ( x==1 )\nENDIF\n";
+        let out = format(src, fixed()).text;
+        assert_eq!(out, "IF(x == 1)\nENDIF\n");
+    }
+
+    #[test]
+    fn casing_edit_and_spacing_edit_coexist_correctly_on_one_line() {
+        let src = "if ( x==1 )\nendif\n";
+        let options = FormatOptions {
+            casing: CasingSettings { control_words: CasingConvention::Upper, ..CasingSettings::default() },
+            operator_spacing: OperatorSpacing::Fixed,
+            ..FormatOptions::default()
+        };
+        let out = format(src, options).text;
+        assert_eq!(out, "IF(x == 1)\nENDIF\n");
+    }
+
+    #[test]
+    fn spacing_edits_respect_fmt_off_on() {
+        let src = "; FMT: OFF\nZONES   = 1\n; FMT: ON\nY   =   2\n";
+        let out = format(src, fixed()).text;
+        assert_eq!(
+            out,
+            "; FMT: OFF\nZONES   = 1\n; FMT: ON\nY = 2\n",
+            "protected region's spacing untouched, unprotected region normalized"
+        );
+    }
+
+    #[test]
+    fn operator_spacing_fixed_is_idempotent() {
+        // 018-operator-spacing tasks.md T020 (post-/speckit-analyze finding
+        // I1) -- re-verified directly, not assumed to hold transitively.
+        let src = "ZONES   = 1\nMATI=a.mat,MATO=b.mat\nIF ( x==1 )\nMW[ 1 ]=mi.1.1+mi.2.1\nENDIF\n";
+        let once = format(src, fixed()).text;
+        let twice = format(&once, fixed()).text;
+        assert_eq!(once, twice);
+    }
+
+    #[test]
+    fn operator_spacing_fixed_respects_fmt_off_on_a_full_fixture() {
+        // 018-operator-spacing tasks.md T020: a protected region's
+        // unnormalized spacing stays exactly as written, while an
+        // unprotected region elsewhere in the same file normalizes. `W`'s
+        // own 4-space body indent (default indent_width, unrelated to this
+        // feature) is expected too -- it's IF's child, indented regardless
+        // of operator_spacing.
+        let src = "IF (X==1)\n; FMT: OFF\nY   =   2\n; FMT: ON\nENDIF\nIF (Z==1)\nW   =   3\nENDIF\n";
+        let out = format(src, fixed()).text;
+        assert_eq!(
+            out,
+            "IF(X == 1)\n; FMT: OFF\nY   =   2\n; FMT: ON\nENDIF\nIF(Z == 1)\n    W = 3\nENDIF\n"
+        );
+    }
+
+    #[test]
+    fn operator_spacing_auto_is_idempotent() {
+        // 018-operator-spacing tasks.md T027 -- aligned padding must not
+        // grow further on a second pass.
+        let src = "A = 1\nBB = 2\nCCC = 3\n";
+        let once = format(src, auto()).text;
+        let twice = format(&once, auto()).text;
+        assert_eq!(once, twice);
+    }
+
+    #[test]
+    fn operator_spacing_auto_respects_fmt_off_on_a_full_fixture() {
+        // 018-operator-spacing tasks.md T027: a protected run's spacing
+        // stays exactly as written (never aligned), while an unprotected
+        // run elsewhere in the same file aligns normally.
+        let src = "; FMT: OFF\nA = 1\nBB = 2\n; FMT: ON\nCCC = 3\nDDDD = 4\n";
+        let out = format(src, auto()).text;
+        assert_eq!(
+            out,
+            "; FMT: OFF\nA = 1\nBB = 2\n; FMT: ON\nCCC  = 3\nDDDD = 4\n",
+            "protected run untouched; unprotected run aligns to its own longest member"
+        );
     }
 }

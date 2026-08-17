@@ -5,7 +5,7 @@
 use std::path::{Path, PathBuf};
 
 use drut_config::{resolve_format_options, ExplicitFormatOverride};
-use voyager_core::{CasingConvention, TopLevelIndentMode};
+use voyager_core::{CasingConvention, OperatorSpacing, TopLevelIndentMode};
 
 fn test_file(name: &str, config: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("drut_config_resolve_test_{}_{name}", std::process::id()));
@@ -263,6 +263,44 @@ fn indent_width_unset_resolves_to_four() {
 
     let (options, _warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default());
     assert_eq!(options.indent_width, 4);
+
+    cleanup(&target);
+}
+
+// -- 018-operator-spacing (tasks.md T016) --
+
+#[test]
+fn operator_spacing_explicit_overrides_config_file() {
+    let target = test_file("operator_spacing_explicit_override", "[format]\noperator_spacing = \"preserve\"\n");
+
+    let (options, _warnings) = resolve_format_options(
+        Some(&target),
+        false,
+        ExplicitFormatOverride { operator_spacing: Some(OperatorSpacing::Fixed), ..Default::default() },
+    );
+    assert_eq!(options.operator_spacing, OperatorSpacing::Fixed);
+
+    cleanup(&target);
+}
+
+#[test]
+fn operator_spacing_unset_anywhere_resolves_to_preserve() {
+    let target = test_file("operator_spacing_unset", "[format]\ncasing = \"upper\"\n");
+
+    let (options, warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default());
+    assert_eq!(options.operator_spacing, OperatorSpacing::Preserve);
+    assert!(warnings.is_empty());
+
+    cleanup(&target);
+}
+
+#[test]
+fn operator_spacing_parses_from_config_and_resolves() {
+    let target = test_file("operator_spacing_from_config", "[format]\noperator_spacing = \"auto\"\n");
+
+    let (options, warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default());
+    assert_eq!(options.operator_spacing, OperatorSpacing::Auto);
+    assert!(warnings.is_empty());
 
     cleanup(&target);
 }

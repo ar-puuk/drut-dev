@@ -35,6 +35,10 @@ pub struct FormatConfig {
     /// this field carries whatever integer `drut.toml` actually had, valid
     /// or not (data-model.md §4).
     pub indent_width: Option<u8>,
+    /// `018-operator-spacing`. Single new setting, no legacy field to stay
+    /// compatible with (unlike `casing`) — precedence is just `explicit >
+    /// this field > built-in default` (data-model.md §4).
+    pub operator_spacing: Option<voyager_core::OperatorSpacing>,
 }
 
 /// A non-fatal problem found while parsing a `drut.toml` (spec.md FR-011).
@@ -83,6 +87,7 @@ pub struct ExplicitFormatOverride {
     pub data_references_casing: Option<voyager_core::CasingConvention>,
     pub top_level_indent: Option<voyager_core::TopLevelIndentMode>,
     pub indent_width: Option<u8>,
+    pub operator_spacing: Option<voyager_core::OperatorSpacing>,
 }
 
 /// Built-in default indentation width (`FormatOptions::default().indent_width`,
@@ -160,11 +165,16 @@ fn resolve_casing_and_indent(
         .or(config.format.top_level_indent)
         .unwrap_or_default();
     let indent_width = resolve_indent_width(explicit.indent_width, config.format.indent_width, config_path, warnings);
+    let operator_spacing = explicit
+        .operator_spacing
+        .or(config.format.operator_spacing)
+        .unwrap_or_default();
 
     voyager_core::FormatOptions {
         casing: voyager_core::CasingSettings { control_words, pair_keywords, data_references },
         top_level_indent,
         indent_width,
+        operator_spacing,
     }
 }
 
