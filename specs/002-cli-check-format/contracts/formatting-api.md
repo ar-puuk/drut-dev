@@ -107,7 +107,13 @@ differently rather than uniformly:
   `text` — `FormatResult` itself carries no diff.
 - No configurable indentation width/style beyond the one canonical form FR-012
   establishes (4-space-per-level, block-relative) — casing is the only
-  configurable axis (FR-015).
+  configurable axis (FR-015). **Corrected 2026-08-17
+  (`017-casing-categories-indent-width`)**: this exclusion no longer holds —
+  `indent_width` is now a configurable `[format]` setting (spec.md FR-009 in
+  that feature, `ROADMAP.md` item 9), default `4`, the same value FR-012
+  fixed unconditionally before. Casing gained a third independent category
+  (`data_references`) in the same feature, described in FR-015's own amended
+  entry above rather than restated here.
 - No refusal-to-run for any input, including `Lossy`-fidelity input — see
   "Encoding safety" above for why that's a caller-side policy, not a change to
   this function's own never-refuses contract.

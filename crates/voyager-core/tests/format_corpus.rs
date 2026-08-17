@@ -19,7 +19,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use voyager_core::format::{format_bytes, CasingConvention, EncodingFidelity, FormatOptions};
+use voyager_core::format::{format_bytes, CasingConvention, CasingSettings, EncodingFidelity, FormatOptions};
 use voyager_core::{parse, BlockKind, Node, Statement, StatementKind, TopLevelIndentMode};
 
 const VALID_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/valid");
@@ -37,10 +37,30 @@ const GOLDEN_NORMALIZE_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/f
 const REAL_CORPUS_GOLDEN_NORMALIZE_DIR: &str =
     concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/golden_normalize/real_corpus");
 
+// -- 017-casing-categories-indent-width, T036: a third variant, mirroring
+// golden_normalize/'s own precedent exactly -- applied only to the 9
+// already-reviewed real_corpus fixtures (not a new redaction review; same
+// underlying already-approved source text, just reformatted differently,
+// the same reasoning golden_normalize/'s own module comment already uses).
+const REAL_CORPUS_GOLDEN_DATA_REFERENCES_DIR: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/golden_data_references/real_corpus");
+
+fn data_references_upper_indent_2_options() -> FormatOptions {
+    FormatOptions {
+        casing: CasingSettings {
+            data_references: CasingConvention::Upper,
+            ..CasingSettings::default()
+        },
+        top_level_indent: TopLevelIndentMode::default(),
+        indent_width: 2,
+    }
+}
+
 fn normalize_options() -> FormatOptions {
     FormatOptions {
-        casing: CasingConvention::Preserve,
+        casing: CasingSettings::default(),
         top_level_indent: TopLevelIndentMode::Normalize,
+        indent_width: 4,
     }
 }
 
@@ -275,6 +295,35 @@ fn real_corpus_fixtures_are_idempotent_under_normalize() {
     check_idempotent(real_corpus_fixtures(), normalize_options());
 }
 
+// -- 017-casing-categories-indent-width, T036 --
+
+fn golden_data_references_path_for_real_corpus(fixture: &Path) -> PathBuf {
+    let rel = fixture
+        .strip_prefix(REAL_CORPUS_DIR)
+        .expect("real_corpus_fixtures() only returns paths under REAL_CORPUS_DIR");
+    Path::new(REAL_CORPUS_GOLDEN_DATA_REFERENCES_DIR).join(rel)
+}
+
+#[test]
+fn real_corpus_fixtures_match_golden_output_under_data_references_upper_indent_2() {
+    check_golden(
+        real_corpus_fixtures(),
+        Path::new(REAL_CORPUS_GOLDEN_DATA_REFERENCES_DIR),
+        golden_data_references_path_for_real_corpus,
+        data_references_upper_indent_2_options(),
+    );
+}
+
+#[test]
+fn real_corpus_fixtures_are_idempotent_under_data_references_upper_indent_2() {
+    check_idempotent(real_corpus_fixtures(), data_references_upper_indent_2_options());
+}
+
+#[test]
+fn real_corpus_fixtures_preserve_structure_and_diagnostics_under_data_references_upper_indent_2() {
+    check_structure_and_diagnostics_preserved(real_corpus_fixtures(), data_references_upper_indent_2_options());
+}
+
 /// A structural "shape" — statement kinds/words/pair-keys and block
 /// kinds/nesting, in order, deliberately ignoring `Span` (which shifts by
 /// construction whenever whitespace width changes) and casing (uppercased
@@ -334,7 +383,13 @@ fn stmt_sig(s: &Statement) -> String {
                 .collect::<Vec<_>>()
                 .join(",")
         ),
-        StatementKind::Assignment { target, .. } => format!("A:{target}"),
+        // Uppercased for the same reason Control's word/pairs already are:
+        // 017-casing-categories-indent-width's data_references category can
+        // legitimately recase an assignment target (e.g. `mw[1]` ->
+        // `MW[1]`) — a real gap this file's own new data-references golden
+        // variant surfaced, not a pre-existing case that happened to never
+        // trigger before this feature existed.
+        StatementKind::Assignment { target, .. } => format!("A:{}", target.to_ascii_uppercase()),
         StatementKind::Label { name } => format!("L:{name}"),
         StatementKind::ShellEscape { .. } => "S".to_string(),
     }

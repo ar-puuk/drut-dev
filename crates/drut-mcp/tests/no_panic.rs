@@ -40,6 +40,10 @@ fn every_tool_survives_every_edge_case_document_without_panicking() {
         let format_result = format(&FormatInput {
             source: source(text),
             casing: None,
+            control_words_casing: None,
+            pair_keywords_casing: None,
+            data_references_casing: None,
+            indent_width: None,
             top_level_indent: None,
             isolated: None,
         });

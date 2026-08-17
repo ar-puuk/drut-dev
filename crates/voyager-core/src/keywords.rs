@@ -151,6 +151,18 @@ const CONTROL_WORDS: &[KeywordEntry] = &[
 /// alphabetically by keyword name; a keyword observed under multiple
 /// control words (e.g. `FILE` under both `PRINT` and `READ`) has all of
 /// them in one entry's `observed_with`.
+///
+/// **Amended 2026-08-17 (`017-casing-categories-indent-width`,
+/// research.md §5)**: `ITER`/`LP`/`NUMREC`/`RECNUM` removed — the original
+/// census's structural `word=value` matching couldn't distinguish a real
+/// reserved pair-keyword from a user-chosen `LOOP <name>=start,end
+/// [,increment]` loop-variable name (Bentley's own reference-guide
+/// examples use `iter`/`INDEX`/`L3`/`_K` interchangeably in that exact
+/// slot), so these four were never real keywords. (`CNT`, discussed
+/// alongside them during that investigation, never actually survived the
+/// original census's own filters and was never in this table to remove.)
+/// `ZONES` added — vendor-confirmed real, previously missing. Net: 194
+/// entries.
 const PAIR_KEYWORDS: &[KeywordEntry] = &[
     pair_entry("ANSWER", &["PROMPT"]),
     pair_entry("APPEND", &["PRINT"]),
@@ -180,7 +192,6 @@ const PAIR_KEYWORDS: &[KeywordEntry] = &[
     pair_entry("INCLUDE", &["FILEO"]),
     pair_entry("INTERPOLATE", &["LOOKUP"]),
     pair_entry("INTRASTEP", &["DISTRIBUTE"]),
-    pair_entry("ITER", &["LOOP"]),
     pair_entry("LINEI[1]", &["FILEI"]),
     pair_entry("LINEI[2]", &["FILEI"]),
     pair_entry("LINEI[3]", &["FILEI"]),
@@ -226,7 +237,6 @@ const PAIR_KEYWORDS: &[KeywordEntry] = &[
     pair_entry("LOOKUP[4]", &["LOOKUP"]),
     pair_entry("LOOKUP[5]", &["LOOKUP"]),
     pair_entry("LOOKUP[6]", &["LOOKUP"]),
-    pair_entry("LP", &["LOOP"]),
     pair_entry("MATI[01]", &["FILEI"]),
     pair_entry("MATI[02]", &["FILEI"]),
     pair_entry("MATI[03]", &["FILEI"]),
@@ -290,7 +300,6 @@ const PAIR_KEYWORDS: &[KeywordEntry] = &[
     pair_entry("NTLEGI[3]", &["FILEI"]),
     pair_entry("NTLEGI[4]", &["FILEI"]),
     pair_entry("NUMLINKS", &["ARRAY"]),
-    pair_entry("NUMREC", &["LOOP"]),
     pair_entry("ONOFFS", &["FILEO"]),
     pair_entry("PATH", &["PATHLOAD"]),
     pair_entry("PENI", &["PATHLOAD"]),
@@ -306,7 +315,6 @@ const PAIR_KEYWORDS: &[KeywordEntry] = &[
     pair_entry("PROCESSNUM", &["DISTRIBUTEMULTISTEP"]),
     pair_entry("QUESTION", &["PROMPT"]),
     pair_entry("READNTLEGI", &["GENERATE"]),
-    pair_entry("RECNUM", &["LOOP"]),
     pair_entry("RECO", &["WRITE"]),
     pair_entry("RECORD", &["MERGE"]),
     pair_entry("RECO[1]", &["FILEO"]),
@@ -345,6 +353,11 @@ const PAIR_KEYWORDS: &[KeywordEntry] = &[
     pair_entry("ZDATI[4]", &["FILEI"]),
     pair_entry("ZDATI[5]", &["FILEI"]),
     pair_entry("ZDATI[6]", &["FILEI"]),
+    // 017-casing-categories-indent-width, research.md §5: vendor-confirmed
+    // real pair-keyword (`RUN PGM=MATRIX ZONES=3 ...`), previously missing
+    // from this census entirely. Its plain-assignment shape (`ZONES = 1`)
+    // is data_reference.rs's concern, not this completion dictionary's.
+    pair_entry("ZONES", &["RUN"]),
     pair_entry("_HOTZONE_DIST", &["ARRAY"]),
     pair_entry("_HOTZONE_TOLL", &["ARRAY"]),
     pair_entry("_HOTZONE_VMT", &["ARRAY"]),
@@ -509,6 +522,29 @@ mod tests {
         assert!(names.contains(&"PRNFILE"), "names were: {names:?}");
         // Scoped, not the general ControlWord list leaking through.
         assert!(!names.contains(&"IF"));
+    }
+
+    #[test]
+    fn loop_variable_name_position_no_longer_suggests_the_removed_non_keywords() {
+        // 017-casing-categories-indent-width, research.md §5: ITER/LP/
+        // NUMREC/RECNUM were never real reserved keywords -- LOOP's
+        // variable-name slot is free-form, user-chosen.
+        let candidates = completion_candidates(CompletionContext {
+            enclosing_control_word: Some("LOOP"),
+        });
+        let names: Vec<&str> = candidates.iter().map(|e| e.name).collect();
+        for removed in ["ITER", "LP", "NUMREC", "RECNUM", "CNT"] {
+            assert!(!names.contains(&removed), "{removed} should no longer be suggested: {names:?}");
+        }
+    }
+
+    #[test]
+    fn run_scoped_completion_now_includes_zones() {
+        let candidates = completion_candidates(CompletionContext {
+            enclosing_control_word: Some("RUN"),
+        });
+        let names: Vec<&str> = candidates.iter().map(|e| e.name).collect();
+        assert!(names.contains(&"ZONES"), "names were: {names:?}");
     }
 
     #[test]

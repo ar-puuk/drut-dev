@@ -12,6 +12,10 @@ fn text_input(text: &str) -> FormatInput {
             path: None,
         },
         casing: None,
+        control_words_casing: None,
+        pair_keywords_casing: None,
+        data_references_casing: None,
+        indent_width: None,
         top_level_indent: None,
         isolated: None,
     }

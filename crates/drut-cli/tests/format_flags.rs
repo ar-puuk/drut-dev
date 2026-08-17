@@ -431,3 +431,150 @@ fn isolated_ignores_a_present_valid_drut_toml_entirely() {
         "isolated must match built-in defaults exactly, as if no drut.toml existed"
     );
 }
+
+// -- 017-casing-categories-indent-width: per-category flags, indent-width,
+// and the literal reported gap (tasks.md T016/T018/T019/T020/T021/T030/T039) --
+
+#[test]
+fn data_references_casing_flag_reaches_tokens_control_words_casing_cannot() {
+    // US2: the literal reported gap (GitHub issue #3) -- mw/li/ni/i/j
+    // uppercased via a flag that never existed before this feature.
+    let dir = TempDir::new("data-references-casing");
+    let file = dir.path().join("x.s");
+    fs::write(&file, "mw[1] = mi.1.1\nx = li.FT\ny = ni.CLASS\nif (i=25) z = j\n").unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--data-references-casing=upper"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "MW[1] = MI.1.1\nx = LI.FT\ny = NI.CLASS\nif (I=25) Z = J\n"
+    );
+}
+
+#[test]
+fn data_references_casing_left_at_preserve_by_default_leaves_the_reported_tokens_untouched() {
+    // US2 Acceptance Scenario 3 -- opt-in only, no --data-references-casing
+    // flag at all, no drut.toml.
+    let dir = TempDir::new("data-references-preserve-default");
+    let file = dir.path().join("x.s");
+    let src = "mw[1] = mi.1.1\nx = li.FT\ny = ni.CLASS\nif (i=25) z = j\nzones = 1\n";
+    fs::write(&file, src).unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(String::from_utf8_lossy(&out.stdout), src, "no flag, no drut.toml -- byte-identical (FR-012)");
+}
+
+#[test]
+fn mw_pair_keyword_shaped_and_assignment_target_shaped_both_uppercase_together() {
+    // FR-005, proven at the CLI/format() level (not just data_reference.rs's
+    // own lower-level recognition tests) -- one flag, uniform result
+    // regardless of structural shape.
+    let dir = TempDir::new("mw-uniform-shape");
+    let file = dir.path().join("x.s");
+    fs::write(&file, "pathload path=time, mw[201]=mi.1.1\nmw[1] = mi.2.1\n").unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--data-references-casing=upper"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "pathload path=time, MW[201]=MI.1.1\nMW[1] = MI.2.1\n"
+    );
+}
+
+#[test]
+fn all_three_casing_categories_set_independently_in_one_run() {
+    // US1 Acceptance Scenario 1: a script mixing all three token kinds,
+    // three different explicit values, each category's tokens change
+    // independently and no category's setting leaks into another's.
+    let dir = TempDir::new("three-categories");
+    let file = dir.path().join("x.s");
+    fs::write(&file, "if (x=1)\nfile=out.txt\ny = mi.1.1\nendif\n").unwrap();
+
+    let out = drut(&[
+        "format",
+        file.to_str().unwrap(),
+        "--control-words-casing=upper",
+        "--pair-keywords-casing=preserve",
+        "--data-references-casing=lower",
+    ]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "IF (x=1)\n    file=out.txt\n    y = mi.1.1\nENDIF\n",
+        "control_words upper, pair_keywords untouched (already lowercase), data_references already lowercase (no-op)"
+    );
+}
+
+#[test]
+fn granular_casing_flag_overrides_legacy_casing_flag_for_its_own_category_only() {
+    let dir = TempDir::new("granular-overrides-legacy");
+    let file = dir.path().join("x.s");
+    fs::write(&file, "if (x=1)\nmw[1] = 1\nendif\n").unwrap();
+
+    let out = drut(&[
+        "format",
+        file.to_str().unwrap(),
+        "--casing=upper",
+        "--data-references-casing=lower",
+    ]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "IF (x=1)\n    mw[1] = 1\nENDIF\n",
+        "legacy --casing still governs control_words, but the granular flag wins for data_references"
+    );
+}
+
+#[test]
+fn data_references_casing_rejects_auto_as_a_usage_error() {
+    // FR-003: no built-in preset ships with this feature -- "auto" is not
+    // a valid value at any casing flag, old or new.
+    let dir = TempDir::new("data-references-casing-auto-rejected");
+    let file = dir.path().join("x.s");
+    fs::write(&file, MESSY).unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--data-references-casing=auto"]);
+    assert_ne!(out.status.code(), Some(0));
+    assert_eq!(fs::read_to_string(&file).unwrap(), MESSY);
+}
+
+#[test]
+fn indent_width_flag_overrides_the_built_in_default() {
+    let dir = TempDir::new("indent-width-flag");
+    let file = dir.path().join("x.s");
+    fs::write(&file, "IF (X=1)\nLOOP i=1,5\nY = 2\nENDLOOP\nENDIF\n").unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--indent-width=2"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "IF (X=1)\n  LOOP i=1,5\n    Y = 2\n  ENDLOOP\nENDIF\n"
+    );
+}
+
+#[test]
+fn indent_width_out_of_range_is_a_usage_error_not_a_silent_clamp() {
+    // The CLI validates its own range at the argument-parsing layer (a
+    // clean usage error) -- distinct from a drut.toml value out of range,
+    // which degrades non-fatally instead (data-model.md §4).
+    let dir = TempDir::new("indent-width-out-of-range");
+    let file = dir.path().join("x.s");
+    fs::write(&file, MESSY).unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--indent-width=0"]);
+    assert_ne!(out.status.code(), Some(0));
+    assert_eq!(fs::read_to_string(&file).unwrap(), MESSY);
+}
+
+#[test]
+fn drut_toml_indent_width_governs_output_with_no_flag_passed() {
+    let dir = TempDir::new("toml-indent-width");
+    fs::write(dir.path().join("drut.toml"), "[format]\nindent_width = 2\n").unwrap();
+    let file = dir.path().join("x.s");
+    fs::write(&file, "IF (X=1)\nY = 2\nENDIF\n").unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "IF (X=1)\n  Y = 2\nENDIF\n");
+}

@@ -9,6 +9,7 @@
 
 pub mod block;
 pub mod block_resolution;
+pub mod data_reference;
 pub mod decode;
 pub mod diagnostic;
 pub mod format;
@@ -22,10 +23,11 @@ pub mod token_resolution;
 
 pub use block::{Block, BlockKind};
 pub use block_resolution::{all_blocks, block_at, BlockFold, BlockInfo, BlockKindName};
+pub use data_reference::{data_reference_entries, data_reference_occurrences, DataReferenceEntry, DataReferenceOccurrence};
 pub use diagnostic::{Diagnostic, DiagnosticKind};
 pub use format::{
-    format, format_bytes, unclosed_fmt_off_markers, CasingConvention, EncodingFidelity, FormatOptions, FormatResult,
-    TopLevelIndentMode,
+    format, format_bytes, unclosed_fmt_off_markers, CasingConvention, CasingSettings, EncodingFidelity, FormatOptions,
+    FormatResult, TopLevelIndentMode,
 };
 pub use keywords::{completion_candidates, did_you_mean, CompletionContext, KeywordEntry, KeywordRole};
 pub use span::{Position, Span};

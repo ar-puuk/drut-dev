@@ -25,6 +25,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::block::{Block, BlockKind};
+use crate::data_reference;
 use crate::decode;
 use crate::diagnostic::{Diagnostic, DiagnosticKind};
 use crate::lexer::tokenize;
@@ -32,11 +33,6 @@ use crate::span::{Position, Span};
 use crate::statement::{pair_keyword_boundaries, Statement, StatementKind};
 use crate::token::{Token, TokenKind};
 use crate::{parse, Node};
-
-/// 4 spaces per nesting level, relative to the enclosing block's own
-/// opening-statement column — confirmed dominant in a 161-file corpus survey
-/// (82.4% of real body-indent occurrences; spec.md FR-012).
-const INDENT_WIDTH: usize = 4;
 
 /// The three supported keyword-casing targets (spec.md FR-015, amended by
 /// `014-casing-preserve-mode` FR-001). `Preserve` is the `#[default]` —
@@ -69,18 +65,68 @@ pub enum TopLevelIndentMode {
     Normalize,
 }
 
+/// Three independently-configurable casing categories (spec.md FR-001,
+/// `017-casing-categories-indent-width`) — replaces the single flat
+/// `CasingConvention` `FormatOptions.casing` used to be. Each field defaults
+/// to `Preserve` via `CasingConvention`'s own `#[default]`, so this struct
+/// needs no manual `Default` impl of its own. No built-in opinionated
+/// preset/"auto" value exists anywhere in this shape (FR-003) — every field
+/// is only ever `Preserve`, `Upper`, or `Lower`, the project's own explicit
+/// choice or nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct CasingSettings {
+    /// Block-structural reserved syntax — `IF`, `LOOP`, `RUN`, etc.
+    pub control_words: CasingConvention,
+    /// `keyword=value` statement parameter names — `FILE=`, `LIST=`, etc.
+    pub pair_keywords: CasingConvention,
+    /// Matrix/Line/Node/Zone/Database abbreviations, the output-record and
+    /// link-endpoint tokens, and the two reserved implicit loop-index
+    /// identifiers (`I`/`J`) — data_reference.rs's recognized-name table.
+    /// One value applies uniformly regardless of which structural shape a
+    /// given occurrence takes (FR-005).
+    pub data_references: CasingConvention,
+}
+
 /// Caller-supplied configuration for one `format`/`format_bytes` call.
-#[derive(Debug, Clone, Copy, Default)]
+///
+/// **No longer `#[derive(Default)]`** (`017-casing-categories-indent-width`):
+/// `indent_width`'s correct default is `4`, not `u8::default()`'s `0` — the
+/// first field on this struct whose default isn't just its own type's
+/// `Default::default()` (research.md §4). See the `impl Default` below.
+#[derive(Debug, Clone, Copy)]
 pub struct FormatOptions {
-    /// Defaults to `Preserve` (FR-015, amended by `014-casing-preserve-
-    /// mode` FR-002) via `CasingConvention`'s own `#[default]` — the same
-    /// non-optional shape `top_level_indent` already uses on this struct.
-    pub casing: CasingConvention,
+    /// Defaults to `CasingSettings::default()` (all three fields
+    /// `Preserve`) — `017-casing-categories-indent-width` widened this from
+    /// a single `CasingConvention` to three independently-configurable
+    /// categories; every already-shipped caller that only ever set/read the
+    /// old single value now reads/writes `control_words`/`pair_keywords`
+    /// (the two categories the old value already reached).
+    pub casing: CasingSettings,
     /// Defaults to `Preserve` (FR-001) via `TopLevelIndentMode`'s own
     /// `#[default]` — every call site is still individually verified
     /// (`009-top-level-indent-toggle`/research.md §2), not trusted
     /// transitively from this derive alone.
     pub top_level_indent: TopLevelIndentMode,
+    /// Spaces per nesting level of block indentation, relative to the
+    /// enclosing block's own opening-statement column (spec.md FR-009,
+    /// `017-casing-categories-indent-width`). Defaults to `4` (see `impl
+    /// Default` below) — confirmed dominant in a 161-file corpus survey
+    /// (82.4% of real body-indent occurrences; `002-cli-check-format`
+    /// FR-012), the fixed value every format call used before this field
+    /// existed. Accepts any `u8` here; the 1–16 valid-range bound is a
+    /// `drut-config`-layer policy decision, not a fact this crate enforces
+    /// (research.md §4).
+    pub indent_width: u8,
+}
+
+impl Default for FormatOptions {
+    fn default() -> Self {
+        FormatOptions {
+            casing: CasingSettings::default(),
+            top_level_indent: TopLevelIndentMode::default(),
+            indent_width: 4,
+        }
+    }
 }
 
 /// How `format_bytes`'s decoding of the input relates to what's safe to
@@ -203,11 +249,34 @@ fn render(source: &str, nodes: &[Node], diagnostics: &[Diagnostic], options: For
 
     let diagnosed_openers = diagnosed_block_openers(diagnostics);
     let mut indent_plan: IndentPlan = BTreeMap::new();
-    plan_indentation(nodes, &char_lines, &diagnosed_openers, &protected, options.top_level_indent, &mut indent_plan);
+    plan_indentation(
+        nodes,
+        &char_lines,
+        &diagnosed_openers,
+        &protected,
+        options.top_level_indent,
+        options.indent_width as usize,
+        &mut indent_plan,
+    );
 
     let mut casing_edits: Vec<CasingEdit> = Vec::new();
-    if options.casing != CasingConvention::Preserve {
+    // Performance short-circuit only, not a correctness requirement —
+    // edit_for_span's Preserve arm already produces a guaranteed no-op
+    // (replacement == original) for any category left at Preserve.
+    if options.casing.control_words != CasingConvention::Preserve
+        || options.casing.pair_keywords != CasingConvention::Preserve
+        || options.casing.data_references != CasingConvention::Preserve
+    {
         collect_casing_edits(nodes, &char_lines, &protected, options.casing, &mut casing_edits);
+        for occurrence in data_reference::data_reference_occurrences(nodes, &char_lines) {
+            push_if_present(
+                &mut casing_edits,
+                &char_lines,
+                &protected,
+                occurrence.span,
+                options.casing.data_references,
+            );
+        }
     }
     let mut edits_by_line: BTreeMap<u32, Vec<(usize, usize, String)>> = BTreeMap::new();
     for (line, start, end, text) in casing_edits {
@@ -439,6 +508,7 @@ fn plan_indentation(
     diagnosed_openers: &BTreeSet<Position>,
     protected: &BTreeSet<u32>,
     mode: TopLevelIndentMode,
+    indent_width: usize,
     plan: &mut IndentPlan,
 ) {
     for node in nodes {
@@ -449,7 +519,7 @@ fn plan_indentation(
             }
         }
         if let Node::Block(block) = node {
-            plan_block(block, lines, diagnosed_openers, protected, plan);
+            plan_block(block, lines, diagnosed_openers, protected, indent_width, plan);
         }
     }
 }
@@ -459,6 +529,7 @@ fn plan_block(
     lines: &[Vec<char>],
     diagnosed_openers: &BTreeSet<Position>,
     protected: &BTreeSet<u32>,
+    indent_width: usize,
     plan: &mut IndentPlan,
 ) {
     let opener_line = block.span.start.line;
@@ -510,15 +581,16 @@ fn plan_block(
                 if idx > 0 && branch_line != opener_line && !protected.contains(&branch_line) {
                     plan.insert(branch_line, base);
                 }
-                plan_children(&branch.children, branch_line, base, lines, diagnosed_openers, protected, plan);
+                plan_children(&branch.children, branch_line, base, lines, diagnosed_openers, protected, indent_width, plan);
             }
         }
         _ => {
-            plan_children(&block.children, opener_line, base, lines, diagnosed_openers, protected, plan);
+            plan_children(&block.children, opener_line, base, lines, diagnosed_openers, protected, indent_width, plan);
         }
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn plan_children(
     children: &[Node],
     opener_line: u32,
@@ -526,6 +598,7 @@ fn plan_children(
     lines: &[Vec<char>],
     diagnosed_openers: &BTreeSet<Position>,
     protected: &BTreeSet<u32>,
+    indent_width: usize,
     plan: &mut IndentPlan,
 ) {
     for child in children {
@@ -534,10 +607,10 @@ fn plan_children(
         // touched (spec.md FR-012's body-indent rule only applies when the
         // child starts on its own line).
         if child_line != opener_line && !protected.contains(&child_line) {
-            plan.insert(child_line, base + INDENT_WIDTH);
+            plan.insert(child_line, base + indent_width);
         }
         if let Node::Block(b) = child {
-            plan_block(b, lines, diagnosed_openers, protected, plan);
+            plan_block(b, lines, diagnosed_openers, protected, indent_width, plan);
         }
     }
 }
@@ -623,13 +696,13 @@ fn collect_casing_edits(
     nodes: &[Node],
     lines: &[Vec<char>],
     protected: &BTreeSet<u32>,
-    convention: CasingConvention,
+    settings: CasingSettings,
     edits: &mut Vec<CasingEdit>,
 ) {
     for node in nodes {
         match node {
-            Node::Statement(stmt) => collect_statement_casing_edits(stmt, lines, protected, convention, edits),
-            Node::Block(block) => collect_block_casing_edits(block, lines, protected, convention, edits),
+            Node::Statement(stmt) => collect_statement_casing_edits(stmt, lines, protected, settings, edits),
+            Node::Block(block) => collect_block_casing_edits(block, lines, protected, settings, edits),
         }
     }
 }
@@ -638,18 +711,28 @@ fn collect_block_casing_edits(
     block: &Block,
     lines: &[Vec<char>],
     protected: &BTreeSet<u32>,
-    convention: CasingConvention,
+    settings: CasingSettings,
     edits: &mut Vec<CasingEdit>,
 ) {
     // The opener statement's own keyword=value pair names (RUN PGM=...,
-    // etc.) — already exact token spans, no scanning needed.
+    // etc.) — already exact token spans, no scanning needed. Pair-keyword
+    // names, not control words, so `settings.pair_keywords` applies here —
+    // except a name data_reference.rs also recognizes (e.g. `ZONES` in
+    // `RUN PGM=MATRIX ZONES=5`), which data_references casing owns
+    // exclusively (FR-005); skipped here so it's never queued for two
+    // different conventions at once.
     for span in &block.opener_pairs {
-        push_if_present(edits, lines, protected, *span, convention);
+        if let Some(text) = data_reference::text_at_span(lines, *span) {
+            if data_reference::is_data_reference_name(&text) {
+                continue;
+            }
+        }
+        push_if_present(edits, lines, protected, *span, settings.pair_keywords);
     }
-    // The explicit closer's own word, if one exists.
+    // The explicit closer's own word, if one exists — a control word.
     if let Some(closer_span) = block.closer {
         if let Some(word_span) = first_word_span(lines, closer_span.start) {
-            push_if_present(edits, lines, protected, word_span, convention);
+            push_if_present(edits, lines, protected, word_span, settings.control_words);
         }
     }
 
@@ -657,18 +740,19 @@ fn collect_block_casing_edits(
         BlockKind::If { branches } => {
             for branch in branches {
                 // Covers IF (idx 0) and ELSEIF/ELSE (idx > 0) uniformly —
-                // all are just "the word starting at this branch's span".
+                // all are just "the word starting at this branch's span",
+                // and all are control words.
                 if let Some(word_span) = first_word_span(lines, branch.span.start) {
-                    push_if_present(edits, lines, protected, word_span, convention);
+                    push_if_present(edits, lines, protected, word_span, settings.control_words);
                 }
-                collect_casing_edits(&branch.children, lines, protected, convention, edits);
+                collect_casing_edits(&branch.children, lines, protected, settings, edits);
             }
         }
         _ => {
             if let Some(word_span) = first_word_span(lines, block.span.start) {
-                push_if_present(edits, lines, protected, word_span, convention);
+                push_if_present(edits, lines, protected, word_span, settings.control_words);
             }
-            collect_casing_edits(&block.children, lines, protected, convention, edits);
+            collect_casing_edits(&block.children, lines, protected, settings, edits);
         }
     }
 }
@@ -677,12 +761,14 @@ fn collect_statement_casing_edits(
     stmt: &Statement,
     lines: &[Vec<char>],
     protected: &BTreeSet<u32>,
-    convention: CasingConvention,
+    settings: CasingSettings,
     edits: &mut Vec<CasingEdit>,
 ) {
     if !matches!(stmt.kind, StatementKind::Control { .. }) {
         // Casing never targets Assignment/Label/ShellEscape content — none
         // of those are "control-word/keyword-name" tokens (FR-015).
+        // (data_references casing on an Assignment target is handled
+        // separately, in render(), via data_reference_occurrences.)
         return;
     }
     // The control word: the first Word-kind token — handles `!RUN`
@@ -690,12 +776,18 @@ fn collect_statement_casing_edits(
     // the ordinary case (tokens[0] itself is the Word) needing no special
     // branch.
     if let Some(word_tok) = stmt.tokens.iter().find(|t| t.kind == TokenKind::Word) {
-        push_if_present(edits, lines, protected, word_tok.span, convention);
+        push_if_present(edits, lines, protected, word_tok.span, settings.control_words);
     }
     // Pair keyword names — never their values, never subscript contents.
+    // A name data_reference.rs also recognizes (e.g. `DBI` in `FILEI
+    // DBI=...`) is skipped here — data_references casing owns it
+    // exclusively (FR-005), never queued for two conventions at once.
     for (kw_start, _eq_idx) in pair_keyword_boundaries(&stmt.tokens) {
         if let Some(tok) = stmt.tokens.get(kw_start) {
-            push_if_present(edits, lines, protected, tok.span, convention);
+            if data_reference::is_data_reference_name(&tok.text) {
+                continue;
+            }
+            push_if_present(edits, lines, protected, tok.span, settings.pair_keywords);
         }
     }
 }
@@ -706,19 +798,89 @@ mod tests {
 
     fn upper() -> FormatOptions {
         FormatOptions {
-            casing: CasingConvention::Upper,
+            // Exactly reproduces pre-017 `CasingConvention::Upper`'s reach:
+            // control words + pair keywords, never data-references — so
+            // every existing assertion below that used upper() keeps
+            // passing unmodified (017-casing-categories-indent-width
+            // tasks.md T007).
+            casing: CasingSettings {
+                control_words: CasingConvention::Upper,
+                pair_keywords: CasingConvention::Upper,
+                data_references: CasingConvention::Preserve,
+            },
             top_level_indent: TopLevelIndentMode::default(),
+            indent_width: 4,
         }
     }
 
     fn normalize() -> FormatOptions {
         FormatOptions {
-            casing: CasingConvention::Preserve,
+            casing: CasingSettings::default(),
             top_level_indent: TopLevelIndentMode::Normalize,
+            indent_width: 4,
         }
     }
 
     // -- Indentation -----------------------------------------------------
+
+    #[test]
+    fn indent_width_default_is_four() {
+        // 017-casing-categories-indent-width tasks.md T028.
+        assert_eq!(FormatOptions::default().indent_width, 4);
+    }
+
+    #[test]
+    fn nested_blocks_advance_by_configured_indent_width_not_the_old_fixed_four() {
+        // 017-casing-categories-indent-width tasks.md T028, US3 AS1.
+        let src = "IF (X=1)\nLOOP i=1,5\nY = 2\nENDLOOP\nENDIF\n";
+        let options = FormatOptions { indent_width: 2, ..FormatOptions::default() };
+        let out = format(src, options).text;
+        assert_eq!(out, "IF (X=1)\n  LOOP i=1,5\n    Y = 2\n  ENDLOOP\nENDIF\n");
+    }
+
+    #[test]
+    fn indent_width_unconfigured_is_byte_identical_to_pre_017_behavior() {
+        // 017-casing-categories-indent-width tasks.md T028, FR-012, US3 AS3
+        // -- FormatOptions::default() must reproduce exactly what the old
+        // fixed INDENT_WIDTH constant produced, for every existing golden
+        // fixture (proven at scale by format_corpus.rs's own golden-file
+        // suite; this is the single most direct unit-level confirmation).
+        let src = "IF (X=1)\nLOOP i=1,5\nY = 2\nENDLOOP\nENDIF\n";
+        let out = format(src, FormatOptions::default()).text;
+        assert_eq!(
+            out,
+            "IF (X=1)\n    LOOP i=1,5\n        Y = 2\n    ENDLOOP\nENDIF\n"
+        );
+    }
+
+    #[test]
+    fn indent_width_is_idempotent() {
+        // 017-casing-categories-indent-width tasks.md T040 (post-/speckit-
+        // analyze finding I1) -- re-verified directly for a non-default
+        // width, not assumed to hold transitively from the default-width
+        // idempotence tests elsewhere in this module.
+        let src = "IF (X=1)\nLOOP i=1,5\nY = 2\nENDLOOP\nENDIF\n";
+        let options = FormatOptions { indent_width: 2, ..FormatOptions::default() };
+        let once = format(src, options).text;
+        let twice = format(&once, options).text;
+        assert_eq!(once, twice);
+    }
+
+    #[test]
+    fn indent_width_respects_fmt_off_on() {
+        // 017-casing-categories-indent-width tasks.md T040 (finding I1): a
+        // nested block inside a `; FMT: OFF` region keeps its exact
+        // original indentation regardless of indent_width, while an
+        // unprotected nested region elsewhere in the same file reflects
+        // the configured width.
+        let src = "IF (X=1)\n; FMT: OFF\nLOOP i=1,5\n      Y = 2\nENDLOOP\n; FMT: ON\nENDIF\nIF (X=2)\nLOOP j=1,5\nZ = 3\nENDLOOP\nENDIF\n";
+        let options = FormatOptions { indent_width: 2, ..FormatOptions::default() };
+        let out = format(src, options).text;
+        assert_eq!(
+            out,
+            "IF (X=1)\n; FMT: OFF\nLOOP i=1,5\n      Y = 2\nENDLOOP\n; FMT: ON\nENDIF\nIF (X=2)\n  LOOP j=1,5\n    Z = 3\n  ENDLOOP\nENDIF\n"
+        );
+    }
 
     #[test]
     fn nested_if_loop_gets_four_space_increments() {
@@ -956,8 +1118,12 @@ mod tests {
     fn format_options_default_casing_is_preserve() {
         // 014-casing-preserve-mode FR-002/SC-003 (point 2 of 3) -- the
         // single most direct confirmation of User Story 3, distinct from
-        // the behavioral tests around it.
-        assert_eq!(FormatOptions::default().casing, CasingConvention::Preserve);
+        // the behavioral tests around it. 017-casing-categories-indent-
+        // width: casing is now three independent fields, all Preserve.
+        assert_eq!(FormatOptions::default().casing, CasingSettings::default());
+        assert_eq!(FormatOptions::default().casing.control_words, CasingConvention::Preserve);
+        assert_eq!(FormatOptions::default().casing.pair_keywords, CasingConvention::Preserve);
+        assert_eq!(FormatOptions::default().casing.data_references, CasingConvention::Preserve);
     }
 
     #[test]
@@ -969,8 +1135,9 @@ mod tests {
         // FormatOptions::default().
         let src = "if (x=1)\nrun pgm=matrix\nendrun\nendif\n";
         let options = FormatOptions {
-            casing: CasingConvention::Preserve,
+            casing: CasingSettings::default(),
             top_level_indent: TopLevelIndentMode::default(),
+            indent_width: 4,
         };
         let out = format(src, options).text;
         assert_eq!(out, "if (x=1)\n    run pgm=matrix\n    endrun\nendif\n");
@@ -985,9 +1152,46 @@ mod tests {
 
     #[test]
     fn casing_upper_rewrites_run_pgm_pair_keyword() {
-        let src = "run pgm=matrix zones=5\nendrun\n";
+        // "msg", not "zones" -- 017-casing-categories-indent-width: ZONES is
+        // now a data_references-category name (FR-005), so with upper()'s
+        // data_references left at Preserve, a ZONES pair here would no
+        // longer be touched by pair_keywords casing (see
+        // zones_pair_keyword_is_owned_by_data_references_not_pair_keywords
+        // below for that exact behavior, deliberately proven).
+        let src = "run pgm=matrix msg=hi\nendrun\n";
         let out = format(src, upper()).text;
-        assert_eq!(out, "RUN PGM=matrix ZONES=5\nENDRUN\n");
+        assert_eq!(out, "RUN PGM=matrix MSG=hi\nENDRUN\n");
+    }
+
+    #[test]
+    fn zones_pair_keyword_is_owned_by_data_references_not_pair_keywords() {
+        // FR-005: ZONES appears in RUN's own opener pairs, but it's a
+        // data_references-category name -- pair_keywords casing must skip
+        // it, and data_references casing must be the one that reaches it.
+        let src = "run pgm=matrix zones=5\nendrun\n";
+        let pair_keywords_only = FormatOptions {
+            casing: CasingSettings {
+                control_words: CasingConvention::Preserve,
+                pair_keywords: CasingConvention::Upper,
+                data_references: CasingConvention::Preserve,
+            },
+            top_level_indent: TopLevelIndentMode::default(),
+            indent_width: 4,
+        };
+        let out = format(src, pair_keywords_only).text;
+        assert_eq!(out, "run PGM=matrix zones=5\nendrun\n", "pair_keywords alone must not touch zones: {out}");
+
+        let data_references_only = FormatOptions {
+            casing: CasingSettings {
+                control_words: CasingConvention::Preserve,
+                pair_keywords: CasingConvention::Preserve,
+                data_references: CasingConvention::Upper,
+            },
+            top_level_indent: TopLevelIndentMode::default(),
+            indent_width: 4,
+        };
+        let out = format(src, data_references_only).text;
+        assert_eq!(out, "run pgm=matrix ZONES=5\nendrun\n", "data_references alone must reach zones: {out}");
     }
 
     #[test]
@@ -1024,8 +1228,13 @@ mod tests {
         let out = format(
             src,
             FormatOptions {
-                casing: CasingConvention::Lower,
+                casing: CasingSettings {
+                    control_words: CasingConvention::Lower,
+                    pair_keywords: CasingConvention::Lower,
+                    data_references: CasingConvention::Preserve,
+                },
                 top_level_indent: TopLevelIndentMode::default(),
+                indent_width: 4,
             },
         )
         .text;
@@ -1038,6 +1247,42 @@ mod tests {
         let once = format(src, upper()).text;
         let twice = format(&once, upper()).text;
         assert_eq!(once, twice);
+    }
+
+    fn data_references_upper() -> FormatOptions {
+        FormatOptions {
+            casing: CasingSettings {
+                control_words: CasingConvention::Preserve,
+                pair_keywords: CasingConvention::Preserve,
+                data_references: CasingConvention::Upper,
+            },
+            top_level_indent: TopLevelIndentMode::default(),
+            indent_width: 4,
+        }
+    }
+
+    #[test]
+    fn data_references_casing_is_idempotent() {
+        // 017-casing-categories-indent-width tasks.md T038 (post-/speckit-
+        // analyze finding I1) -- re-verified directly, not assumed to hold
+        // transitively from the control_words/pair_keywords idempotence
+        // test above.
+        let src = "mw[1] = mi.1.1 + mi.2.1\nx = li.FT\n";
+        let once = format(src, data_references_upper()).text;
+        let twice = format(&once, data_references_upper()).text;
+        assert_eq!(once, twice);
+    }
+
+    #[test]
+    fn data_references_casing_respects_fmt_off_on() {
+        // 017-casing-categories-indent-width tasks.md T038 (finding I1):
+        // a data-reference token inside a `; FMT: OFF` region must be left
+        // exactly as written, the same guarantee every other casing
+        // category already has -- while an unprotected occurrence
+        // elsewhere in the same file still gets rewritten.
+        let src = "; FMT: OFF\nmw[1] = mi.1.1\n; FMT: ON\nmw[2] = mi.2.1\n";
+        let out = format(src, data_references_upper()).text;
+        assert_eq!(out, "; FMT: OFF\nmw[1] = mi.1.1\n; FMT: ON\nMW[2] = MI.2.1\n");
     }
 
     // -- format_bytes / EncodingFidelity ------------------------------------

@@ -67,8 +67,18 @@ fn parse_format_table(path: &Path, table: &toml::Table, warnings: &mut Vec<Confi
 
     for (key, value) in table {
         match key.as_str() {
-            "casing" => format.casing = parse_casing(path, value, warnings),
+            "casing" => format.casing = parse_casing(path, "casing", value, warnings),
+            "control_words_casing" => {
+                format.control_words_casing = parse_casing(path, "control_words_casing", value, warnings)
+            }
+            "pair_keywords_casing" => {
+                format.pair_keywords_casing = parse_casing(path, "pair_keywords_casing", value, warnings)
+            }
+            "data_references_casing" => {
+                format.data_references_casing = parse_casing(path, "data_references_casing", value, warnings)
+            }
             "top_level_indent" => format.top_level_indent = parse_top_level_indent(path, value, warnings),
+            "indent_width" => format.indent_width = parse_indent_width(path, value, warnings),
             other => warnings.push(ConfigWarning::UnrecognizedKey {
                 path: path.to_path_buf(),
                 table: "format".to_string(),
@@ -89,8 +99,16 @@ fn invalid_value(path: &Path, key: &str, message: String) -> ConfigWarning {
     }
 }
 
+/// Shared by the legacy `casing` field and the three new granular
+/// `*_casing` fields (`017-casing-categories-indent-width`) — identical
+/// accepted-value shape (`"preserve"`/`"upper"`/`"lower"`) at every one of
+/// them; `"auto"` (or any other string) is deliberately just another
+/// unrecognized value here, not a special case — this feature ships no
+/// built-in preset (FR-003), so there is nothing for a fourth named value
+/// to mean.
 fn parse_casing(
     path: &Path,
+    key: &str,
     value: &toml::Value,
     warnings: &mut Vec<ConfigWarning>,
 ) -> Option<voyager_core::CasingConvention> {
@@ -101,7 +119,7 @@ fn parse_casing(
         Some(other) => {
             warnings.push(invalid_value(
                 path,
-                "casing",
+                key,
                 format!("must be \"preserve\", \"upper\", or \"lower\", got {other:?}"),
             ));
             None
@@ -109,8 +127,37 @@ fn parse_casing(
         None => {
             warnings.push(invalid_value(
                 path,
-                "casing",
+                key,
                 format!("must be a string (\"preserve\", \"upper\", or \"lower\"), got {value:?}"),
+            ));
+            None
+        }
+    }
+}
+
+/// `017-casing-categories-indent-width`. Accepts any TOML integer here —
+/// the 1–16 valid-range bound is enforced later, at
+/// `resolve_format_options`'s resolve layer (data-model.md §4), not during
+/// parsing; a value here that's merely the wrong *type* (not an integer at
+/// all) is still a parse-level `InvalidValue`, same as every other field.
+fn parse_indent_width(path: &Path, value: &toml::Value, warnings: &mut Vec<ConfigWarning>) -> Option<u8> {
+    match value.as_integer() {
+        Some(n) => match u8::try_from(n) {
+            Ok(width) => Some(width),
+            Err(_) => {
+                warnings.push(invalid_value(
+                    path,
+                    "indent_width",
+                    format!("must be an integer between 1 and 16, got {n}"),
+                ));
+                None
+            }
+        },
+        None => {
+            warnings.push(invalid_value(
+                path,
+                "indent_width",
+                format!("must be an integer between 1 and 16, got {value:?}"),
             ));
             None
         }

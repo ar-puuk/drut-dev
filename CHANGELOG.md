@@ -11,6 +11,32 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+### Added
+
+- Casing is now three independently-configurable settings instead of one:
+  `control_words`, `pair_keywords`, and a new `data_references` category
+  covering the Matrix/Line/Node/Zone/Database abbreviations (`MI`/`MO`/`MW`,
+  `LI`/`LW`, `NI`/`NW`, `ZI`/`ZONES`/`Z`, `DBI`/`DBA`), `RO`, the link
+  endpoint fields `A`/`B`, and the reserved loop-index identifiers `I`/`J`
+  — all previously untouched by casing no matter what was configured.
+  Each of the three accepts `upper`/`lower`/`preserve` independently (still
+  defaulting to `preserve`) via `drut.toml`, the CLI, and the MCP `format`
+  tool; the existing flat `casing` setting keeps working exactly as before
+  (still covers `control_words`+`pair_keywords` together) alongside the new
+  per-category controls. No built-in "auto" or opinionated preset ships —
+  every value comes from a project's own configuration.
+- `indent_width` is now a configurable `[format]` setting (default `4`,
+  matching prior behavior), alongside `casing`/`top_level_indent`.
+
+### Fixed
+
+- `NUMREC`, `CNT`, `ITER`, `LP`, and `RECNUM` no longer appear as completion/
+  spell-check suggestions for a `LOOP` statement's variable-name position —
+  they were never real Voyager keywords, just names a prior census
+  mistakenly picked up (the position genuinely accepts any user-chosen
+  name). `ZONES` was added in their place, a real, previously-missing
+  keyword.
+
 ## [0.1.3] - 2026-08-16
 
 ### Added

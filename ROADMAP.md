@@ -116,8 +116,9 @@ already been researched or partially unblocked; see the note per item.
      folding in action) — this matters a lot for Marketplace conversion and
      needs real captures from the actual running extension, not a mockup.
      Owner-scoped, same as the icon was.
-9. **`indent_width` becomes a configurable `[format]` setting** — *queued,
-   not started* (added 2026-08-13). **Explicitly a deliberate owner decision,
+9. **`indent_width` becomes a configurable `[format]` setting** — ✅ *done,
+   implemented 2026-08-17 as part of `017-casing-categories-indent-width`*
+   (added 2026-08-13). **Explicitly a deliberate owner decision,
    not an evidence-driven one** — recorded honestly as such, the same way
    `008`'s default-reversal and `009`'s later correction of it were both
    recorded rather than smoothed over. Immediately before this was queued, a
@@ -159,11 +160,103 @@ already been researched or partially unblocked; see the note per item.
      failure.
    - **Sequencing**: full spec-kit cycle when started, same rigor as
      `009`/`012`/`014` (touches `drut-config`, all three adapters, and
-     `format.rs`'s core indentation math). **Held, not started**, until the
-     owner finishes reviewing and committing the in-flight README/
-     CONTRIBUTING.md restructure and constitution amendment — not a
-     technical dependency, an explicit sequencing choice to avoid
-     interleaving unrelated in-flight work.
+     `format.rs`'s core indentation math). **Update 2026-08-17**: the prior
+     hold is lifted — owner decision, bundled into the same spec-kit cycle
+     as item 10 below (both add fields to the same `[format]` table, same
+     adapters touched).
+10. **`--casing` reframed as a 3-category `drut.toml` setting, `auto`
+    dropped entirely** — ✅ *done, implemented 2026-08-17 as
+    `017-casing-categories-indent-width`, bundled with item 9*. Supersedes
+    resolved-queued item 4
+    below — real corpus/vendor-doc evidence plus direct stakeholder input
+    (`casing-convention-decision.csv`, Bill and Chris's per-token opinions,
+    GitHub issue #3) settled what item 4 left as an open philosophy
+    question. Two changes from item 4's original framing:
+    - **No `auto`/preset mode.** Item 4's blocking "real-usage-fidelity vs.
+      vendor-canon-fidelity" question (see "Open questions" below — now
+      resolved as moot) doesn't need answering, because drut ships no
+      opinionated house style at all. Each project states its own
+      preference in its own `drut.toml`; the tool imposes nothing beyond
+      the existing `Preserve` default.
+    - **Three independently-configurable categories**: `control_words`
+      (the existing `CONTROL` role), `pair_keywords` (the existing
+      `PAIRKEYWORD` role), and `data_references` (a new role covering
+      `MI`/`MO`/`MW`, `LI`/`LW`, `NI`/`NW`, `ZI`/`ZONES`/`Z`, `DBI`/`DBA`,
+      `RO`, `A`/`B`, `I`/`J` — merging item 4's originally-separate
+      `OPERAND_PREFIX` and `ASSIGNMENT_TARGET` roles into one user-facing
+      knob, since nothing in the evidence supports splitting them *yet* —
+      see item 11 below for the one case that does). Each independently
+      `upper`/`lower`/`preserve`, default `preserve`.
+    - **`keywords.rs` correction found along the way**: `NUMREC`/`CNT`/
+      `ITER`/`LP`/`RECNUM` were miscategorized as `PairKeyword` dictionary
+      entries by the original census — the real `LOOP <name>=start,end
+      [,inc]` syntax takes a free-form, user-chosen loop-variable name in
+      that slot (vendor doc confirms `iter`/`INDEX`/`L3`/`_K` used
+      interchangeably across examples), so these were never real keywords.
+      Removed from the dictionary, not cased either way. `ZONES` added
+      instead — a real, previously-missing entry, confirmed dual-role
+      (pair-keyword under `RUN PGM=MATRIX`, and a plain assignment).
+    - Reaching `data_references` still needs the lexer change item 4
+      already scoped (the `.` boundary in `mi.1.1`-shaped tokens isn't a
+      token delimiter today) — unchanged core-crate scope and golden-
+      fixture review burden from item 4's original sizing.
+11. **`data_references` may need to split into a 4th category** (an
+    `assignment_targets` category, separating `MW`/`LW`/`NW`'s
+    assignment-target role — `MW[1] = ...` — from their operand-prefix-
+    read role — `mw[3]*mw[99]` — and from the pure-read tokens like `MI`/
+    `LI`) — *queued, not started, evidence captured 2026-08-17*. Real
+    evidence, not speculative: Bill's own recorded vote differs by role
+    for the same token (`UC` for `MW`'s `PATHLOAD MW[201]=` pair-keyword-
+    shaped usage, `lc` for `MW[1] = ...`'s assignment-target usage), and
+    the corpus backs the split (99.7% lowercase for the pair-keyword form,
+    n=360, near-unanimous; 85.4% lowercase for the assignment-target form,
+    n=6071, noticeably softer — real authors write these two roles
+    differently in practice). Deliberately **not** built into item 10 —
+    additive-only design: a `data_references`-default with a later,
+    optional `assignment_targets` override that falls back to
+    `data_references` when unset is a pure additive change, non-breaking
+    for anyone's existing `drut.toml`; building it speculatively now,
+    before item 10 even ships, would be exactly the premature-abstraction
+    item 10 itself was trimmed down to avoid. Revisit once item 10 has
+    real usage, or immediately if the owner (or Bill specifically) wants
+    it sooner.
+12. **`=`/operator spacing normalization** (`PHASE=ILOOP` / `PHASE =ILOOP`
+    / `PHASE= ILOOP` / `PHASE = ILOOP` all becoming one canonical form) —
+    *queued, not started, needs more research before it's spec-ready*
+    (added 2026-08-17). Confirmed genuinely new scope, not an existing
+    gap: `format.rs`/`formatting-api.md` today normalize indentation and
+    (optionally) casing only — no existing logic touches spacing around
+    `=` or any other operator, and the real corpus shows this is
+    genuinely inconsistent even within one file (e.g. `ZONES   = 1` three
+    lines from `ZONES = 1` in the same fixture). Three shapes discussed,
+    none settled yet:
+    - An `auto` mode — one space on each side of `=` — but it's not yet
+      decided how (or whether) this extends to other operators (`+`,
+      `-`, `==`, etc.) inside computed expressions; that's a materially
+      bigger, fuzzier scope than `=`-spacing alone (closer to a
+      line-reflow feature than a spacing tweak) and needs its own
+      research pass before it's folded in, not assumed.
+    - Explicit adoption of the Tidyverse (R) style-guide convention —
+      always one space around `=`, including in named/keyword-argument
+      position, which is where R's own convention deliberately differs
+      from e.g. Python's PEP 8 — needs a deeper read of the full
+      Tidyverse (and/or Air formatter) rule set before committing to it
+      as Voyager's own canonical form, not just the `=` rule in
+      isolation.
+    - A `preserve` mode (default) — leaves existing spacing exactly as
+      written, mirroring this project's own established default-to-
+      `Preserve` pattern for every other formatting axis shipped so far.
+    - **Related cases identified, not yet scoped** (ranked by how directly
+      they follow from `=`-spacing): (1) the same `=` rule applied to
+      `Assignment` statements (`MW[1]=mi.1.1` vs `MW[1] = mi.1.1`) — small,
+      direct extension; (2) comma spacing between multiple pairs on one
+      statement (`MATI=a.mat,MATO=b.mat`, real corpus already shows the
+      no-space form) — small, direct extension; (3) arithmetic/comparison
+      operator spacing inside expressions (`mi.1.1+mi.2.1`, `I==1`) — the
+      "other operators" question above, materially bigger; (4) spacing
+      between a control word and its opening paren (`IF(x)` vs `IF (x)`)
+      — a separate axis; (5) interior padding inside brackets/parens
+      (`MW[ 1 ]` vs `MW[1]`) — another separate axis.
 
 ## Resolved queued items (historical log, not part of the pre-publish sequence)
 
@@ -318,6 +411,14 @@ after this log.)
    example calling `tokenize_bytes`/`build_statements` directly, same
    approach as the RUN/IF census) if this is picked back up rather than
    trusting memory of the numbers above.
+
+   **Update 2026-08-17**: revisited — real usage did confirm this was
+   wanted (GitHub issue #3). Superseded by pre-publish sequence item 10,
+   which resolves this differently than either path sketched above: no
+   `auto` mode at all, a 3-category `drut.toml` setting instead, and the
+   `OPERAND_PREFIX`/`ASSIGNMENT_TARGET` split flagged as unreachable here
+   is deliberately deferred again as item 11, now with real evidence
+   (Bill's own split vote) rather than left as a philosophy question.
 5. **Short-form (single-line, self-closing, no explicit closer) syntax for
    other block-opening control words** — *closed, IF-only confirmed*
    (investigated 2026-08-11). Checked both archive sources' dedicated
@@ -368,6 +469,20 @@ answer:
   likely isn't token-specific: whichever philosophy is picked probably
   applies consistently across future casing decisions, not just this one
   family.
+
+  **Resolved as moot, 2026-08-17**: pre-publish sequence item 10 decided
+  not to ship any opinionated `auto`/preset mode at all, so this question
+  no longer needs an answer from drut itself — each project's own
+  `drut.toml` states its own preference, informed by whichever philosophy
+  its own authors care about, without the tool having to pick a side.
+  Separately worth recording, since it surfaced during the vendor-doc
+  research for item 10: the FORTRAN/COBOL-era all-caps convention that
+  vendor-canon uppercase likely traces back to was itself a 1950s-60s
+  hardware artifact (punch cards/line printers had no lowercase glyphs),
+  not a principled design choice — so "vendor-canon" was never actually
+  the more-authoritative side of this fork, just the older habit. Left
+  here as a closed record, not deleted, since the investigation itself
+  remains useful context.
 
 ## Later / stretch (explicitly not part of the pre-publish sequence)
 

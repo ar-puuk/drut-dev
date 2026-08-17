@@ -14,8 +14,30 @@ pub struct FormatInput {
     /// `"preserve"` / `"upper"` / `"lower"` / absent — absent means
     /// "consult the resolved `drut.toml`, then the built-in default"
     /// (012-toml-configuration), same precedence CLI flags follow.
-    /// `"preserve"` added by 014-casing-preserve-mode FR-007.
+    /// `"preserve"` added by 014-casing-preserve-mode FR-007. Unchanged by
+    /// 017-casing-categories-indent-width: still applies to
+    /// `control_words` + `pair_keywords` only, exactly as before — the
+    /// three parameters below are new, independent, granular overrides.
     pub casing: Option<String>,
+    /// Independent override for the control-words category
+    /// (017-casing-categories-indent-width FR-001) — wins over `casing`
+    /// for this category specifically when both are given.
+    pub control_words_casing: Option<String>,
+    /// Independent override for the pair-keywords category
+    /// (017-casing-categories-indent-width FR-001) — wins over `casing`
+    /// for this category specifically when both are given.
+    pub pair_keywords_casing: Option<String>,
+    /// Independent override for the data-references category — Matrix/
+    /// Line/Node/Zone/Database abbreviations, the output-record and
+    /// link-endpoint tokens, and the two reserved loop-index identifiers
+    /// (017-casing-categories-indent-width FR-004). Not reachable by
+    /// `casing` at all.
+    pub data_references_casing: Option<String>,
+    /// Spaces per nesting level of block indentation
+    /// (017-casing-categories-indent-width FR-009), 1–16 if given. Same
+    /// absent-means-"consult drut.toml, then default (4)" precedence as
+    /// every other setting here.
+    pub indent_width: Option<u8>,
     /// `"preserve"` / `"normalize"` / absent — same precedence as `casing`
     /// above. Closes the former CLI/MCP asymmetry (012-toml-configuration
     /// FR-010): this tool previously had no way to reach `top_level_indent`
@@ -58,18 +80,32 @@ fn fidelity_name(f: voyager_core::EncodingFidelity) -> &'static str {
     }
 }
 
+/// Shared by `casing` and the three new granular `*_casing` parameters
+/// (017-casing-categories-indent-width) — identical accepted-value shape at
+/// every one of them. `"auto"` (or any other string) is deliberately just
+/// another unrecognized value here, not a special case — this feature
+/// ships no built-in preset (FR-003).
+fn parse_casing_param(field: &str, value: Option<&str>) -> Result<Option<voyager_core::CasingConvention>, String> {
+    match value {
+        None => Ok(None),
+        Some("preserve") => Ok(Some(voyager_core::CasingConvention::Preserve)),
+        Some("upper") => Ok(Some(voyager_core::CasingConvention::Upper)),
+        Some("lower") => Ok(Some(voyager_core::CasingConvention::Lower)),
+        Some(other) => Err(format!("`{field}` must be \"preserve\", \"upper\", or \"lower\" if given, got {other:?}")),
+    }
+}
+
 fn explicit_override(input: &FormatInput) -> Result<drut_config::ExplicitFormatOverride, String> {
-    let casing = match input.casing.as_deref() {
-        None => None,
-        Some("preserve") => Some(voyager_core::CasingConvention::Preserve),
-        Some("upper") => Some(voyager_core::CasingConvention::Upper),
-        Some("lower") => Some(voyager_core::CasingConvention::Lower),
-        Some(other) => {
-            return Err(format!(
-                "`casing` must be \"preserve\", \"upper\", or \"lower\" if given, got {other:?}"
-            ))
+    let casing = parse_casing_param("casing", input.casing.as_deref())?;
+    let control_words_casing = parse_casing_param("control_words_casing", input.control_words_casing.as_deref())?;
+    let pair_keywords_casing = parse_casing_param("pair_keywords_casing", input.pair_keywords_casing.as_deref())?;
+    let data_references_casing =
+        parse_casing_param("data_references_casing", input.data_references_casing.as_deref())?;
+    if let Some(width) = input.indent_width {
+        if !(1..=16).contains(&width) {
+            return Err(format!("`indent_width` must be between 1 and 16 if given, got {width}"));
         }
-    };
+    }
     let top_level_indent = match input.top_level_indent.as_deref() {
         None => None,
         Some("preserve") => Some(voyager_core::TopLevelIndentMode::Preserve),
@@ -80,7 +116,14 @@ fn explicit_override(input: &FormatInput) -> Result<drut_config::ExplicitFormatO
             ))
         }
     };
-    Ok(drut_config::ExplicitFormatOverride { casing, top_level_indent })
+    Ok(drut_config::ExplicitFormatOverride {
+        casing,
+        control_words_casing,
+        pair_keywords_casing,
+        data_references_casing,
+        top_level_indent,
+        indent_width: input.indent_width,
+    })
 }
 
 /// Runs `voyager_core::format`/`format_bytes` (depending on whether
@@ -125,6 +168,10 @@ mod tests {
                 path: None,
             },
             casing: casing.map(str::to_string),
+            control_words_casing: None,
+            pair_keywords_casing: None,
+            data_references_casing: None,
+            indent_width: None,
             top_level_indent: None,
             isolated: None,
         }
@@ -137,8 +184,34 @@ mod tests {
                 path: Some(path.to_string()),
             },
             casing: casing.map(str::to_string),
+            control_words_casing: None,
+            pair_keywords_casing: None,
+            data_references_casing: None,
+            indent_width: None,
             top_level_indent: top_level_indent.map(str::to_string),
             isolated,
+        }
+    }
+
+    fn granular_input(
+        text: &str,
+        control_words_casing: Option<&str>,
+        pair_keywords_casing: Option<&str>,
+        data_references_casing: Option<&str>,
+        indent_width: Option<u8>,
+    ) -> FormatInput {
+        FormatInput {
+            source: ScriptSource {
+                text: Some(text.to_string()),
+                path: None,
+            },
+            casing: None,
+            control_words_casing: control_words_casing.map(str::to_string),
+            pair_keywords_casing: pair_keywords_casing.map(str::to_string),
+            data_references_casing: data_references_casing.map(str::to_string),
+            indent_width,
+            top_level_indent: None,
+            isolated: None,
         }
     }
 
@@ -296,6 +369,68 @@ mod tests {
 
         let reverted = format(&path_input(file.to_str().unwrap(), None, None, None)).unwrap();
         assert_eq!(reverted.text, "IF (x=1)\nENDIF\n", "no explicit param -- the file's own setting applies again");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // -- 017-casing-categories-indent-width (tasks.md T017/T030/T039) --
+
+    #[test]
+    fn granular_data_references_casing_reaches_previously_unreachable_tokens() {
+        // US2: mw/li/ni/i/j -- unreachable by any casing setting before
+        // this feature -- become reachable via data_references_casing.
+        let input = granular_input("mw[1] = mi.1.1\nx = li.FT\nif (i=25) y = j\n", None, None, Some("upper"), None);
+        let result = format(&input).unwrap();
+        assert_eq!(result.text, "MW[1] = MI.1.1\nx = LI.FT\nif (I=25) y = J\n");
+    }
+
+    #[test]
+    fn explicit_granular_override_wins_for_its_own_category_only() {
+        let input = granular_input(
+            "if (x=1)\nMW[1] = 1\nendif\n",
+            Some("upper"),
+            None,
+            Some("lower"),
+            None,
+        );
+        let result = format(&input).unwrap();
+        assert_eq!(
+            result.text, "IF (x=1)\n    mw[1] = 1\nENDIF\n",
+            "control_words upper and data_references lower each independently applied"
+        );
+    }
+
+    #[test]
+    fn auto_is_rejected_as_an_invalid_casing_value_at_every_casing_param() {
+        // FR-003: this feature ships no built-in preset -- "auto" is just
+        // another unrecognized string at every one of the four params.
+        for field_value in [
+            granular_input("x = 1\n", Some("auto"), None, None, None),
+            granular_input("x = 1\n", None, Some("auto"), None, None),
+            granular_input("x = 1\n", None, None, Some("auto"), None),
+        ] {
+            let err = format(&field_value).unwrap_err();
+            assert!(err.contains("auto"), "expected an error naming the rejected value, got: {err}");
+        }
+        let legacy = text_input("x = 1\n", Some("auto"));
+        assert!(format(&legacy).is_err(), "legacy casing param must also reject auto");
+    }
+
+    #[test]
+    fn indent_width_param_overrides_config_and_out_of_range_is_a_clean_error() {
+        let dir = temp_project("indent_width");
+        write_config(&dir, "[format]\nindent_width = 4\n");
+        let file = dir.join("x.s");
+        std::fs::write(&file, "IF (X=1)\nY = 1\nENDIF\n").unwrap();
+
+        let mut overridden = path_input(file.to_str().unwrap(), None, None, None);
+        overridden.indent_width = Some(2);
+        let result = format(&overridden).unwrap();
+        assert_eq!(result.text, "IF (X=1)\n  Y = 1\nENDIF\n");
+
+        let mut out_of_range = path_input(file.to_str().unwrap(), None, None, None);
+        out_of_range.indent_width = Some(0);
+        assert!(format(&out_of_range).is_err(), "an explicit out-of-range indent_width must be a clean error, not silently clamped");
 
         let _ = std::fs::remove_dir_all(&dir);
     }

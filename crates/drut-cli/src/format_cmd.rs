@@ -71,12 +71,17 @@ enum Mode {
     Diff,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn run(
     path: &Path,
     write: bool,
     check: bool,
     diff: bool,
     casing: Option<CasingArg>,
+    control_words_casing: Option<CasingArg>,
+    pair_keywords_casing: Option<CasingArg>,
+    data_references_casing: Option<CasingArg>,
+    indent_width: Option<u8>,
     top_level_indent: Option<TopLevelIndentArg>,
     isolated: bool,
 ) -> ExitOutcome {
@@ -91,7 +96,11 @@ pub fn run(
     };
     let explicit = ExplicitFormatOverride {
         casing: casing.map(CasingConvention::from),
+        control_words_casing: control_words_casing.map(CasingConvention::from),
+        pair_keywords_casing: pair_keywords_casing.map(CasingConvention::from),
+        data_references_casing: data_references_casing.map(CasingConvention::from),
         top_level_indent: top_level_indent.map(TopLevelIndentMode::from),
+        indent_width,
     };
 
     let traversal = traverse(path);

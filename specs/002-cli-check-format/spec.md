@@ -325,6 +325,22 @@ unchanged from the pre-format parse (behavior preservation).
   letting a user force casing untouched for one run even when a resolved
   `drut.toml` specifies `upper`/`lower` — the existing "no bare `--casing`" rule is
   unchanged; the flag still requires an explicit value whenever given at all.
+  **Amended 2026-08-17 (`017-casing-categories-indent-width`)**: `--casing`/
+  `drut.toml`'s `casing`/the MCP `casing` parameter now set two of three
+  independently-configurable casing categories — `control_words` and
+  `pair_keywords`, exactly the reach this field already had — rather than
+  "casing" as one undifferentiated concept. A third category, `data_references`
+  (Matrix/Line/Node/Zone/Database abbreviations, the output-record and
+  link-endpoint tokens, and the two reserved implicit loop-index identifiers),
+  is reachable only via new, independent per-category settings
+  (`control_words_casing`/`pair_keywords_casing`/`data_references_casing` at
+  every surface) — `--casing` itself was never widened to reach it, by design,
+  preserving its exact pre-existing behavior for every caller that doesn't
+  adopt the new fields. No built-in opinionated preset/"auto" value was added
+  at any surface — every casing field still accepts only `preserve`/`upper`/
+  `lower`, the project's own explicit choice or nothing (see
+  `specs/017-casing-categories-indent-width/spec.md` FR-003 for the full
+  rationale).
 - **FR-016**: `format`'s default invocation (no write/check/diff flag) MUST print
   the formatted result to stdout and MUST NOT modify any file on disk.
 - **FR-017**: `format` MUST support a `--write` flag that overwrites each matched
