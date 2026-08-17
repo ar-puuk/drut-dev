@@ -1,9 +1,7 @@
 //! `textDocument/semanticTokens/full` (FR-016–FR-018, data-model.md §6,
 //! `contracts/lsp-capabilities.md`).
 
-use voyager_core::{
-    Block, BlockKind, DiagnosticKind, Node, ParseResult, Position as CorePosition, Span, Statement, TokenKind,
-};
+use voyager_core::{Block, BlockKind, DiagnosticKind, Node, ParseResult, Span, Statement, TokenKind};
 
 use crate::document_store::ServerState;
 use crate::position::to_lsp_position;
@@ -136,32 +134,31 @@ fn is_misplaced_break(parse_result: &ParseResult, stmt: &Statement) -> bool {
 /// pair's value, even inside a quoted string -- `lexer.rs` already
 /// recognizes it in all of those positions, data-model.md's own Token
 /// entity), not only inside the structural positions `collect` above
-/// already visits. Only the *name* is covered, not the `@` delimiters --
-/// those stay under the static TextMate grammar's own
-/// `punctuation.definition.variable` scope, deliberately not re-covered
-/// here (semantic tokens take priority over TextMate scope coloring where
-/// both apply, so covering the delimiters too would silently steal their
-/// distinct punctuation color).
+/// already visits. Covers the *entire* `@name@` reference, `@` delimiters
+/// included (changed 002-fix-token-highlighting/issue #2: this used to
+/// cover only the name, deliberately leaving the delimiters to the static
+/// TextMate grammar's own separate scope -- but semantic tokens take
+/// priority over TextMate scope coloring wherever both apply, so that
+/// split survived even after the grammar itself was fixed to use one
+/// uniform scope, since the name's color came from here, not the grammar,
+/// the whole time. Using `tok.span` directly (which already covers the
+/// full `@name@` construct) rather than a narrowed name-only span fixes
+/// this at its actual source.
 fn collect_variable_refs(text: &str) -> Vec<RawToken> {
     voyager_core::tokenize(text)
         .into_iter()
         .filter_map(|tok| {
-            let TokenKind::VariableRef { name } = &tok.kind else {
+            if !matches!(tok.kind, TokenKind::VariableRef { .. }) {
                 return None;
-            };
+            }
             if tok.span.start.line != tok.span.end.line {
                 // Never actually happens (an `@name@` reference can't
                 // contain a newline by construction), but never fabricate
                 // a cross-line span if it somehow did.
                 return None;
             }
-            let name_start = tok.span.start.column.saturating_add(1);
-            let name_end = name_start.saturating_add(name.chars().count() as u32);
             Some(RawToken {
-                span: Span::new(
-                    CorePosition::new(tok.span.start.line, name_start),
-                    CorePosition::new(tok.span.start.line, name_end),
-                ),
+                span: tok.span,
                 token_type: VARIABLE_TYPE_INDEX,
                 modifiers_bitset: 0,
             })
@@ -241,6 +238,7 @@ pub fn handle(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use voyager_core::Position as CorePosition;
 
     #[test]
     fn short_if_is_flagged() {
@@ -319,8 +317,12 @@ mod tests {
         let tokens = collect_variable_refs(text);
         assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0].token_type, VARIABLE_TYPE_INDEX);
-        // Covers just "MODE" (columns 6..10, 1-based), not the @ delimiters.
-        assert_eq!(tokens[0].span, Span::new(CorePosition::new(1, 6), CorePosition::new(1, 10)));
+        // Covers the whole "@MODE@" reference (columns 5..11, 1-based),
+        // delimiters included -- not just "MODE" (issue #2: the semantic
+        // token's own span must match what the fixed TextMate grammar
+        // already does, or the @ delimiters fall back to a differently
+        // colored path since semantic tokens take priority where they apply).
+        assert_eq!(tokens[0].span, Span::new(CorePosition::new(1, 5), CorePosition::new(1, 11)));
     }
 
     #[test]

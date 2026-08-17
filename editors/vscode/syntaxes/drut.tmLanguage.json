@@ -53,13 +53,9 @@
       "match": "\\\\[nrt\\\\'\"]"
     },
     "variable-ref": {
-      "comment": "@name@ substitution. Split into begin/name/end captures using the widely-theme-supported punctuation.definition.variable + variable.other.readwrite scopes (the same convention shell-script grammars use for $VAR) rather than a single custom leaf scope -- a bare variable.other.substitution.<lang> scope (this grammar's own original choice) doesn't match most themes' color rules at all, since theme selectors are scope-chain prefixes and few themes have a rule for the literal segment \"substitution\" (found via real manual VS Code testing, 2026-08-10: @MODE@ rendered with no color whatsoever under a stock dark theme).",
-      "match": "(@)([A-Za-z_][A-Za-z0-9_]*)(@)",
-      "captures": {
-        "1": { "name": "punctuation.definition.variable.begin.drut" },
-        "2": { "name": "variable.other.readwrite.drut" },
-        "3": { "name": "punctuation.definition.variable.end.drut" }
-      }
+      "comment": "@name@ substitution. One uniform scope over the whole match (delimiters included), not split into begin/name/end captures -- a prior version scoped the @ delimiters as punctuation.definition.variable.* separately from the name's variable.other.readwrite, which most themes render in a different (often muted) color from the name, since punctuation.definition.* is a distinct, more-specific selector many themes have their own rule for (issue #2: users want the entire @token@, @ included, to read as one color, distinct from string). variable.other.readwrite is kept as the scope (rather than e.g. bhereth's entity.name.tag) since it's already validated against real theme testing (2026-08-10: a bare custom variable.other.substitution.<lang> leaf scope rendered with no color at all under a stock dark theme; variable.other.readwrite -- the same convention shell-script grammars use for $VAR -- did not have that problem).",
+      "name": "variable.other.readwrite.drut",
+      "match": "@[A-Za-z_][A-Za-z0-9_]*@"
     },
     "control-words": {
       "name": "keyword.control.drut",

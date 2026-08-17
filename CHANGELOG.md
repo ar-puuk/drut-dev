@@ -11,6 +11,27 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-08-16
+
+### Added
+
+- Hovering an `@token@` reference now shows the value it currently resolves
+  to, and where that value was assigned — the most recent same-file
+  `TOKEN = value` assignment before the reference, or, if none exists, one
+  found in a file the document directly pulls in via a literal
+  `READ FILE = '<path>'` statement (e.g. a scenario's "control center"
+  file). Token-built `READ FILE` paths (e.g. `@ParentDir@...`) and anything
+  beyond that first level of inclusion are not resolved; hovering such a
+  token falls back to the previous hover behavior rather than guessing.
+
+### Fixed
+
+- `@token@` syntax highlighting now colors the whole reference — both `@`
+  delimiters and the name between them — as a single, uniform color.
+  Previously the delimiters were scoped separately from the name, so most
+  themes rendered the `@`s in a different (often muted) color than the
+  token itself.
+
 ## [0.1.2] - 2026-08-13
 
 ### Fixed

@@ -1,6 +1,6 @@
 [package]
 name = "drut-config"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 description = "Drut project configuration: drut.toml discovery, parsing, and resolution"
 license = "MIT OR Apache-2.0"
@@ -14,7 +14,7 @@ repository = "https://github.com/ar-puuk/drut-dev"
 # crate never derives `Deserialize` (per-field fallback parsing walks
 # `toml::Value` by hand instead, research.md §4).
 [dependencies]
-voyager-core = { path = "../voyager-core", version = "0.1.2" }
+voyager-core = { path = "../voyager-core", version = "0.1.3" }
 toml = "1"
 
 [dev-dependencies]
