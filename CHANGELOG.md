@@ -11,6 +11,17 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+### Added
+
+- Hovering an `@token@` reference now shows the value it currently resolves
+  to, and where that value was assigned — the most recent same-file
+  `TOKEN = value` assignment before the reference, or, if none exists, one
+  found in a file the document directly pulls in via a literal
+  `READ FILE = '<path>'` statement (e.g. a scenario's "control center"
+  file). Token-built `READ FILE` paths (e.g. `@ParentDir@...`) and anything
+  beyond that first level of inclusion are not resolved; hovering such a
+  token falls back to the previous hover behavior rather than guessing.
+
 ## [0.1.2] - 2026-08-13
 
 ### Fixed
