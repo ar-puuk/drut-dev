@@ -65,6 +65,41 @@ pub fn to_lsp_range(text: &str, span: Span) -> lsp_types::Range {
     }
 }
 
+/// Slices `text` for the substring `span` covers (016-token-hover-value,
+/// contracts/token-resolution-api.md) — used to render a resolved token
+/// value's, or a `READ FILE` target's, real original source text, rather
+/// than reconstructing it by joining tokens (which would drop internal
+/// whitespace the lexer split on; see `token_resolution.rs`'s own doc
+/// comment on `ReadFileRef`). Uses the same line/`char`-walking approach
+/// [`to_lsp_position`] already uses; clamps rather than panics for a span
+/// outside `text`'s real range, matching this module's existing guarantee.
+pub fn text_for_span(text: &str, span: Span) -> String {
+    let mut out = String::new();
+    for line_idx in (span.start.line.saturating_sub(1))..=(span.end.line.saturating_sub(1)) {
+        let Some(line_text) = text.lines().nth(line_idx as usize) else {
+            break;
+        };
+        let start_char = if line_idx == span.start.line.saturating_sub(1) {
+            span.start.column.saturating_sub(1) as usize
+        } else {
+            0
+        };
+        let end_char = if line_idx == span.end.line.saturating_sub(1) {
+            span.end.column.saturating_sub(1) as usize
+        } else {
+            line_text.chars().count()
+        };
+        let chars: Vec<char> = line_text.chars().collect();
+        let start_char = start_char.min(chars.len());
+        let end_char = end_char.min(chars.len()).max(start_char);
+        out.extend(&chars[start_char..end_char]);
+        if line_idx != span.end.line.saturating_sub(1) {
+            out.push('\n');
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -76,6 +111,35 @@ mod tests {
         let lsp_pos = to_lsp_position(text, core_pos);
         assert_eq!(lsp_pos, lsp_types::Position::new(0, 3));
         assert_eq!(from_lsp_position(text, lsp_pos), core_pos);
+    }
+
+    #[test]
+    fn text_for_span_slices_the_exact_substring() {
+        let text = "ZoneMsgRate = 50\n";
+        let span = Span::new(CorePosition::new(1, 15), CorePosition::new(1, 17));
+        assert_eq!(text_for_span(text, span), "50");
+    }
+
+    #[test]
+    fn text_for_span_preserves_internal_whitespace() {
+        let text = "READ FILE = 'Network Processing Tools\\x.block'\n";
+        let expected = "'Network Processing Tools\\x.block'";
+        let start_col = text.find(expected).unwrap() as u32 + 1; // 1-based
+        let end_col = start_col + expected.chars().count() as u32;
+        let span = Span::new(
+            CorePosition::new(1, start_col),
+            CorePosition::new(1, end_col),
+        );
+        assert_eq!(text_for_span(text, span), expected);
+    }
+
+    #[test]
+    fn text_for_span_clamps_rather_than_panics_out_of_range() {
+        let text = "short\n";
+        let span = Span::new(CorePosition::new(1, 1), CorePosition::new(50, 999));
+        // Should not panic; result is whatever text remains, clamped.
+        let result = text_for_span(text, span);
+        assert!(result.starts_with("short"));
     }
 
     #[test]

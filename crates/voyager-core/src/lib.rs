@@ -18,6 +18,7 @@ pub mod lexer;
 pub mod span;
 pub mod statement;
 pub mod token;
+pub mod token_resolution;
 
 pub use block::{Block, BlockKind};
 pub use block_resolution::{all_blocks, block_at, BlockFold, BlockInfo, BlockKindName};
@@ -30,6 +31,10 @@ pub use keywords::{completion_candidates, did_you_mean, CompletionContext, Keywo
 pub use span::{Position, Span};
 pub use statement::{Statement, StatementKind};
 pub use token::{Token, TokenKind};
+pub use token_resolution::{
+    all_assignments, read_file_refs, resolve_token_value, variable_ref_at, Assignment, ReadFileRef,
+    ResolvedTokenValue, Source as TokenValueSource, VariableRefAt,
+};
 
 /// Tokenizes `source` into a flat, position-tracked token stream.
 ///
