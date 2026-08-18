@@ -54,6 +54,16 @@ pub struct ServerState {
     /// `rootUri` nor `workspaceFolders`, or before `initialize` completes —
     /// not a startup failure either way.
     workspace_root: Option<std::path::PathBuf>,
+    /// Cached client (editor) `[format]` setting defaults, pulled via the
+    /// standard LSP `workspace/configuration` mechanism
+    /// (021-editor-settings-config, data-model.md §2) — a single, session-
+    /// wide value, not tracked per document (spec.md Edge Cases: every open
+    /// document's next format request reflects the shared cache). `Default`
+    /// (every field `None`) until the first successful pull completes, or
+    /// forever for a client that never advertises `workspace.configuration`
+    /// support — both cases just mean this precedence tier contributes
+    /// nothing, never a startup failure.
+    client_format_defaults: drut_config::ExplicitFormatOverride,
 }
 
 impl ServerState {
@@ -67,6 +77,24 @@ impl ServerState {
 
     pub fn workspace_root(&self) -> Option<&std::path::Path> {
         self.workspace_root.as_deref()
+    }
+
+    /// Replaces the cached client format-setting defaults wholesale — called
+    /// once after each successful `workspace/configuration` pull
+    /// (021-editor-settings-config, data-model.md §2). Never called for a
+    /// pull that failed or returned something unparseable; the previous
+    /// cached value (possibly still `Default`) is left untouched in that
+    /// case.
+    pub fn set_client_format_defaults(&mut self, defaults: drut_config::ExplicitFormatOverride) {
+        self.client_format_defaults = defaults;
+    }
+
+    /// The currently-cached client format-setting defaults —
+    /// `ExplicitFormatOverride` is `Copy`, so this returns by value, same
+    /// convention `drut_config::resolve_format_options`'s own parameters
+    /// already use.
+    pub fn client_format_defaults(&self) -> drut_config::ExplicitFormatOverride {
+        self.client_format_defaults
     }
 
     /// `textDocument/didOpen`: inserts (or replaces) the document.
@@ -165,6 +193,45 @@ mod tests {
     fn open_uris_is_empty_with_no_documents_open() {
         let state = ServerState::new();
         assert_eq!(state.open_uris().count(), 0);
+    }
+
+    // -- 021-editor-settings-config (tasks.md T010) --------------------------
+
+    #[test]
+    fn client_format_defaults_starts_at_default_before_any_pull() {
+        let state = ServerState::new();
+        assert_eq!(state.client_format_defaults().casing, None);
+        assert_eq!(state.client_format_defaults().indent_width, None);
+    }
+
+    #[test]
+    fn client_format_defaults_round_trips_through_set() {
+        let mut state = ServerState::new();
+        let defaults = drut_config::ExplicitFormatOverride {
+            casing: Some(voyager_core::CasingConvention::Upper),
+            indent_width: Some(2),
+            ..Default::default()
+        };
+        state.set_client_format_defaults(defaults);
+        assert_eq!(state.client_format_defaults().casing, Some(voyager_core::CasingConvention::Upper));
+        assert_eq!(state.client_format_defaults().indent_width, Some(2));
+    }
+
+    #[test]
+    fn set_client_format_defaults_replaces_the_previous_cache_wholesale() {
+        let mut state = ServerState::new();
+        state.set_client_format_defaults(drut_config::ExplicitFormatOverride {
+            casing: Some(voyager_core::CasingConvention::Upper),
+            ..Default::default()
+        });
+        // A second pull with a different (and, notably, sparser) value must
+        // fully replace the first -- not merge field-by-field.
+        state.set_client_format_defaults(drut_config::ExplicitFormatOverride {
+            indent_width: Some(8),
+            ..Default::default()
+        });
+        assert_eq!(state.client_format_defaults().casing, None, "the earlier pull's casing value must not linger");
+        assert_eq!(state.client_format_defaults().indent_width, Some(8));
     }
 
     #[test]

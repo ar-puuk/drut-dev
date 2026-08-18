@@ -348,6 +348,34 @@ already been researched or partially unblocked; see the note per item.
       Hint-severity streams exactly — never reaches CLI `check` or MCP
       `diagnose`, which stay strictly `DiagnosticKind`-only ("never a
       narrowed subset," `002-cli-check-format` FR-003) unchanged.
+15. **Editor-settings exposure for every `[format]` config field** — ✅ *done,
+    implemented 2026-08-17 as `021-editor-settings-config`* (added
+    2026-08-17; see `specs/021-editor-settings-config/` for the full
+    spec/plan/tasks). All 10 current `drut-config::FormatConfig`/`ExplicitFormatOverride`
+    fields (`casing`, `control_words_casing`, `pair_keywords_casing`,
+    `data_references_casing`, `top_level_indent`, `indent_width`,
+    `operator_spacing`, `blank_lines`, `top_level_blank_line_cap`,
+    `nested_blank_line_cap`) become settable as editor client settings, not
+    just `drut.toml`. Two real decisions made through direct conversation:
+    - **Precedence**: `drut.toml` wins over a client setting — precedence
+      becomes `explicit CLI flag/MCP param > drut.toml > client setting >
+      built-in default` (no separate "explicit" tier exists for LSP
+      requests specifically, since none exists today either — a client
+      setting slots in between `drut.toml` and the built-in default only).
+      A personal editor preference deliberately never overrides a project's
+      own committed formatting config, matching how Prettier/ESLint-style
+      tools with a project config file already behave.
+    - **Mechanism**: the standard LSP `workspace/configuration`/
+      `workspace/didChangeConfiguration` capability (constitution Principle
+      VI), not something VS Code-specific — confirmed via direct grep that
+      `drut-lsp` has **zero** existing handling of either today (every
+      match in the repo is inside `node_modules`, the unused client
+      library) — this is a genuinely new server capability, not a thin
+      settings-declaration task. Benefits any conforming LSP client, not
+      only VS Code.
+    - Exact settings namespace/naming (e.g. `drut.format.controlWordsCasing`
+      mapped from `control_words_casing`, VS Code's camelCase convention)
+      is a planning-phase decision, not fixed here.
 
 ## Resolved queued items (historical log, not part of the pre-publish sequence)
 

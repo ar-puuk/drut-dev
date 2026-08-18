@@ -68,6 +68,31 @@ CONTRIBUTING.md's "Versioning" section).
   command or the MCP `diagnose` tool, matching how the existing unclosed
   `; FMT: OFF` and malformed `drut.toml` hints already behave. No
   configuration surface; always on.
+- All 10 `[format]` settings (`casing`, `control_words_casing`,
+  `pair_keywords_casing`, `data_references_casing`, `top_level_indent`,
+  `indent_width`, `operator_spacing`, `blank_lines`,
+  `top_level_blank_line_cap`, `nested_blank_line_cap`) are now settable as
+  personal editor (client) settings, not only via a project's committed
+  `drut.toml`. A new precedence tier — `client_defaults` — sits between
+  `drut.toml` and the built-in default: `explicit CLI flag/MCP parameter >
+  drut.toml > client setting > built-in default`. A `drut.toml` value
+  always wins over a conflicting client setting for the same field; a
+  client setting only ever fills in a field `drut.toml` leaves unset.
+  Delivered via the standard LSP `workspace/configuration`/
+  `workspace/didChangeConfiguration` mechanism (not a VS Code-proprietary
+  side channel) — `drut-lsp` pulls the client's merged `"drut.format"`
+  section once at startup (when the client advertises support) and again
+  on every `workspace/didChangeConfiguration` notification, so a changed
+  setting is reflected on the very next format request against an
+  already-open document, with no reopen or editor restart needed. A client
+  that doesn't advertise `workspace/configuration` support is never asked
+  at all — formatting behaves exactly as before this feature, with no
+  error or degraded experience. Exposed in the VS Code extension as 10 new
+  `drut.format.*` settings (e.g. `drut.format.controlWordsCasing`,
+  `drut.format.indentWidth`), visible and settable through VS Code's
+  built-in Settings UI. Scoped entirely to the LSP surface — `drut-cli`
+  and the MCP `format` tool gain no new capability and are behaviorally
+  unaffected.
 
 ### Fixed
 

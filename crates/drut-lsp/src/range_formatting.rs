@@ -110,6 +110,11 @@ pub fn handle(
         resolve_path(uri, state).as_deref(),
         false,
         drut_config::ExplicitFormatOverride::default(),
+        // 021-editor-settings-config T009: the real cached client-settings
+        // value, populated (if at all) by the `workspace/configuration`
+        // pull in lib.rs — `Default` (every field `None`) before the first
+        // successful pull completes, self-correcting once it does.
+        state.client_format_defaults(),
     );
     let result = voyager_core::format(&doc.text, options);
     if !result.changed {

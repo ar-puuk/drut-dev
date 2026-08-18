@@ -943,3 +943,204 @@ fn a_registration_request_that_receives_an_error_response_is_logged_and_does_not
 
     shutdown(&client);
 }
+
+// --- 021-editor-settings-config (tasks.md T011) -------------------------
+
+fn configuration_capabilities(supported: bool) -> serde_json::Value {
+    json!({
+        "workspace": {
+            "configuration": supported
+        }
+    })
+}
+
+/// Answers a server-initiated `workspace/configuration` request with a
+/// single merged `"drut.format"` section — `WorkspaceConfiguration`'s
+/// `Result` is `Vec<Value>`, one entry per requested item, and this server
+/// always requests exactly one (research.md §4).
+fn respond_to_configuration_request(client: &Connection, req: lsp_server::Request, section: serde_json::Value) {
+    client
+        .sender
+        .send(Message::Response(Response::new_ok(req.id, json!([section]))))
+        .unwrap();
+}
+
+#[test]
+fn client_settings_apply_one_field_per_category_with_no_drut_toml_present() {
+    // spec.md US1 AS1 / SC-001: casing, indentation, operator spacing, and
+    // blank lines each independently reflect a client-set value, with no
+    // drut.toml anywhere. Expected text confirmed via the CLI's own
+    // explicit flags (`--control-words-casing upper --indent-width 2
+    // --operator-spacing fixed --blank-lines auto --isolated`), which
+    // resolve to an identical `FormatOptions` per field, independent of
+    // which precedence tier supplies the value.
+    let (client, _handle) = spawn_server();
+    initialize_with_capabilities(&client, configuration_capabilities(true));
+
+    let req = recv_request(&client, "workspace/configuration");
+    respond_to_configuration_request(
+        &client,
+        req,
+        json!({
+            "controlWordsCasing": "upper",
+            "indentWidth": 2,
+            "operatorSpacing": "fixed",
+            "blankLines": "auto"
+        }),
+    );
+
+    did_open(&client, "file:///client_settings.s", "if (a=b)\ny=1\nendif\nx=1\n\n\n\n\n\nz=2\n");
+    send_request(
+        &client,
+        2,
+        "textDocument/formatting",
+        json!({
+            "textDocument": {"uri": "file:///client_settings.s"},
+            "options": {"tabSize": 4, "insertSpaces": true}
+        }),
+    );
+    let response = recv_response(&client);
+    let edits = response.response_result.expect("formatting must succeed");
+    let edits = edits.as_array().unwrap();
+    assert_eq!(edits.len(), 1, "got {edits:?}");
+    assert_eq!(
+        edits[0]["newText"],
+        json!("IF(a = b)\n  y = 1\nENDIF\nx = 1\n\n\nz = 2\n"),
+        "casing, indent_width, operator_spacing, and blank_lines must each reflect their own client setting"
+    );
+
+    shutdown(&client);
+}
+
+#[test]
+fn drut_toml_wins_for_its_own_field_while_a_client_setting_still_wins_for_a_field_drut_toml_never_sets() {
+    // spec.md US2 AS1/AS2. drut.toml sets only indent_width; the client
+    // sets both indent_width (conflicting) and control_words_casing (which
+    // drut.toml never mentions at all).
+    let dir = std::env::temp_dir().join(format!("drut_lsp_protocol_smoke_test_{}_client_vs_toml", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("drut.toml"), "[format]\nindent_width = 4\n").unwrap();
+    let file = dir.join("a.s");
+    let uri = file_uri_str(&file);
+
+    let (client, _handle) = spawn_server();
+    initialize_with_capabilities(&client, configuration_capabilities(true));
+
+    let req = recv_request(&client, "workspace/configuration");
+    respond_to_configuration_request(
+        &client,
+        req,
+        json!({
+            "indentWidth": 2,
+            "controlWordsCasing": "upper"
+        }),
+    );
+
+    let note = did_open(&client, &uri, "if (a=b)\ny=1\nendif\n");
+    assert!(note.params["diagnostics"].as_array().unwrap().is_empty());
+
+    send_request(
+        &client,
+        2,
+        "textDocument/formatting",
+        json!({
+            "textDocument": {"uri": uri},
+            "options": {"tabSize": 4, "insertSpaces": true}
+        }),
+    );
+    let response = recv_response(&client);
+    let edits = response.response_result.expect("formatting must succeed");
+    let edits = edits.as_array().unwrap();
+    assert_eq!(edits.len(), 1, "got {edits:?}");
+    assert_eq!(
+        edits[0]["newText"],
+        json!("IF (a=b)\n    y=1\nENDIF\n"),
+        "drut.toml's indent_width (4) must win over the client's (2); the client's \
+         control_words_casing must still apply since drut.toml never sets casing at all"
+    );
+
+    shutdown(&client);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_did_change_configuration_notification_triggers_a_repull_reflected_on_the_next_format_request_no_reopen_needed() {
+    // spec.md US1 AS2 / SC-004.
+    let (client, _handle) = spawn_server();
+    initialize_with_capabilities(&client, configuration_capabilities(true));
+
+    let req = recv_request(&client, "workspace/configuration");
+    respond_to_configuration_request(&client, req, json!({"indentWidth": 2}));
+
+    did_open(&client, "file:///live_config.s", "if (a=b)\ny=1\nendif\n");
+    send_request(
+        &client,
+        2,
+        "textDocument/formatting",
+        json!({
+            "textDocument": {"uri": "file:///live_config.s"},
+            "options": {"tabSize": 4, "insertSpaces": true}
+        }),
+    );
+    let response = recv_response(&client);
+    let edits = response.response_result.expect("formatting must succeed");
+    assert_eq!(edits[0]["newText"], json!("if (a=b)\n  y=1\nendif\n"));
+
+    // The modern LSP client convention sends `settings: null` here, purely
+    // a re-pull trigger (research.md §3) -- this server never reads it as a
+    // data source, only reacts to receiving the notification at all.
+    send_notification(&client, "workspace/didChangeConfiguration", json!({"settings": null}));
+
+    let req = recv_request(&client, "workspace/configuration");
+    respond_to_configuration_request(&client, req, json!({"indentWidth": 6}));
+
+    send_request(
+        &client,
+        3,
+        "textDocument/formatting",
+        json!({
+            "textDocument": {"uri": "file:///live_config.s"},
+            "options": {"tabSize": 4, "insertSpaces": true}
+        }),
+    );
+    let response = recv_response(&client);
+    let edits = response.response_result.expect("formatting must succeed");
+    assert_eq!(
+        edits[0]["newText"],
+        json!("if (a=b)\n      y=1\nendif\n"),
+        "the refreshed client setting must apply to the very next format request against \
+         the still-open document, no reopen needed"
+    );
+
+    shutdown(&client);
+}
+
+#[test]
+fn a_client_that_never_advertises_workspace_configuration_support_never_receives_the_request_and_formatting_is_unaffected() {
+    // spec.md FR-004 / SC-005.
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+
+    assert_no_request_arrives_within(&client, std::time::Duration::from_millis(300));
+
+    did_open(&client, "file:///no_client_config.s", "if (a=b)\nendif\n");
+    send_request(
+        &client,
+        2,
+        "textDocument/formatting",
+        json!({
+            "textDocument": {"uri": "file:///no_client_config.s"},
+            "options": {"tabSize": 4, "insertSpaces": true}
+        }),
+    );
+    let response = recv_response(&client);
+    let edits = response.response_result.expect("formatting must succeed");
+    assert_eq!(
+        edits,
+        json!([]),
+        "no client settings ever pulled -- built-in defaults, unchanged from before this feature"
+    );
+
+    shutdown(&client);
+}

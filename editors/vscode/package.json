@@ -71,7 +71,91 @@
           ]
         }
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Drut",
+      "properties": {
+        "drut.format.casing": {
+          "type": "string",
+          "enum": [
+            "preserve",
+            "upper",
+            "lower"
+          ],
+          "markdownDescription": "Legacy keyword-casing convention, applied to control words and pair keywords only (021-editor-settings-config). Left unset (no default declared here) means \"consult a project's `drut.toml`, then the built-in default.\" A workspace `drut.toml` setting for the same category always wins over this personal setting."
+        },
+        "drut.format.controlWordsCasing": {
+          "type": "string",
+          "enum": [
+            "preserve",
+            "upper",
+            "lower"
+          ],
+          "markdownDescription": "Casing convention for control-word keywords (e.g. `IF`/`ENDIF`/`LOOP`) — wins over `drut.format.casing` for this category specifically when both are set. A workspace `drut.toml` setting for this field always wins over this personal setting."
+        },
+        "drut.format.pairKeywordsCasing": {
+          "type": "string",
+          "enum": [
+            "preserve",
+            "upper",
+            "lower"
+          ],
+          "markdownDescription": "Casing convention for pair keywords — wins over `drut.format.casing` for this category specifically when both are set. A workspace `drut.toml` setting for this field always wins over this personal setting."
+        },
+        "drut.format.dataReferencesCasing": {
+          "type": "string",
+          "enum": [
+            "preserve",
+            "upper",
+            "lower"
+          ],
+          "markdownDescription": "Casing convention for data-reference tokens (Matrix/Line/Node/Zone/Database abbreviations, output-record and link-endpoint tokens, and the two reserved loop-index identifiers) — not reachable by `drut.format.casing` at all. A workspace `drut.toml` setting for this field always wins over this personal setting."
+        },
+        "drut.format.topLevelIndent": {
+          "type": "string",
+          "enum": [
+            "preserve",
+            "normalize"
+          ],
+          "markdownDescription": "Top-level (depth-0) indentation policy — `preserve` leaves it exactly as written; `normalize` forces every top-level line to column 0. A workspace `drut.toml` setting for this field always wins over this personal setting."
+        },
+        "drut.format.indentWidth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "markdownDescription": "Spaces per nesting level of block indentation. A workspace `drut.toml` setting for this field always wins over this personal setting."
+        },
+        "drut.format.operatorSpacing": {
+          "type": "string",
+          "enum": [
+            "preserve",
+            "fixed",
+            "auto"
+          ],
+          "markdownDescription": "Whitespace normalization around operators/commas/bracket-paren interiors — `preserve` leaves it exactly as written; `fixed` normalizes to one space each side of every recognized operator; `auto` does everything `fixed` does plus vertically aligning consecutive assignment statements' `=`. A workspace `drut.toml` setting for this field always wins over this personal setting."
+        },
+        "drut.format.blankLines": {
+          "type": "string",
+          "enum": [
+            "preserve",
+            "auto"
+          ],
+          "markdownDescription": "Whether/how excessive blank-line runs are contracted — `preserve` leaves every run exactly as written; `auto` contracts a run down to the applicable cap (see `drut.format.topLevelBlankLineCap`/`drut.format.nestedBlankLineCap`) only when it exceeds that cap. A workspace `drut.toml` setting for this field always wins over this personal setting."
+        },
+        "drut.format.topLevelBlankLineCap": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "markdownDescription": "Maximum number of consecutive blank lines `auto` allows between top-level statements/blocks before contracting the run. A workspace `drut.toml` setting for this field always wins over this personal setting."
+        },
+        "drut.format.nestedBlankLineCap": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "markdownDescription": "Maximum number of consecutive blank lines `auto` allows inside any block's own body, uniformly regardless of nesting depth, before contracting the run. A workspace `drut.toml` setting for this field always wins over this personal setting."
+        }
+      }
+    }
   },
   "scripts": {
     "compile": "tsc -p ./",

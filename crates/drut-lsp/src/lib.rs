@@ -34,11 +34,26 @@ pub const SHORT_IF_TOKEN_TYPE: &str = "shortIf";
 pub const STATEMENT_TOKEN_TYPE: &str = "statement";
 pub const UNREACHABLE_TOKEN_MODIFIER: &str = "unreachable";
 
-/// Fixed registration ID for the one and only request this server ever
-/// sends (013-lsp-config-file-watch) — safe as a single fixed constant
-/// since there is only ever one outstanding server-initiated request kind;
-/// a second one would need real per-request ID generation.
+/// Fixed registration ID for the first request this server ever sends
+/// (013-lsp-config-file-watch) — safe as a fixed constant since only one
+/// request of *this* kind is ever outstanding at a time; distinguished from
+/// `CLIENT_FORMAT_DEFAULTS_ID` below (021-editor-settings-config's own,
+/// second, server-initiated request kind) by `handle_response`'s own match
+/// on the response's ID.
 const DRUT_TOML_WATCHER_ID: &str = "drut-toml-watcher";
+
+/// Fixed ID for the (now second) request this server ever initiates
+/// (021-editor-settings-config, research.md §2/§4) — asking the client for
+/// its `"drut.format"` `workspace/configuration` section. Re-sent (still
+/// under this same fixed ID) on every `workspace/didChangeConfiguration`
+/// notification, not just once at startup — safe as a single fixed constant
+/// for the identical reason `DRUT_TOML_WATCHER_ID` already is: only one
+/// pull is ever outstanding for this request kind at a time; a stale
+/// response from a superseded pull is simply the most recent one
+/// `handle_response` sees, matching the existing "whatever arrives last
+/// wins" cache-replacement semantics of `ServerState::set_client_format_
+/// defaults`.
+const CLIENT_FORMAT_DEFAULTS_ID: &str = "drut-client-format-defaults";
 
 /// Builds the `ServerCapabilities` this server declares at `initialize`
 /// (`contracts/lsp-capabilities.md`).
@@ -132,6 +147,13 @@ pub fn run(connection: Connection) {
     // main loop below never blocks on any single message, so an unconfirmed
     // registration can never stall anything else.
 
+    // 021-editor-settings-config: the second server-initiated request this
+    // server ever sends, identical fire-and-forget shape as the watcher
+    // registration immediately above — no wait here either.
+    if workspace_configuration_supported(init_params.as_ref()) {
+        request_client_format_defaults(&connection);
+    }
+
     for msg in &connection.receiver {
         match msg {
             Message::Request(req) => {
@@ -146,7 +168,7 @@ pub fn run(connection: Connection) {
                 handle_notification(&connection, note, &mut state);
             }
             Message::Response(response) => {
-                handle_response(&connection, response);
+                handle_response(&connection, response, &mut state);
             }
         }
     }
@@ -217,16 +239,84 @@ fn register_drut_toml_watcher(connection: &Connection) {
     let _ = connection.sender.send(Message::Request(request));
 }
 
-/// Handles a response to the one request this server ever sends
-/// (013-lsp-config-file-watch, research.md §1/FR-010). Never blocks
-/// anything — called generically from the main loop's own unified message
-/// dispatch, which has no per-message-type blocking wait of any kind; a
-/// response that never arrives simply means this is never called for that
-/// ID, and every other message continues to be handled normally regardless.
-/// An error result is logged (never silent, matching `010`/`011`/`012`'s
-/// own precedent) but otherwise changes nothing about how the session
-/// continues.
-fn handle_response(connection: &Connection, response: Response) {
+/// Whether the client advertised support for `workspace/configuration`
+/// (021-editor-settings-config, research.md §2) — same "no static-
+/// capability alternative, confirmed against `lsp-types`' own capability
+/// doc comment" shape `did_change_watched_files_supported` already
+/// established for the file watcher. `false` for a client that omits this,
+/// doesn't support it, or whose params failed to parse — the request is
+/// then never attempted (FR-004), and formatting behaves exactly as before
+/// this feature.
+fn workspace_configuration_supported(params: Option<&lsp_types::InitializeParams>) -> bool {
+    params
+        .and_then(|p| p.capabilities.workspace.as_ref())
+        .and_then(|w| w.configuration)
+        .unwrap_or(false)
+}
+
+/// Sends the (now second) request this server ever initiates: asking the
+/// client for its merged `"drut.format"` `workspace/configuration` section
+/// (021-editor-settings-config, research.md §2/§4, `contracts/
+/// editor-settings-config.md`). Only called when `workspace_configuration_
+/// supported` already returned `true` — never attempted against a client
+/// that hasn't advertised support (FR-004). Fire-and-forget, identical
+/// shape to `register_drut_toml_watcher`: does not wait for a response —
+/// the eventual response, if any, is handled generically by
+/// `handle_response` whenever it arrives on the main loop, and a response
+/// that never arrives simply means the cache stays at its previous value
+/// (research.md §2).
+fn request_client_format_defaults(connection: &Connection) {
+    use lsp_types::request::{Request as _, WorkspaceConfiguration};
+
+    let params = lsp_types::ConfigurationParams {
+        items: vec![lsp_types::ConfigurationItem {
+            // 021-editor-settings-config, research.md §5: one single,
+            // global pull — no per-document/per-workspace-folder scoping.
+            scope_uri: None,
+            section: Some("drut.format".to_string()),
+        }],
+    };
+    let request = lsp_server::Request::new(
+        lsp_server::RequestId::from(CLIENT_FORMAT_DEFAULTS_ID.to_string()),
+        WorkspaceConfiguration::METHOD.to_string(),
+        params,
+    );
+    let _ = connection.sender.send(Message::Request(request));
+}
+
+/// Handles a response to one of the (now two) requests this server ever
+/// sends (013-lsp-config-file-watch, 021-editor-settings-config, FR-010).
+/// Never blocks anything — called generically from the main loop's own
+/// unified message dispatch, which has no per-message-type blocking wait of
+/// any kind; a response that never arrives simply means this is never
+/// called for that ID, and every other message continues to be handled
+/// normally regardless. Distinguishes the two request kinds by ID:
+/// `CLIENT_FORMAT_DEFAULTS_ID` updates `state`'s cache on success and is
+/// silently left alone on failure/malformed content (the cache simply stays
+/// at its previous value, research.md §2); anything else (i.e. the
+/// `drut.toml` watcher registration) keeps its original error-result-is-
+/// logged-but-otherwise-inert behavior.
+fn handle_response(connection: &Connection, response: Response, state: &mut ServerState) {
+    if response.id == lsp_server::RequestId::from(CLIENT_FORMAT_DEFAULTS_ID.to_string()) {
+        if let Ok(value) = response.response_result {
+            // `WorkspaceConfiguration::Result` is `Vec<Value>`, one entry
+            // per requested `ConfigurationItem` — exactly one item was ever
+            // requested (research.md §4), so only its first entry matters.
+            // A client that can't provide the section returns `null` there
+            // (per `lsp-types`' own doc comment on `WorkspaceConfiguration`)
+            // -- `parse_client_format_defaults` treats that identically to
+            // an object with every field absent (spec.md Edge Cases).
+            if let Some(section) = value.as_array().and_then(|items| items.first()) {
+                state.set_client_format_defaults(parse_client_format_defaults(section));
+            }
+        }
+        // An error result, or a response whose shape didn't match at all,
+        // simply leaves the cache at its previous value — never a hard
+        // failure, matching every other malformed-config-value contract in
+        // this project.
+        return;
+    }
+
     if let Err(error) = response.response_result {
         let params = lsp_types::LogMessageParams {
             typ: lsp_types::MessageType::WARNING,
@@ -235,6 +325,84 @@ fn handle_response(connection: &Connection, response: Response) {
         let note = lsp_server::Notification::new(lsp_types::notification::LogMessage::METHOD.to_string(), params);
         let _ = connection.sender.send(Message::Notification(note));
     }
+}
+
+/// Parses a `workspace/configuration` response's `"drut.format"` section
+/// (a JSON object whose keys are this feature's own camelCase VS Code
+/// setting names, data-model.md §3) into an `ExplicitFormatOverride`
+/// (021-editor-settings-config T008). Every field is looked up
+/// independently — a missing key, a key of the wrong JSON type, or an
+/// unrecognized string value all resolve to that one field staying `None`,
+/// never a hard failure and never affecting any other field (data-model.md
+/// §2). `value` being anything other than a JSON object (e.g. `null`, for a
+/// client that can't provide the section at all) also resolves to every
+/// field `None` — the same outcome as an object with every key individually
+/// absent (spec.md Edge Cases).
+fn parse_client_format_defaults(value: &serde_json::Value) -> drut_config::ExplicitFormatOverride {
+    let field = |key: &str| value.get(key);
+    drut_config::ExplicitFormatOverride {
+        casing: field("casing").and_then(parse_client_casing),
+        control_words_casing: field("controlWordsCasing").and_then(parse_client_casing),
+        pair_keywords_casing: field("pairKeywordsCasing").and_then(parse_client_casing),
+        data_references_casing: field("dataReferencesCasing").and_then(parse_client_casing),
+        top_level_indent: field("topLevelIndent").and_then(parse_client_top_level_indent),
+        indent_width: field("indentWidth").and_then(parse_client_u8),
+        operator_spacing: field("operatorSpacing").and_then(parse_client_operator_spacing),
+        blank_lines: field("blankLines").and_then(parse_client_blank_lines),
+        top_level_blank_line_cap: field("topLevelBlankLineCap").and_then(parse_client_u8),
+        nested_blank_line_cap: field("nestedBlankLineCap").and_then(parse_client_u8),
+    }
+}
+
+/// Shared by `casing` and the three granular `*Casing` fields — identical
+/// accepted-value shape (`"preserve"`/`"upper"`/`"lower"`) every one of
+/// them already has at the `drut.toml` parsing layer (`drut_config::
+/// parse::parse_casing`); any other string, or any non-string JSON value,
+/// is simply unrecognized here (`None`), not a hard failure.
+fn parse_client_casing(value: &serde_json::Value) -> Option<voyager_core::CasingConvention> {
+    match value.as_str()? {
+        "preserve" => Some(voyager_core::CasingConvention::Preserve),
+        "upper" => Some(voyager_core::CasingConvention::Upper),
+        "lower" => Some(voyager_core::CasingConvention::Lower),
+        _ => None,
+    }
+}
+
+fn parse_client_top_level_indent(value: &serde_json::Value) -> Option<voyager_core::TopLevelIndentMode> {
+    match value.as_str()? {
+        "preserve" => Some(voyager_core::TopLevelIndentMode::Preserve),
+        "normalize" => Some(voyager_core::TopLevelIndentMode::Normalize),
+        _ => None,
+    }
+}
+
+fn parse_client_operator_spacing(value: &serde_json::Value) -> Option<voyager_core::OperatorSpacing> {
+    match value.as_str()? {
+        "preserve" => Some(voyager_core::OperatorSpacing::Preserve),
+        "fixed" => Some(voyager_core::OperatorSpacing::Fixed),
+        "auto" => Some(voyager_core::OperatorSpacing::Auto),
+        _ => None,
+    }
+}
+
+fn parse_client_blank_lines(value: &serde_json::Value) -> Option<voyager_core::BlankLineMode> {
+    match value.as_str()? {
+        "preserve" => Some(voyager_core::BlankLineMode::Preserve),
+        "auto" => Some(voyager_core::BlankLineMode::Auto),
+        _ => None,
+    }
+}
+
+/// Shared by `indentWidth`/`topLevelBlankLineCap`/`nestedBlankLineCap` — any
+/// JSON number that fits in a `u8` is accepted here; the 1–16 (or
+/// 1–50) valid-range bound is enforced later, at `drut_config::
+/// resolve_format_options`'s own resolve layer, the same two-stage
+/// parse-then-validate split `drut_config::parse` already uses for
+/// `drut.toml`'s own `indent_width`/blank-line-cap fields. A value that
+/// doesn't even fit in a `u8` (negative, or too large) is left `None`
+/// here rather than silently clamped.
+fn parse_client_u8(value: &serde_json::Value) -> Option<u8> {
+    value.as_u64().and_then(|n| u8::try_from(n).ok())
 }
 
 /// Reports exactly which binary/build is running, directly from inside the
@@ -271,7 +439,9 @@ fn log_startup_info(connection: &Connection) {
 }
 
 fn handle_notification(connection: &Connection, note: ServerNotification, state: &mut ServerState) {
-    use lsp_types::notification::{DidChangeTextDocument, DidChangeWatchedFiles, DidCloseTextDocument, DidOpenTextDocument};
+    use lsp_types::notification::{
+        DidChangeConfiguration, DidChangeTextDocument, DidChangeWatchedFiles, DidCloseTextDocument, DidOpenTextDocument,
+    };
 
     let note = match note.extract::<lsp_types::DidOpenTextDocumentParams>(DidOpenTextDocument::METHOD) {
         Ok(params) => {
@@ -317,11 +487,28 @@ fn handle_notification(connection: &Connection, note: ServerNotification, state:
     // (research.md §5). Every `FileEvent` in `changes` is treated
     // identically regardless of its own `typ` (Created/Changed/Deleted) --
     // deliberate, per spec.md's Edge Cases.
-    if note.extract::<lsp_types::DidChangeWatchedFilesParams>(DidChangeWatchedFiles::METHOD).is_ok() {
-        let uris: Vec<lsp_types::Uri> = state.open_uris().cloned().collect();
-        for uri in &uris {
-            diagnostics::publish(connection, state, uri);
+    let note = match note.extract::<lsp_types::DidChangeWatchedFilesParams>(DidChangeWatchedFiles::METHOD) {
+        Ok(_params) => {
+            let uris: Vec<lsp_types::Uri> = state.open_uris().cloned().collect();
+            for uri in &uris {
+                diagnostics::publish(connection, state, uri);
+            }
+            return;
         }
+        Err(lsp_server::ExtractError::MethodMismatch(note)) => note,
+        Err(lsp_server::ExtractError::JsonError { .. }) => return,
+    };
+
+    // 021-editor-settings-config FR-002/FR-006, research.md §3: a client
+    // setting changed somewhere -- re-fire the same fire-and-forget
+    // workspace/configuration pull, never read this notification's own
+    // `settings` payload (the modern LSP client convention sends it as a
+    // bare `null` re-pull trigger, not a real data source). The refreshed
+    // cache is picked up by the *next* format request against any open
+    // document, with no reopen needed (SC-004) -- no document-level action
+    // is taken here.
+    if note.extract::<lsp_types::DidChangeConfigurationParams>(DidChangeConfiguration::METHOD).is_ok() {
+        request_client_format_defaults(connection);
     }
 }
 
@@ -374,4 +561,99 @@ fn send_ok<T: serde::Serialize>(connection: &Connection, id: lsp_server::Request
 fn send_err(connection: &Connection, id: lsp_server::RequestId, message: String) {
     let response = Response::new_err(id, lsp_server::ErrorCode::MethodNotFound as i32, message);
     let _ = connection.sender.send(Message::Response(response));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// Builds `Option<InitializeParams>` the same way `run()` itself does
+    /// (`serde_json::from_value(...).ok()`), for `workspace_configuration_
+    /// supported`'s own unit tests (021-editor-settings-config T010).
+    fn init_params(capabilities: serde_json::Value) -> Option<lsp_types::InitializeParams> {
+        serde_json::from_value(json!({"capabilities": capabilities})).ok()
+    }
+
+    #[test]
+    fn workspace_configuration_supported_true_when_the_client_advertises_it() {
+        let params = init_params(json!({"workspace": {"configuration": true}}));
+        assert!(workspace_configuration_supported(params.as_ref()));
+    }
+
+    #[test]
+    fn workspace_configuration_supported_false_when_the_workspace_key_is_absent() {
+        let params = init_params(json!({}));
+        assert!(!workspace_configuration_supported(params.as_ref()));
+    }
+
+    #[test]
+    fn workspace_configuration_supported_false_when_explicitly_advertised_false() {
+        let params = init_params(json!({"workspace": {"configuration": false}}));
+        assert!(!workspace_configuration_supported(params.as_ref()));
+    }
+
+    #[test]
+    fn workspace_configuration_supported_false_for_no_params_at_all() {
+        assert!(!workspace_configuration_supported(None));
+    }
+
+    #[test]
+    fn parse_client_format_defaults_parses_every_known_field() {
+        let value = json!({
+            "casing": "upper",
+            "controlWordsCasing": "lower",
+            "pairKeywordsCasing": "preserve",
+            "dataReferencesCasing": "upper",
+            "topLevelIndent": "normalize",
+            "indentWidth": 2,
+            "operatorSpacing": "fixed",
+            "blankLines": "auto",
+            "topLevelBlankLineCap": 3,
+            "nestedBlankLineCap": 1
+        });
+        let result = parse_client_format_defaults(&value);
+        assert_eq!(result.casing, Some(voyager_core::CasingConvention::Upper));
+        assert_eq!(result.control_words_casing, Some(voyager_core::CasingConvention::Lower));
+        assert_eq!(result.pair_keywords_casing, Some(voyager_core::CasingConvention::Preserve));
+        assert_eq!(result.data_references_casing, Some(voyager_core::CasingConvention::Upper));
+        assert_eq!(result.top_level_indent, Some(voyager_core::TopLevelIndentMode::Normalize));
+        assert_eq!(result.indent_width, Some(2));
+        assert_eq!(result.operator_spacing, Some(voyager_core::OperatorSpacing::Fixed));
+        assert_eq!(result.blank_lines, Some(voyager_core::BlankLineMode::Auto));
+        assert_eq!(result.top_level_blank_line_cap, Some(3));
+        assert_eq!(result.nested_blank_line_cap, Some(1));
+    }
+
+    /// T010's own dedicated regression case: a malformed/partially-invalid
+    /// pulled JSON object leaves only the affected field `None`, not the
+    /// whole cache.
+    #[test]
+    fn parse_client_format_defaults_leaves_only_the_malformed_field_none() {
+        let value = json!({
+            "casing": "sideways",
+            "indentWidth": 4
+        });
+        let result = parse_client_format_defaults(&value);
+        assert_eq!(result.casing, None, "an unrecognized string must leave only this field None");
+        assert_eq!(result.indent_width, Some(4), "a sibling valid field must be unaffected");
+    }
+
+    #[test]
+    fn parse_client_format_defaults_of_a_non_object_value_resolves_to_every_field_none() {
+        // A client that can't provide the section returns `null` for that
+        // item (lsp-types' own WorkspaceConfiguration doc comment) --
+        // treated identically to an object with every key absent (spec.md
+        // Edge Cases).
+        let result = parse_client_format_defaults(&json!(null));
+        assert_eq!(result.casing, None);
+        assert_eq!(result.indent_width, None);
+    }
+
+    #[test]
+    fn parse_client_format_defaults_of_an_empty_object_resolves_to_every_field_none() {
+        let result = parse_client_format_defaults(&json!({}));
+        assert_eq!(result.casing, None);
+        assert_eq!(result.indent_width, None);
+    }
 }

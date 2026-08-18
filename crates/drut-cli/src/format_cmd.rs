@@ -151,7 +151,11 @@ pub fn run(
     };
 
     for file in &traversal.matched_files {
-        let (options, warnings) = resolve_format_options(Some(&file.path), isolated, explicit);
+        // 021-editor-settings-config: the CLI has no client-settings tier of
+        // its own (spec.md FR-007) — always the empty default, never any
+        // other value.
+        let (options, warnings) =
+            resolve_format_options(Some(&file.path), isolated, explicit, ExplicitFormatOverride::default());
         if !warnings.is_empty() {
             report.config_warnings.push((file.path.clone(), warnings));
         }

@@ -199,8 +199,14 @@ fn explicit_override(input: &FormatInput) -> Result<drut_config::ExplicitFormatO
 pub fn format(input: &FormatInput) -> Result<FormatResultDto, String> {
     let explicit = explicit_override(input)?;
     let file_path = input.source.path.as_deref().map(Path::new);
-    let (options, warnings) =
-        drut_config::resolve_format_options(file_path, input.isolated.unwrap_or(false), explicit);
+    // 021-editor-settings-config: MCP has no client-settings tier of its own
+    // (spec.md FR-007) — always the empty default, never any other value.
+    let (options, warnings) = drut_config::resolve_format_options(
+        file_path,
+        input.isolated.unwrap_or(false),
+        explicit,
+        drut_config::ExplicitFormatOverride::default(),
+    );
 
     let source = input.source.resolve().map_err(|e: SourceError| e.to_string())?;
     let result = match source {
