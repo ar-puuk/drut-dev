@@ -9,3 +9,11 @@ editors/vscode/node_modules/
 editors/vscode/out/
 editors/vscode/*.vsix
 editors/vscode/.vscode-test/
+# Copied fresh from the repo-root CHANGELOG.md by the "vscode:prepublish" npm
+# script (package.json) every time `vsce package`/`publish` runs, so the
+# Marketplace/Open VSX "Changelog" tab (which reads CHANGELOG.md from the
+# packaged extension's own root, not the repo's) never goes stale via a
+# hand-maintained duplicate -- same drift risk this project already hit once
+# with CONTRIBUTING.md's old Configuration section, deliberately not repeated
+# here.
+editors/vscode/CHANGELOG.md

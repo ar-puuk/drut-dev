@@ -2,7 +2,7 @@
   "name": "drut",
   "displayName": "Drut for Cube Voyager",
   "description": "Syntax highlighting and language support for Cube Voyager control-statement scripts (.s/.block), backed by the Drut language server.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "arpuuk",
   "license": "MIT OR Apache-2.0",
   "icon": "icon.png",
@@ -160,7 +160,8 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "ts-node test/grammar.test.ts && ts-node test/formatOnSave.test.ts && ts-node test/binaryBootstrap.test.ts"
+    "test": "ts-node test/grammar.test.ts && ts-node test/formatOnSave.test.ts && ts-node test/binaryBootstrap.test.ts",
+    "vscode:prepublish": "node -e \"require('fs').copyFileSync(require('path').join('..','..','CHANGELOG.md'), 'CHANGELOG.md')\""
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

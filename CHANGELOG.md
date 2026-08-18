@@ -11,6 +11,20 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-18
+
+### Fixed
+
+- The VS Code Marketplace/Open VSX "Changelog" tab showed nothing —
+  `editors/vscode/` (the directory actually packaged into the `.vsix`) never
+  had a `CHANGELOG.md` of its own; only the repo root did, one directory up
+  from what `vsce`/`ovsx` bundle. A new `vscode:prepublish` npm script (a
+  hook `vsce package`/`vsce publish` already run automatically, the same
+  purpose `npm run compile` already used it for) copies the repo-root
+  `CHANGELOG.md` into `editors/vscode/CHANGELOG.md` immediately before
+  packaging, every time — generated fresh at publish time, not a
+  hand-maintained duplicate that could go stale.
+
 ## [0.2.0] - 2026-08-17
 
 ### Added
