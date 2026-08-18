@@ -37,6 +37,12 @@ struct OperatorOccurrence {
     /// `TokenKind::ContinuationMarker` (research.md §3) — suppresses the
     /// trailing-side edit entirely, since nothing follows it on this line.
     is_continuation: bool,
+    /// Target gap width on both sides of this occurrence (023-range-dash-
+    /// spacing data-model.md §1). `1` for every operator kind except a
+    /// qualifying range dash, which wants `0` — a binary `-` inside a
+    /// `Control` statement's pair-keyword value with a bare integer literal
+    /// directly adjacent on both sides (see `is_range_dash`).
+    want_spaces: usize,
 }
 
 /// Tracks which token indices in `tokens` fall inside an open string/quoted
@@ -87,11 +93,47 @@ fn is_binary_arithmetic(tokens: &[Token], index: usize) -> bool {
     true
 }
 
+/// A bare integer literal (023-range-dash-spacing data-model.md §1,
+/// research.md §3): a `Word` token whose text is non-empty and consists
+/// entirely of ASCII digits. `.` is not a lexer delimiter (`lexer.rs::
+/// is_delimiter`), so a decimal number (`1.5`) or a dotted data-reference
+/// (`mi.1.1`) already tokenizes as one `Word` token containing a non-digit
+/// character — excluded here by construction, no extra logic needed.
+fn is_bare_integer_literal(tok: &Token) -> bool {
+    tok.kind == TokenKind::Word && !tok.text.is_empty() && tok.text.chars().all(|c| c.is_ascii_digit())
+}
+
+/// Whether the binary `-` at `stmt.tokens[index]` is a range dash
+/// (023-range-dash-spacing FR-001/FR-002): inside a `Control` statement's
+/// pair-keyword value, with a bare integer literal directly adjacent on
+/// both sides. Reuses `pair_keyword_boundaries` — the same value-boundary
+/// data `collect_comma_edits` already derives for the identical statement
+/// (FR-010) — rather than a separately-maintained notion of where a value
+/// starts and ends. Only ever called for an occurrence `is_binary_arithmetic`
+/// already accepted, so a unary `-` never reaches this check (FR-005).
+fn is_range_dash(stmt: &Statement, index: usize) -> bool {
+    let StatementKind::Control { .. } = &stmt.kind else {
+        return false;
+    };
+    let tokens = &stmt.tokens;
+    if index == 0 || index + 1 >= tokens.len() {
+        return false;
+    }
+    let boundaries = pair_keyword_boundaries(tokens);
+    let in_a_value = boundaries.iter().enumerate().any(|(i, &(_, eq_idx))| {
+        let value_start = eq_idx + 1;
+        let value_end = boundaries.get(i + 1).map(|p| p.0).unwrap_or(tokens.len());
+        (value_start..value_end).contains(&index)
+    });
+    in_a_value && is_bare_integer_literal(&tokens[index - 1]) && is_bare_integer_literal(&tokens[index + 1])
+}
+
 /// Recognizes assignment/comparison/binary-arithmetic operator occurrences
-/// in `tokens` (research.md §1, §2, §5) — never commas (a separate,
+/// in `stmt.tokens` (research.md §1, §2, §5) — never commas (a separate,
 /// pair-boundary-aware rule, [`collect_comma_edits`]) and never a token
 /// [`quoted_token_mask`] marks as inside a string literal.
-fn recognize_operators(tokens: &[Token]) -> Vec<OperatorOccurrence> {
+fn recognize_operators(stmt: &Statement) -> Vec<OperatorOccurrence> {
+    let tokens = &stmt.tokens;
     let mask = quoted_token_mask(tokens);
     let mut out = Vec::new();
     let mut i = 0;
@@ -115,6 +157,7 @@ fn recognize_operators(tokens: &[Token]) -> Vec<OperatorOccurrence> {
                         end_index: i + 2,
                         span: tok.span.merge(next.span),
                         is_continuation: next.kind == TokenKind::ContinuationMarker,
+                        want_spaces: 1,
                     });
                     i += 2;
                     continue;
@@ -130,11 +173,16 @@ fn recognize_operators(tokens: &[Token]) -> Vec<OperatorOccurrence> {
             _ => None,
         };
         if kind.is_some() {
+            // 023-range-dash-spacing FR-001: a binary `-` that's also a
+            // range dash wants zero surrounding whitespace instead of the
+            // one space every other operator occurrence wants.
+            let want_spaces = if text == "-" && is_range_dash(stmt, i) { 0 } else { 1 };
             out.push(OperatorOccurrence {
                 start_index: i,
                 end_index: i + 1,
                 span: tok.span,
                 is_continuation: tok.kind == TokenKind::ContinuationMarker,
+                want_spaces,
             });
         }
         i += 1;
@@ -181,14 +229,16 @@ fn push_gap_edit(lines: &[Vec<char>], edits: &mut Vec<SpacingEdit>, from: Positi
 
 /// `Fixed`'s operator-spacing rule (FR-002/FR-003/FR-012): one space on each
 /// side of every recognized operator, leading-side-only for a trailing
-/// continuation-position occurrence.
-pub(crate) fn collect_operator_edits(tokens: &[Token], lines: &[Vec<char>], edits: &mut Vec<SpacingEdit>) {
-    for occ in recognize_operators(tokens) {
+/// continuation-position occurrence — except a range dash
+/// (023-range-dash-spacing FR-001), which wants zero on each side instead.
+pub(crate) fn collect_operator_edits(stmt: &Statement, lines: &[Vec<char>], edits: &mut Vec<SpacingEdit>) {
+    let tokens = &stmt.tokens;
+    for occ in recognize_operators(stmt) {
         if occ.start_index > 0 {
-            push_gap_edit(lines, edits, tokens[occ.start_index - 1].span.end, occ.span.start, 1);
+            push_gap_edit(lines, edits, tokens[occ.start_index - 1].span.end, occ.span.start, occ.want_spaces);
         }
         if !occ.is_continuation && occ.end_index < tokens.len() {
-            push_gap_edit(lines, edits, occ.span.end, tokens[occ.end_index].span.start, 1);
+            push_gap_edit(lines, edits, occ.span.end, tokens[occ.end_index].span.start, occ.want_spaces);
         }
     }
 }
@@ -287,7 +337,7 @@ pub(crate) fn collect_fixed_edits(stmt: &Statement, lines: &[Vec<char>], edits: 
     if matches!(stmt.kind, StatementKind::ShellEscape { .. }) {
         return;
     }
-    collect_operator_edits(&stmt.tokens, lines, edits);
+    collect_operator_edits(stmt, lines, edits);
     collect_bracket_paren_edits(&stmt.tokens, lines, edits);
     collect_comma_edits(stmt, lines, edits);
 }
@@ -602,6 +652,96 @@ mod tests {
         let src = "MW[1] = A+-B";
         let out = apply(src, &fixed_edits_for(src));
         assert_eq!(out, "MW[1] = A + -B");
+    }
+
+    // -- 023-range-dash-spacing ---------------------------------------------
+
+    #[test]
+    fn range_dash_between_bare_integers_in_a_pair_value_renders_tight() {
+        // research.md §5: a bare `SELECTLINK=...` with nothing before it
+        // parses as Assignment, not Control -- a leading control word
+        // (FILEO here, matching the real corpus shape) is required for this
+        // to be a pair-keyword value at all. The pair's own `=` still gets
+        // 018's ordinary one-space-each-side treatment (unrelated to this
+        // feature) -- only the range dashes themselves render tight.
+        let src = "FILEO SELECTLINK=1-50,75,90-100";
+        let out = apply(src, &fixed_edits_for(src));
+        assert_eq!(
+            out, "FILEO SELECTLINK = 1-50,75,90-100",
+            "the ranges stay tight; only the pair's own = gets 018's existing spacing"
+        );
+
+        for spaced in ["FILEO NODES=200 - 300", "FILEO NODES=200- 300", "FILEO NODES=200 -300"] {
+            let out = apply(spaced, &fixed_edits_for(spaced));
+            assert_eq!(out, "FILEO NODES = 200-300", "input: {spaced}");
+        }
+    }
+
+    #[test]
+    fn same_pair_internal_commas_are_never_touched_by_either_rule() {
+        // The comma rule only ever touches a pair-*boundary* comma
+        // (018-operator-spacing FR-004) -- these three commas are all
+        // inside SELECTLINK's own single value, never candidates for it.
+        // The only edit present is the pair's own `=` (018's existing,
+        // unrelated behavior) -- confirm no edit touches any of the commas.
+        let src = "FILEO SELECTLINK=1-50,75,90-100";
+        let edits = fixed_edits_for(src);
+        let comma_cols: Vec<usize> = src.match_indices(',').map(|(i, _)| i).collect();
+        for (_, start, _, _) in &edits {
+            assert!(
+                !comma_cols.contains(start),
+                "no edit should touch a same-pair-internal comma, got {edits:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn range_dash_only_applies_inside_a_pair_keyword_value() {
+        let src = "X = 100-1";
+        let out = apply(src, &fixed_edits_for(src));
+        assert_eq!(out, "X = 100 - 1", "an Assignment's RHS keeps ordinary binary-arithmetic spacing");
+
+        let src2 = "IF (COUNT-1 == 0)\nENDIF";
+        let out2 = apply(src2, &fixed_edits_for(src2));
+        assert_eq!(out2, "IF(COUNT - 1 == 0)\nENDIF", "a condition is never a pair-keyword value");
+    }
+
+    #[test]
+    fn range_dash_requires_a_bare_integer_literal_on_both_sides() {
+        let src = "FILEO SELECTLINK=@START@-50";
+        let out = apply(src, &fixed_edits_for(src));
+        assert_eq!(
+            out, "FILEO SELECTLINK = @START@ - 50",
+            "a @token@ reference is not a bare integer literal"
+        );
+
+        let src2 = "FILEO THRESHOLD=1.5-2.5";
+        let out2 = apply(src2, &fixed_edits_for(src2));
+        assert_eq!(
+            out2, "FILEO THRESHOLD = 1.5 - 2.5",
+            "a decimal number is one Word token containing '.', never a bare integer literal"
+        );
+    }
+
+    #[test]
+    fn leading_unary_minus_in_a_pair_value_is_never_a_range_dash_candidate() {
+        let src = "FILEO OFFSET=-100,50";
+        let out = apply(src, &fixed_edits_for(src));
+        assert_eq!(
+            out, "FILEO OFFSET = -100,50",
+            "unary minus is never a binary occurrence at all -- only the pair's own = is spaced"
+        );
+    }
+
+    #[test]
+    fn range_dash_composes_with_pair_boundary_comma_spacing() {
+        // spec.md Acceptance Scenario 6 / FR-006: a pair-boundary comma (a
+        // real candidate for 018's comma rule, unlike same-pair-internal
+        // commas) sitting immediately next to range-dash values -- both
+        // rules apply independently to their own disjoint gaps.
+        let src = "FILEO NODES=1-50 ,SELECTLINK=75 - 100";
+        let out = apply(src, &fixed_edits_for(src));
+        assert_eq!(out, "FILEO NODES = 1-50, SELECTLINK = 75-100");
     }
 
     #[test]

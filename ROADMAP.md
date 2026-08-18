@@ -616,6 +616,30 @@ after this log.)
    grammar's own coloring, matching the block-style form, with no
    overlapping tokens. LSP-only fix (`crates/drut-lsp/src/
    semantic_tokens.rs`), no `voyager-core` change.
+8. **Range-dash spacing exemption for `operator_spacing`** — *done*, merged
+   2026-08-18 as `023-range-dash-spacing`. `fixed`/`auto` treated every `-`
+   inside a `Control` statement's pair-keyword value as arithmetic
+   subtraction, spacing it apart (`1 - 50`) — but a `-` joining two bare
+   integer literals there is Cube Voyager's own inclusive-range list
+   notation (`SELECTLINK=1-50,75,90-100`, `NODES=200-300`), not
+   subtraction, and spacing it apart obscured the convention. Confirmed
+   against the real fixture corpus, not just reasoned about: four real
+   files (`AssignHwy/02_Assign_AM_MD_PM_EV.s`,
+   `Distribute/3_SumToDistricts_GRAVITY.s`,
+   `Distribute/4pd_mainbody_distribution.block`,
+   `ModeChoice/06_HBW_logsums.s`) contain exactly this shape (`mo=31-60`,
+   `EXCLUDEGROUP=1-2,7`), and their golden fixtures under
+   `operator_spacing=fixed`/`auto` needed updating once this shipped — real
+   evidence the bug was live, not hypothetical. A binary `-` inside a
+   pair-keyword value with a bare integer literal directly adjacent on both
+   sides now renders with zero surrounding whitespace instead of one space
+   each side, regardless of how it was originally spaced; every `-`
+   elsewhere (an `Assignment` RHS, an `IF`/short-`IF` condition, a `LOOP`
+   bound) keeps its existing spacing unchanged, and `preserve` mode is
+   unaffected either way. No new `[format]` field, CLI flag, MCP parameter,
+   or editor setting — reachable through the existing `operator_spacing`
+   setting alone. `crates/voyager-core/src/operator_spacing.rs` only, no
+   adapter-crate change.
 
 ## Open questions (not part of the pre-publish sequence)
 

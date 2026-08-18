@@ -77,6 +77,21 @@ CONTRIBUTING.md's "Versioning" section).
   closing paren) as one token to distinguish a short-`IF` from a
   block-style one; narrowed to just the `IF`/`ELSEIF` keyword itself, so
   the condition and body now color exactly like the block-style form.
+- `operator_spacing = "fixed"`/`"auto"` spaced apart a `-` joining two bare
+  integer literals inside a `Control` statement's pair-keyword value (e.g.
+  `SELECTLINK=1-50,75,90-100` → `SELECTLINK=1 - 50,75,90 - 100`), even
+  though that's Cube Voyager's own inclusive-range list notation, not
+  arithmetic subtraction — confirmed live in the real fixture corpus
+  (`mo=31-60`, `EXCLUDEGROUP=1-2,7`, among others), not just a
+  hypothetical case. A binary `-` joining two bare integer literals inside
+  a pair-keyword value now renders with zero surrounding whitespace
+  instead, regardless of how it was originally spaced (`1 - 50`/`1- 50`/
+  `1 -50` all become `1-50`); a `-` anywhere else (an `Assignment`'s
+  right-hand side, an `IF`/short-`IF` condition, a `LOOP` bound) is
+  unaffected and keeps its existing spacing, and `operator_spacing` left
+  unset or `"preserve"` is unaffected either way. No new `[format]` field,
+  CLI flag, MCP parameter, or editor setting — this is a correction to
+  `operator_spacing`'s existing `fixed`/`auto` behavior, not a new one.
 
 ## [0.2.1] - 2026-08-18
 

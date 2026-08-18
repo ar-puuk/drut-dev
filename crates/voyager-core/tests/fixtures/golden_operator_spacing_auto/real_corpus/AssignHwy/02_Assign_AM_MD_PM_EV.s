@@ -218,7 +218,7 @@ RUN PGM = HIGHWAY   MSG = 'Final Assign: AM period trip assignment'
     
     
     FILEO MATO[1] = '@ParentDir@@ScenarioDir@\5_AssignHwy\3_SelectLink\@RID@_SL1_@PrdTag@.mtx',
-           mo = 31 - 60,
+           mo = 31-60,
            name = HBW_DA_NON,
                 HBW_SR_NON,
                 HBW_SR_HOV,
@@ -257,7 +257,7 @@ RUN PGM = HIGHWAY   MSG = 'Final Assign: AM period trip assignment'
                 Ext_HV    
           
     FILEO MATO[2] = '@ParentDir@@ScenarioDir@\5_AssignHwy\3_SelectLink\@RID@_SL2_@PrdTag@.mtx',
-          mo = 61 - 90,
+          mo = 61-90,
            name = HBW_DA_NON,
                 HBW_SR_NON,
                 HBW_SR_HOV,
@@ -369,7 +369,7 @@ RUN PGM = HIGHWAY   MSG = 'Final Assign: MD period trip assignment'
     
     
     FILEO MATO[1] = '@ParentDir@@ScenarioDir@\5_AssignHwy\3_SelectLink\@RID@_SL1_@PrdTag@.mtx',
-           mo = 31 - 60,
+           mo = 31-60,
            name = HBW_DA_NON,
                 HBW_SR_NON,
                 HBW_SR_HOV,
@@ -408,7 +408,7 @@ RUN PGM = HIGHWAY   MSG = 'Final Assign: MD period trip assignment'
                 Ext_HV    
           
     FILEO MATO[2] = '@ParentDir@@ScenarioDir@\5_AssignHwy\3_SelectLink\@RID@_SL2_@PrdTag@.mtx',
-          mo = 61 - 90,
+          mo = 61-90,
            name = HBW_DA_NON,
                 HBW_SR_NON,
                 HBW_SR_HOV,
@@ -519,7 +519,7 @@ RUN PGM = HIGHWAY   MSG = 'Final Assign: PM period trip assignment'
     
     
     FILEO MATO[1] = '@ParentDir@@ScenarioDir@\5_AssignHwy\3_SelectLink\@RID@_SL1_@PrdTag@.mtx',
-           mo = 31 - 60,
+           mo = 31-60,
            name = HBW_DA_NON,
                 HBW_SR_NON,
                 HBW_SR_HOV,
@@ -558,7 +558,7 @@ RUN PGM = HIGHWAY   MSG = 'Final Assign: PM period trip assignment'
                 Ext_HV    
           
     FILEO MATO[2] = '@ParentDir@@ScenarioDir@\5_AssignHwy\3_SelectLink\@RID@_SL2_@PrdTag@.mtx',
-          mo = 61 - 90,
+          mo = 61-90,
            name = HBW_DA_NON,
                 HBW_SR_NON,
                 HBW_SR_HOV,
@@ -668,7 +668,7 @@ RUN PGM = HIGHWAY   MSG = 'Final Assign: EV period trip assignment'
     
     
     FILEO MATO[1] = '@ParentDir@@ScenarioDir@\5_AssignHwy\3_SelectLink\@RID@_SL1_@PrdTag@.mtx',
-           mo = 31 - 60,
+           mo = 31-60,
            name = HBW_DA_NON,
                 HBW_SR_NON,
                 HBW_SR_HOV,
@@ -708,7 +708,7 @@ RUN PGM = HIGHWAY   MSG = 'Final Assign: EV period trip assignment'
     
     
     FILEO MATO[2] = '@ParentDir@@ScenarioDir@\5_AssignHwy\3_SelectLink\@RID@_SL2_@PrdTag@.mtx',
-          mo = 61 - 90,
+          mo = 61-90,
            name = HBW_DA_NON,
                 HBW_SR_NON,
                 HBW_SR_HOV,
@@ -1176,7 +1176,7 @@ if(Use_SelLinkGrp = 1)
         FILEI MATI[8] = '@ParentDir@@ScenarioDir@\5_AssignHwy\3_SelectLink\@RID@_SL2_EV.mtx'
         
         FILEO MATO[1] = '@ParentDir@@ScenarioDir@\5_AssignHwy\3_SelectLink\@RID@_SL1_DY.mtx',
-               mo = 01 - 30,
+               mo = 01-30,
                name = HBW_DA_NON,
                     HBW_SR_NON,
                     HBW_SR_HOV,
@@ -1215,7 +1215,7 @@ if(Use_SelLinkGrp = 1)
                     Ext_HV    
         
         FILEO MATO[2] = '@ParentDir@@ScenarioDir@\5_AssignHwy\3_SelectLink\@RID@_SL2_DY.mtx',
-               mo = 31 - 60,
+               mo = 31-60,
                name = HBW_DA_NON,
                     HBW_SR_NON,
                     HBW_SR_HOV,
