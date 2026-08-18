@@ -776,7 +776,7 @@
             PATHLOAD PATH = lw.COST_Auto_Wrk, DEC = F2,
                 CONSOLIDATE = T, 
                 PENI = 1,
-                EXCLUDEGROUP = 1 - 2,7,    ;exclude HOV/HOT lanes
+                EXCLUDEGROUP = 1-2,7,    ;exclude HOV/HOT lanes
                 VOL[01] = mw[01],        ;HBW
                 VOL[31] = mw[31]         ;Tel_HBW
             
@@ -785,7 +785,7 @@
             PATHLOAD PATH = lw.COST_Auto_Per, DEC = F2,
                 CONSOLIDATE = T, 
                 PENI = 1,
-                EXCLUDEGROUP = 1 - 2,7,    ;exclude HOV/HOT lanes
+                EXCLUDEGROUP = 1-2,7,    ;exclude HOV/HOT lanes
                 VOL[02] = mw[02],        ;HBShp   
                 VOL[03] = mw[03],        ;HBOth   
                 VOL[04] = mw[04],        ;HBSch_Pr
@@ -801,7 +801,7 @@
             PATHLOAD PATH = lw.COST_Auto_Ext, DEC = F2,
                 CONSOLIDATE = T, 
                 PENI = 1,
-                EXCLUDEGROUP = 1 - 2,7,    ;exclude HOV/HOT lanes
+                EXCLUDEGROUP = 1-2,7,    ;exclude HOV/HOT lanes
                 VOL[09] = mw[09],        ;IX
                 VOL[10] = mw[10],        ;XI
                 VOL[11] = mw[11]         ;XX
@@ -811,7 +811,7 @@
             PATHLOAD PATH = lw.COST_Truck_LT, DEC = F2,
                 CONSOLIDATE = T, 
                 PENI = 1, 
-                EXCLUDEGROUP = 1 - 2,7,    ;exclude HOV/HOT lanes
+                EXCLUDEGROUP = 1-2,7,    ;exclude HOV/HOT lanes
                 VOL[12] = mw[12]         ;SH_LT
             
             
@@ -819,7 +819,7 @@
             PATHLOAD PATH = lw.COST_Truck_MD, DEC = F2,
                 CONSOLIDATE = T, 
                 PENI = 1, 
-                EXCLUDEGROUP = 1 - 2,5,7,  ;exclude HOV/HOT & truck restricted lanes
+                EXCLUDEGROUP = 1-2,5,7,  ;exclude HOV/HOT & truck restricted lanes
                 VOL[13] = mw[13],        ;SH_MD
                 VOL[15] = mw[15]         ;Ext_MD
             
@@ -828,7 +828,7 @@
             PATHLOAD PATH = lw.COST_Truck_HV, DEC = F2,
                 CONSOLIDATE = T, 
                 PENI = 1, 
-                EXCLUDEGROUP = 1 - 2,5,7,  ;exclude HOV/HOT & truck restricted lanes
+                EXCLUDEGROUP = 1-2,5,7,  ;exclude HOV/HOT & truck restricted lanes
                 VOL[14] = mw[14],        ;SH_HV
                 VOL[16] = mw[16]         ;Ext_HV
             

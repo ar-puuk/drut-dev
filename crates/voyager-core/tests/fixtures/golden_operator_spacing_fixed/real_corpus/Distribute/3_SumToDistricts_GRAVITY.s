@@ -75,7 +75,7 @@ RUN PGM = MATRIX  MSG = 'Distribution 2: District Summary - DISTLRG'
     FILEI MATI[1] = '@ParentDir@@ScenarioDir@3_Distribute\PA_AllPurp_Gravity.mtx'
 
     FILEO MATO[1] = '@ParentDir@@ScenarioDir@3_Distribute\SumToDistricts\DISTLRG_PA_Gravity_AllPurp.mtx',
-    mo = 100 - 116, 120, 130 - 131, 140 - 141,
+    mo = 100-116, 120, 130-131, 140-141,
     name = TOT      ,
          HBW      ,
          HBShp    ,
@@ -147,7 +147,7 @@ RUN PGM = MATRIX  MSG = 'Distribution 2: District Summary - DISTMED'
     FILEI MATI[1] = '@ParentDir@@ScenarioDir@3_Distribute\PA_AllPurp_Gravity.mtx'
 
     FILEO MATO[1] = '@ParentDir@@ScenarioDir@3_Distribute\SumToDistricts\DISTMED_PA_Gravity_AllPurp.mtx',
-    mo = 100 - 116, 120, 130 - 131, 140 - 141,
+    mo = 100-116, 120, 130-131, 140-141,
     name = TOT      ,
          HBW      ,
          HBShp    ,

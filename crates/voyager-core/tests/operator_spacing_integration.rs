@@ -169,3 +169,73 @@ fn casing_indentation_and_operator_spacing_all_apply_independently_together() {
          all apply together, none interfering with another"
     );
 }
+
+// -- 023-range-dash-spacing -------------------------------------------------
+
+#[test]
+fn rds_acceptance_scenarios_1_through_4_and_6_through_the_real_format_entry_point() {
+    // spec.md Acceptance Scenarios 1, 2, 3, 4, 6 -- through format(), not
+    // just the lower-level operator_spacing.rs unit tests.
+    let src = "\
+FILEO SELECTLINK=1-50,75,90-100
+X = 100-1
+IF (COUNT-1 == 0)
+ENDIF
+FILEO NODES=200 - 300
+FILEO NODES=1-50 ,SELECTLINK=75 - 100
+";
+    let out = format(src, fixed()).text;
+    assert_eq!(
+        out,
+        "\
+FILEO SELECTLINK = 1-50,75,90-100
+X = 100 - 1
+IF(COUNT - 1 == 0)
+ENDIF
+FILEO NODES = 200-300
+FILEO NODES = 1-50, SELECTLINK = 75-100
+",
+        "AS1: range list stays tight (its own = still gets 018's spacing); \
+         AS3: Assignment RHS keeps ordinary binary-arithmetic spacing; \
+         AS4: a condition is never a pair-keyword value; \
+         AS2: existing spacing on a range is actively stripped, not preserved; \
+         AS6: a pair-boundary comma and both range dashes normalize together"
+    );
+}
+
+#[test]
+fn rds_acceptance_scenario_5_preserve_leaves_every_script_above_byte_identical() {
+    let src = "\
+FILEO SELECTLINK=1-50,75,90-100
+X = 100-1
+IF (COUNT-1 == 0)
+ENDIF
+FILEO NODES=200 - 300
+FILEO NODES=1-50 ,SELECTLINK=75 - 100
+";
+    let out = format(src, FormatOptions::default()).text;
+    assert_eq!(out, src, "preserve (unconfigured) must change nothing this feature touches");
+}
+
+#[test]
+fn rds_is_idempotent() {
+    let src = "FILEO SELECTLINK=1-50,75,90-100\n";
+    let once = format(src, fixed()).text;
+    let twice = format(&once, fixed()).text;
+    assert_eq!(once, twice, "a second formatting pass must be a pure no-op");
+}
+
+#[test]
+fn rds_respects_fmt_off_on_regions() {
+    // A range-list value sitting inside a protected region stays exactly as
+    // written, even when spaced with extra whitespace -- matching every
+    // other 018-operator-spacing rule's existing protected-region guarantee.
+    let src = "FILEO SELECTLINK=1-50,75,90-100\n; FMT: OFF\nFILEO NODES=200 - 300\n; FMT: ON\nFILEO NODES=200 - 300\n";
+    let out = format(src, fixed()).text;
+    assert_eq!(
+        out,
+        "FILEO SELECTLINK = 1-50,75,90-100\n; FMT: OFF\nFILEO NODES=200 - 300\n; FMT: ON\nFILEO NODES = 200-300\n",
+        "the protected FILEO NODES line stays exactly as written; the unprotected ones \
+         (before and after the region) normalize as usual"
+    );
+}

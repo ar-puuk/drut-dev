@@ -53,13 +53,13 @@ ScriptStartTime = currenttime()
 
 
       FILEO MATO[1] = '@ParentDir@@ScenarioDir@6_REMM\_logsums_@purp@_@prd@.mtx', 
-        MO = 8 - 10, 
+        MO = 8-10, 
         name = 0veh,
              1veh,
              2veh 
     
       FILEO MATO[2] = '@ParentDir@@ScenarioDir@Temp\4_ModeChoice\@purp@_logsums_@prd@.mtx', 
-        MO = 33 - 38, 
+        MO = 33-38, 
         name = 0veh_lo,
              0veh_hi,
              1veh_lo,
