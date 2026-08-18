@@ -40,15 +40,15 @@ for accepted values, defaults, and what each actually does:
 
 | Flag | `drut.toml` field |
 |---|---|
-| `--control-words-casing` | [`control_words_casing`](configuration-reference.md#control_words_casing) |
-| `--pair-keywords-casing` | [`pair_keywords_casing`](configuration-reference.md#pair_keywords_casing) |
-| `--data-references-casing` | [`data_references_casing`](configuration-reference.md#data_references_casing) |
-| `--top-level-indent` | [`top_level_indent`](configuration-reference.md#top_level_indent) |
+| `--casing-control-words` | [`casing_control_words`](configuration-reference.md#casing_control_words) |
+| `--casing-pair-keywords` | [`casing_pair_keywords`](configuration-reference.md#casing_pair_keywords) |
+| `--casing-data-references` | [`casing_data_references`](configuration-reference.md#casing_data_references) |
+| `--indent-top-level` | [`indent_top_level`](configuration-reference.md#indent_top_level) |
 | `--indent-width` | [`indent_width`](configuration-reference.md#indent_width) |
 | `--operator-spacing` | [`operator_spacing`](configuration-reference.md#operator_spacing) |
 | `--blank-lines` | [`blank_lines`](configuration-reference.md#blank_lines) |
-| `--top-level-blank-line-cap` | [`top_level_blank_line_cap`](configuration-reference.md#top_level_blank_line_cap) |
-| `--nested-blank-line-cap` | [`nested_blank_line_cap`](configuration-reference.md#nested_blank_line_cap) |
+| `--blank-lines-top-cap` | [`blank_lines_top_cap`](configuration-reference.md#blank_lines_top_cap) |
+| `--blank-lines-nested-cap` | [`blank_lines_nested_cap`](configuration-reference.md#blank_lines_nested_cap) |
 
 An explicit flag here always wins over `drut.toml` and any editor setting for
 that one run — see the Configuration Reference's

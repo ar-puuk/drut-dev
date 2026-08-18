@@ -20,7 +20,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use voyager_core::format::{format_bytes, CasingConvention, CasingSettings, EncodingFidelity, FormatOptions};
-use voyager_core::{parse, BlankLineMode, BlockKind, Node, OperatorSpacing, Statement, StatementKind, TopLevelIndentMode};
+use voyager_core::{parse, BlankLineMode, BlockKind, Node, OperatorSpacing, Statement, StatementKind, IndentTopLevelMode};
 
 const VALID_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/valid");
 const GOLDEN_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/golden");
@@ -51,7 +51,7 @@ fn data_references_upper_indent_2_options() -> FormatOptions {
             data_references: CasingConvention::Upper,
             ..CasingSettings::default()
         },
-        top_level_indent: TopLevelIndentMode::default(),
+        indent_top_level: IndentTopLevelMode::default(),
         indent_width: 2,
         operator_spacing: OperatorSpacing::default(),
         ..FormatOptions::default()
@@ -69,7 +69,7 @@ const REAL_CORPUS_GOLDEN_OPERATOR_SPACING_AUTO_DIR: &str =
 fn operator_spacing_fixed_options() -> FormatOptions {
     FormatOptions {
         casing: CasingSettings::default(),
-        top_level_indent: TopLevelIndentMode::default(),
+        indent_top_level: IndentTopLevelMode::default(),
         indent_width: 4,
         operator_spacing: OperatorSpacing::Fixed,
         ..FormatOptions::default()
@@ -79,7 +79,7 @@ fn operator_spacing_fixed_options() -> FormatOptions {
 fn operator_spacing_auto_options() -> FormatOptions {
     FormatOptions {
         casing: CasingSettings::default(),
-        top_level_indent: TopLevelIndentMode::default(),
+        indent_top_level: IndentTopLevelMode::default(),
         indent_width: 4,
         operator_spacing: OperatorSpacing::Auto,
         ..FormatOptions::default()
@@ -95,7 +95,7 @@ const REAL_CORPUS_GOLDEN_BLANK_LINES_DIR: &str =
 fn blank_lines_auto_options() -> FormatOptions {
     FormatOptions {
         casing: CasingSettings::default(),
-        top_level_indent: TopLevelIndentMode::default(),
+        indent_top_level: IndentTopLevelMode::default(),
         indent_width: 4,
         operator_spacing: OperatorSpacing::default(),
         blank_lines: BlankLineMode::Auto,
@@ -106,7 +106,7 @@ fn blank_lines_auto_options() -> FormatOptions {
 fn normalize_options() -> FormatOptions {
     FormatOptions {
         casing: CasingSettings::default(),
-        top_level_indent: TopLevelIndentMode::Auto,
+        indent_top_level: IndentTopLevelMode::Auto,
         indent_width: 4,
         operator_spacing: OperatorSpacing::default(),
         ..FormatOptions::default()

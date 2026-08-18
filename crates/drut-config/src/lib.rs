@@ -30,10 +30,10 @@ pub struct DrutConfig {
 /// key.)
 #[derive(Debug, Clone, Default)]
 pub struct FormatConfig {
-    pub control_words_casing: Option<voyager_core::CasingConvention>,
-    pub pair_keywords_casing: Option<voyager_core::CasingConvention>,
-    pub data_references_casing: Option<voyager_core::CasingConvention>,
-    pub top_level_indent: Option<voyager_core::TopLevelIndentMode>,
+    pub casing_control_words: Option<voyager_core::CasingConvention>,
+    pub casing_pair_keywords: Option<voyager_core::CasingConvention>,
+    pub casing_data_references: Option<voyager_core::CasingConvention>,
+    pub indent_top_level: Option<voyager_core::IndentTopLevelMode>,
     /// Valid range 1–16 is enforced by `resolve_format_options`, not here —
     /// this field carries whatever integer `drut.toml` actually had, valid
     /// or not (data-model.md §4).
@@ -49,10 +49,10 @@ pub struct FormatConfig {
     /// Valid range is enforced by `resolve_format_options`, not here — this
     /// field carries whatever integer `drut.toml` actually had, valid or
     /// not (data-model.md §3), mirroring `indent_width`'s own precedent.
-    pub top_level_blank_line_cap: Option<u8>,
+    pub blank_lines_top_cap: Option<u8>,
     /// Same range-validated-with-fallback treatment as
-    /// `top_level_blank_line_cap` above, independently.
-    pub nested_blank_line_cap: Option<u8>,
+    /// `blank_lines_top_cap` above, independently.
+    pub blank_lines_nested_cap: Option<u8>,
 }
 
 /// A non-fatal problem found while parsing a `drut.toml` (spec.md FR-011).
@@ -95,15 +95,15 @@ impl std::fmt::Display for ConfigWarning {
 /// the resolved config file, then the built-in default" (spec.md FR-006).
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ExplicitFormatOverride {
-    pub control_words_casing: Option<voyager_core::CasingConvention>,
-    pub pair_keywords_casing: Option<voyager_core::CasingConvention>,
-    pub data_references_casing: Option<voyager_core::CasingConvention>,
-    pub top_level_indent: Option<voyager_core::TopLevelIndentMode>,
+    pub casing_control_words: Option<voyager_core::CasingConvention>,
+    pub casing_pair_keywords: Option<voyager_core::CasingConvention>,
+    pub casing_data_references: Option<voyager_core::CasingConvention>,
+    pub indent_top_level: Option<voyager_core::IndentTopLevelMode>,
     pub indent_width: Option<u8>,
     pub operator_spacing: Option<voyager_core::OperatorSpacing>,
     pub blank_lines: Option<voyager_core::BlankLineMode>,
-    pub top_level_blank_line_cap: Option<u8>,
-    pub nested_blank_line_cap: Option<u8>,
+    pub blank_lines_top_cap: Option<u8>,
+    pub blank_lines_nested_cap: Option<u8>,
 }
 
 /// Built-in default indentation width (`FormatOptions::default().indent_width`,
@@ -117,11 +117,11 @@ const DEFAULT_INDENT_WIDTH: u8 = 4;
 const INDENT_WIDTH_RANGE: std::ops::RangeInclusive<u8> = 1..=16;
 
 /// Built-in default caps (`FormatOptions::default()`'s own
-/// `top_level_blank_line_cap`/`nested_blank_line_cap`, spec.md FR-002) —
+/// `blank_lines_top_cap`/`blank_lines_nested_cap`, spec.md FR-002) —
 /// the fallback used whenever no layer supplies a value, or the supplied
 /// value is out of the valid range.
-const DEFAULT_TOP_LEVEL_BLANK_LINE_CAP: u8 = 2;
-const DEFAULT_NESTED_BLANK_LINE_CAP: u8 = 1;
+const DEFAULT_BLANK_LINES_TOP_CAP: u8 = 2;
+const DEFAULT_BLANK_LINES_NESTED_CAP: u8 = 1;
 /// The valid range for each blank-line cap (spec.md Assumptions: "a sane
 /// upper bound, not unlimited" is a planning-phase detail, not fixed by the
 /// spec) — both caps are "positive-integer" per spec.md's own framing, so
@@ -190,24 +190,24 @@ fn resolve_casing_and_indent(
     warnings: &mut Vec<ConfigWarning>,
 ) -> voyager_core::FormatOptions {
     let control_words = explicit
-        .control_words_casing
-        .or(config.format.control_words_casing)
-        .or(client_defaults.control_words_casing)
+        .casing_control_words
+        .or(config.format.casing_control_words)
+        .or(client_defaults.casing_control_words)
         .unwrap_or_default();
     let pair_keywords = explicit
-        .pair_keywords_casing
-        .or(config.format.pair_keywords_casing)
-        .or(client_defaults.pair_keywords_casing)
+        .casing_pair_keywords
+        .or(config.format.casing_pair_keywords)
+        .or(client_defaults.casing_pair_keywords)
         .unwrap_or_default();
     let data_references = explicit
-        .data_references_casing
-        .or(config.format.data_references_casing)
-        .or(client_defaults.data_references_casing)
+        .casing_data_references
+        .or(config.format.casing_data_references)
+        .or(client_defaults.casing_data_references)
         .unwrap_or_default();
-    let top_level_indent = explicit
-        .top_level_indent
-        .or(config.format.top_level_indent)
-        .or(client_defaults.top_level_indent)
+    let indent_top_level = explicit
+        .indent_top_level
+        .or(config.format.indent_top_level)
+        .or(client_defaults.indent_top_level)
         .unwrap_or_default();
     let indent_width = resolve_indent_width(
         explicit.indent_width,
@@ -226,33 +226,33 @@ fn resolve_casing_and_indent(
         .or(config.format.blank_lines)
         .or(client_defaults.blank_lines)
         .unwrap_or_default();
-    let top_level_blank_line_cap = resolve_blank_line_cap(
-        explicit.top_level_blank_line_cap,
-        config.format.top_level_blank_line_cap,
-        client_defaults.top_level_blank_line_cap,
-        "top_level_blank_line_cap",
-        DEFAULT_TOP_LEVEL_BLANK_LINE_CAP,
+    let blank_lines_top_cap = resolve_blank_line_cap(
+        explicit.blank_lines_top_cap,
+        config.format.blank_lines_top_cap,
+        client_defaults.blank_lines_top_cap,
+        "blank_lines_top_cap",
+        DEFAULT_BLANK_LINES_TOP_CAP,
         config_path,
         warnings,
     );
-    let nested_blank_line_cap = resolve_blank_line_cap(
-        explicit.nested_blank_line_cap,
-        config.format.nested_blank_line_cap,
-        client_defaults.nested_blank_line_cap,
-        "nested_blank_line_cap",
-        DEFAULT_NESTED_BLANK_LINE_CAP,
+    let blank_lines_nested_cap = resolve_blank_line_cap(
+        explicit.blank_lines_nested_cap,
+        config.format.blank_lines_nested_cap,
+        client_defaults.blank_lines_nested_cap,
+        "blank_lines_nested_cap",
+        DEFAULT_BLANK_LINES_NESTED_CAP,
         config_path,
         warnings,
     );
 
     voyager_core::FormatOptions {
         casing: voyager_core::CasingSettings { control_words, pair_keywords, data_references },
-        top_level_indent,
+        indent_top_level,
         indent_width,
         operator_spacing,
         blank_lines,
-        top_level_blank_line_cap,
-        nested_blank_line_cap,
+        blank_lines_top_cap,
+        blank_lines_nested_cap,
     }
 }
 
@@ -324,7 +324,7 @@ fn resolve_indent_width(
     DEFAULT_INDENT_WIDTH
 }
 
-/// Shared by `top_level_blank_line_cap` and `nested_blank_line_cap`
+/// Shared by `blank_lines_top_cap` and `blank_lines_nested_cap`
 /// (019-blank-line-normalization) — identical range-validated-with-fallback
 /// shape as `resolve_indent_width` above, parameterized by `key`/`default`
 /// since there are two independent caps rather than one.

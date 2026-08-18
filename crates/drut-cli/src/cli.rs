@@ -42,24 +42,24 @@ pub enum Command {
         /// Opt-in keyword-casing convention for the control-words category
         /// (things like `IF`, `ENDIF`, `LOOP`, `ENDLOOP`) — must be
         /// `preserve`, `upper`, or `lower` when given; no bare
-        /// `--control-words-casing` (FR-015, amended by
+        /// `--casing-control-words` (FR-015, amended by
         /// 014-casing-preserve-mode FR-006; 017-casing-categories-indent-width
         /// FR-001). A flat `--casing` covering this category and
-        /// `--pair-keywords-casing` together once existed — removed once
+        /// `--casing-pair-keywords` together once existed — removed once
         /// this granular flag and the one below fully superseded it.
         #[arg(long, value_enum)]
-        control_words_casing: Option<CasingArg>,
+        casing_control_words: Option<CasingArg>,
         /// Independent override for the pair-keywords category
         /// (017-casing-categories-indent-width FR-001) — keyword names
         /// inside a `Control` statement's `keyword=value` pairs.
         #[arg(long, value_enum)]
-        pair_keywords_casing: Option<CasingArg>,
+        casing_pair_keywords: Option<CasingArg>,
         /// Independent override for the data-references category — Matrix/
         /// Line/Node/Zone/Database abbreviations, the output-record and
         /// link-endpoint tokens, and the two reserved loop-index
         /// identifiers (017-casing-categories-indent-width FR-004).
         #[arg(long, value_enum)]
-        data_references_casing: Option<CasingArg>,
+        casing_data_references: Option<CasingArg>,
         /// Spaces per nesting level of block indentation
         /// (017-casing-categories-indent-width FR-009). `Option`-typed like
         /// `--casing` — omitting the flag means "consult `drut.toml`, then
@@ -78,13 +78,13 @@ pub enum Command {
         /// (research.md §1). Behavior with no `drut.toml` anywhere is
         /// unchanged: absent still resolves to `Preserve`.
         #[arg(long, value_enum)]
-        top_level_indent: Option<TopLevelIndentArg>,
+        indent_top_level: Option<IndentTopLevelArg>,
         /// Whitespace normalization around operators/commas/bracket-paren
         /// interiors (018-operator-spacing) — `preserve` (default) leaves it
         /// exactly as written; `fixed` normalizes to one space each side of
         /// every recognized operator; `auto` does everything `fixed` does
         /// plus vertically aligns consecutive `Assignment` statements'
-        /// `=`. Same `Option`-typed shape as `--casing`/`--top-level-indent`
+        /// `=`. Same `Option`-typed shape as `--casing`/`--indent-top-level`
         /// — omitting the flag means "consult `drut.toml`, then the
         /// built-in default (preserve)."
         #[arg(long, value_enum)]
@@ -104,14 +104,14 @@ pub enum Command {
         /// `--indent-width` — omitting the flag means "consult
         /// `drut.toml`, then the built-in default (2)."
         #[arg(long, value_parser = clap::value_parser!(u8).range(1..=50))]
-        top_level_blank_line_cap: Option<u8>,
+        blank_lines_top_cap: Option<u8>,
         /// The maximum number of consecutive blank lines `auto` allows
         /// inside any block's own body, uniformly regardless of nesting
         /// depth, before contracting the run (019-blank-line-normalization
-        /// FR-002/FR-008). Same shape as `--top-level-blank-line-cap`,
+        /// FR-002/FR-008). Same shape as `--blank-lines-top-cap`,
         /// independently — built-in default `1`.
         #[arg(long, value_parser = clap::value_parser!(u8).range(1..=50))]
-        nested_blank_line_cap: Option<u8>,
+        blank_lines_nested_cap: Option<u8>,
         /// Skip `drut.toml` discovery entirely for this run, using built-in
         /// defaults plus any other explicit flags (012-toml-configuration
         /// US3, mirroring Ruff's `--isolated`).
@@ -145,7 +145,7 @@ pub enum CasingArg {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum TopLevelIndentArg {
+pub enum IndentTopLevelArg {
     Preserve,
     Auto,
 }
@@ -163,7 +163,7 @@ pub enum BlankLinesArg {
     Auto,
 }
 
-// The CasingArg -> voyager_core::CasingConvention and TopLevelIndentArg ->
-// voyager_core::TopLevelIndentMode conversions live in format_cmd.rs (added
+// The CasingArg -> voyager_core::CasingConvention and IndentTopLevelArg ->
+// voyager_core::IndentTopLevelMode conversions live in format_cmd.rs (added
 // alongside the voyager-core format module) rather than here, so this
 // Foundational-phase module has no dependency on those not-yet-built types.

@@ -70,24 +70,24 @@ fn parse_format_table(path: &Path, table: &toml::Table, warnings: &mut Vec<Confi
             // The legacy flat `casing` key was removed (superseded by the
             // three granular fields below) -- it now falls through to the
             // `other` catch-all arm below like any other unrecognized key.
-            "control_words_casing" => {
-                format.control_words_casing = parse_casing(path, "control_words_casing", value, warnings)
+            "casing_control_words" => {
+                format.casing_control_words = parse_casing(path, "casing_control_words", value, warnings)
             }
-            "pair_keywords_casing" => {
-                format.pair_keywords_casing = parse_casing(path, "pair_keywords_casing", value, warnings)
+            "casing_pair_keywords" => {
+                format.casing_pair_keywords = parse_casing(path, "casing_pair_keywords", value, warnings)
             }
-            "data_references_casing" => {
-                format.data_references_casing = parse_casing(path, "data_references_casing", value, warnings)
+            "casing_data_references" => {
+                format.casing_data_references = parse_casing(path, "casing_data_references", value, warnings)
             }
-            "top_level_indent" => format.top_level_indent = parse_top_level_indent(path, value, warnings),
+            "indent_top_level" => format.indent_top_level = parse_indent_top_level(path, value, warnings),
             "indent_width" => format.indent_width = parse_indent_width(path, value, warnings),
             "operator_spacing" => format.operator_spacing = parse_operator_spacing(path, value, warnings),
             "blank_lines" => format.blank_lines = parse_blank_lines(path, value, warnings),
-            "top_level_blank_line_cap" => {
-                format.top_level_blank_line_cap = parse_blank_line_cap(path, "top_level_blank_line_cap", value, warnings)
+            "blank_lines_top_cap" => {
+                format.blank_lines_top_cap = parse_blank_line_cap(path, "blank_lines_top_cap", value, warnings)
             }
-            "nested_blank_line_cap" => {
-                format.nested_blank_line_cap = parse_blank_line_cap(path, "nested_blank_line_cap", value, warnings)
+            "blank_lines_nested_cap" => {
+                format.blank_lines_nested_cap = parse_blank_line_cap(path, "blank_lines_nested_cap", value, warnings)
             }
             other => warnings.push(ConfigWarning::UnrecognizedKey {
                 path: path.to_path_buf(),
@@ -174,7 +174,7 @@ fn parse_indent_width(path: &Path, value: &toml::Value, warnings: &mut Vec<Confi
 }
 
 /// `018-operator-spacing`. Same exact-lowercase-string shape `casing`/
-/// `top_level_indent` already use (both are, on inspection, case-sensitive
+/// `indent_top_level` already use (both are, on inspection, case-sensitive
 /// today — an exact match against "preserve"/"upper"/"lower" and
 /// "preserve"/"auto" respectively, not the case-insensitive behavior this
 /// feature's own design docs assumed of them; matched here for consistency
@@ -209,7 +209,7 @@ fn parse_operator_spacing(
 }
 
 /// `019-blank-line-normalization`. Same exact-lowercase-string shape
-/// `operator_spacing`/`top_level_indent` already use — case-sensitive, only
+/// `operator_spacing`/`indent_top_level` already use — case-sensitive, only
 /// `"preserve"`/`"auto"` recognized (there is exactly one non-preserve
 /// behavior here, so no third named value).
 fn parse_blank_lines(
@@ -239,7 +239,7 @@ fn parse_blank_lines(
     }
 }
 
-/// Shared by `top_level_blank_line_cap`/`nested_blank_line_cap`
+/// Shared by `blank_lines_top_cap`/`blank_lines_nested_cap`
 /// (019-blank-line-normalization) — accepts any TOML integer here; the
 /// valid-range bound is enforced later, at `resolve_format_options`'s
 /// resolve layer (data-model.md §3), not during parsing, the same
@@ -260,24 +260,24 @@ fn parse_blank_line_cap(path: &Path, key: &str, value: &toml::Value, warnings: &
     }
 }
 
-fn parse_top_level_indent(
+fn parse_indent_top_level(
     path: &Path,
     value: &toml::Value,
     warnings: &mut Vec<ConfigWarning>,
-) -> Option<voyager_core::TopLevelIndentMode> {
+) -> Option<voyager_core::IndentTopLevelMode> {
     match value.as_str() {
-        Some("preserve") => Some(voyager_core::TopLevelIndentMode::Preserve),
+        Some("preserve") => Some(voyager_core::IndentTopLevelMode::Preserve),
         // Renamed from "normalize" for `preserve`/`auto` naming consistency
         // with `operator_spacing`/`blank_lines` above -- old drut.toml files
         // written with "normalize" no longer parse; they fall through to
         // the `other` arm below like any other invalid value (warns, falls
         // back to the built-in default) rather than being silently accepted
         // under two names.
-        Some("auto") => Some(voyager_core::TopLevelIndentMode::Auto),
+        Some("auto") => Some(voyager_core::IndentTopLevelMode::Auto),
         Some(other) => {
             warnings.push(invalid_value(
                 path,
-                "top_level_indent",
+                "indent_top_level",
                 format!("must be \"preserve\" or \"auto\", got {other:?}"),
             ));
             None
@@ -285,7 +285,7 @@ fn parse_top_level_indent(
         None => {
             warnings.push(invalid_value(
                 path,
-                "top_level_indent",
+                "indent_top_level",
                 format!("must be a string (\"preserve\" or \"auto\"), got {value:?}"),
             ));
             None

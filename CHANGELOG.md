@@ -13,9 +13,36 @@ CONTRIBUTING.md's "Versioning" section).
 
 ### Changed
 
+- **Breaking**: every `[format]` field name changed to a flat,
+  group-prefixed shape — the "group" word (`casing`, `indent`, `blank_lines`)
+  now leads the name instead of trailing it, matching the convention rustfmt
+  itself uses (`imports_granularity`, `imports_layout`, ...) for the same
+  reason: it clusters related settings alphabetically (in `--help` output,
+  editor autocomplete, and this changelog's own docs) instead of scattering
+  them. Renamed: `control_words_casing` → `casing_control_words`,
+  `pair_keywords_casing` → `casing_pair_keywords`, `data_references_casing`
+  → `casing_data_references`, `top_level_indent` → `indent_top_level`,
+  `top_level_blank_line_cap` → `blank_lines_top_cap`,
+  `nested_blank_line_cap` → `blank_lines_nested_cap`. Applies identically to
+  `drut.toml` keys, CLI flags (e.g. `--control-words-casing` →
+  `--casing-control-words`), the MCP `format` tool's parameters, and the VS
+  Code `drut.format.*` settings (e.g. `drut.format.controlWordsCasing` →
+  `drut.format.casingControlWords`). `indent_width`, `operator_spacing`, and
+  `blank_lines` are unchanged — each already led with its own group name (or
+  needed no grouping at all). An old name in any of these four places now
+  degrades to a plain "unrecognized key"/usage-error, the same non-blocking
+  fallback every other unrecognized `[format]` key already gets — nothing
+  silently keeps working under its old name. `voyager-core`'s own public
+  `FormatOptions` struct (published independently to crates.io) renamed its
+  matching fields/type the same way — `top_level_indent` →
+  `indent_top_level`, `top_level_blank_line_cap` → `blank_lines_top_cap`,
+  `nested_blank_line_cap` → `blank_lines_nested_cap`,
+  `TopLevelIndentMode` → `IndentTopLevelMode` — so there's one name for each
+  setting end to end, not an internal name translated to an external one at
+  the `drut-config` boundary.
 - **Breaking**: removed the legacy, flat `casing` setting — superseded by the
-  three granular fields (`control_words_casing`, `pair_keywords_casing`,
-  `data_references_casing`) since `017-casing-categories-indent-width`, which
+  three granular fields (`casing_control_words`, `casing_pair_keywords`,
+  `casing_data_references`) since `017-casing-categories-indent-width`, which
   together already cover everything `casing` used to (`control_words`+
   `pair_keywords` together; `data_references` was never reachable through it
   at all). Removed everywhere it existed: `drut.toml`'s `casing` key, the
@@ -27,14 +54,14 @@ CONTRIBUTING.md's "Versioning" section).
   or invalid value already gets, never a hard failure. `--casing` on the CLI
   is now a usage error (unknown flag) rather than being silently accepted.
   If you relied on one `casing = "upper"` covering both categories, set
-  `control_words_casing` and `pair_keywords_casing` explicitly instead.
-- **Breaking**: `top_level_indent`'s non-`preserve` value is now `"auto"`,
+  `casing_control_words` and `casing_pair_keywords` explicitly instead.
+- **Breaking**: `indent_top_level`'s non-`preserve` value is now `"auto"`,
   not `"normalize"` — matching the `preserve`/`auto` naming
   `operator_spacing`/`blank_lines` already use for the same "leave it
   alone" vs. "actively fix it" shape. Applies identically to `drut.toml`
-  (`top_level_indent = "auto"`), the CLI (`--top-level-indent=auto`), the
-  MCP `format` tool (`top_level_indent: "auto"`), and the VS Code
-  `drut.format.topLevelIndent` setting. A `drut.toml`/CLI/MCP value of
+  (`indent_top_level = "auto"`), the CLI (`--indent-top-level=auto`), the
+  MCP `format` tool (`indent_top_level: "auto"`), and the VS Code
+  `drut.format.indentTopLevel` setting. A `drut.toml`/CLI/MCP value of
   `"normalize"` is no longer recognized — it now warns and falls back to
   the built-in default (`preserve`), the same as any other invalid value,
   rather than being silently accepted under its old name.

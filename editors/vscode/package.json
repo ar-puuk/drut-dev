@@ -75,7 +75,7 @@
     "configuration": {
       "title": "Drut",
       "properties": {
-        "drut.format.controlWordsCasing": {
+        "drut.format.casingControlWords": {
           "type": "string",
           "enum": [
             "preserve",
@@ -84,7 +84,7 @@
           ],
           "markdownDescription": "Casing convention for control-word keywords (e.g. `IF`/`ENDIF`/`LOOP`). A workspace `drut.toml` setting for this field always wins over this personal setting."
         },
-        "drut.format.pairKeywordsCasing": {
+        "drut.format.casingPairKeywords": {
           "type": "string",
           "enum": [
             "preserve",
@@ -93,7 +93,7 @@
           ],
           "markdownDescription": "Casing convention for pair keywords. A workspace `drut.toml` setting for this field always wins over this personal setting."
         },
-        "drut.format.dataReferencesCasing": {
+        "drut.format.casingDataReferences": {
           "type": "string",
           "enum": [
             "preserve",
@@ -102,7 +102,7 @@
           ],
           "markdownDescription": "Casing convention for data-reference tokens (Matrix/Line/Node/Zone/Database abbreviations, output-record and link-endpoint tokens, and the two reserved loop-index identifiers). A workspace `drut.toml` setting for this field always wins over this personal setting."
         },
-        "drut.format.topLevelIndent": {
+        "drut.format.indentTopLevel": {
           "type": "string",
           "enum": [
             "preserve",
@@ -131,15 +131,15 @@
             "preserve",
             "auto"
           ],
-          "markdownDescription": "Whether/how excessive blank-line runs are contracted — `preserve` leaves every run exactly as written; `auto` contracts a run down to the applicable cap (see `drut.format.topLevelBlankLineCap`/`drut.format.nestedBlankLineCap`) only when it exceeds that cap. A workspace `drut.toml` setting for this field always wins over this personal setting."
+          "markdownDescription": "Whether/how excessive blank-line runs are contracted — `preserve` leaves every run exactly as written; `auto` contracts a run down to the applicable cap (see `drut.format.blankLinesTopCap`/`drut.format.blankLinesNestedCap`) only when it exceeds that cap. A workspace `drut.toml` setting for this field always wins over this personal setting."
         },
-        "drut.format.topLevelBlankLineCap": {
+        "drut.format.blankLinesTopCap": {
           "type": "integer",
           "minimum": 1,
           "maximum": 50,
           "markdownDescription": "Maximum number of consecutive blank lines `auto` allows between top-level statements/blocks before contracting the run. A workspace `drut.toml` setting for this field always wins over this personal setting."
         },
-        "drut.format.nestedBlankLineCap": {
+        "drut.format.blankLinesNestedCap": {
           "type": "integer",
           "minimum": 1,
           "maximum": 50,

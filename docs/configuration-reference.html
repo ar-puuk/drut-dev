@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-a73fb0dd.js";
+            window.path_to_searchindex_js = "searchindex-b368c168.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c6afe1e7.js"></script>
@@ -184,7 +184,7 @@
 <p>Every <code>[format]</code> field Drut currently understands, in one place. All of them are
 set the same way, in a <code>drut.toml</code> file at (or above) the file you’re formatting:</p>
 <pre><code class="language-toml">[format]
-control_words_casing = "lower"
+casing_control_words = "lower"
 indent_width = 2
 </code></pre>
 <p>Drut discovers the nearest <code>drut.toml</code> by walking up from the file being
@@ -199,15 +199,15 @@ at your project root and uncomment (then change) only the fields you want to
 override — a commented-out line changes nothing, so you never need to remember
 the full field list or its defaults from scratch:</p>
 <pre><code class="language-toml">[format]
-# control_words_casing = "preserve"      # preserve | upper | lower
-# pair_keywords_casing = "preserve"      # preserve | upper | lower
-# data_references_casing = "preserve"    # preserve | upper | lower
-# top_level_indent = "preserve"          # preserve | auto
-# indent_width = 4                       # 1-16
-# operator_spacing = "preserve"          # preserve | fixed | auto
-# blank_lines = "preserve"               # preserve | auto
-# top_level_blank_line_cap = 2           # 1-50, only used when blank_lines = "auto"
-# nested_blank_line_cap = 1              # 1-50, only used when blank_lines = "auto"
+# casing_control_words = "preserve"    # preserve | upper | lower
+# casing_pair_keywords = "preserve"    # preserve | upper | lower
+# casing_data_references = "preserve"  # preserve | upper | lower
+# indent_top_level = "preserve"        # preserve | auto
+# indent_width = 4                     # 1-16
+# operator_spacing = "preserve"        # preserve | fixed | auto
+# blank_lines = "preserve"             # preserve | auto
+# blank_lines_top_cap = 2              # 1-50, only used when blank_lines = "auto"
+# blank_lines_nested_cap = 1           # 1-50, only used when blank_lines = "auto"
 </code></pre>
 <p>See <a href="#fields">Fields</a> below for what each one actually does, and
 <a href="#precedence">Precedence</a> for how a set value interacts with CLI flags, MCP
@@ -242,46 +242,46 @@ anything; it degrades exactly like any other unrecognized key (a warning,
 falling back to each field’s own built-in default), never a hard failure.</p>
 </blockquote>
 <h2 id="fields"><a class="header" href="#fields">Fields</a></h2>
-<h3 id="control_words_casing"><a class="header" href="#control_words_casing"><code>control_words_casing</code></a></h3>
+<h3 id="casing_control_words"><a class="header" href="#casing_control_words"><code>casing_control_words</code></a></h3>
 <p>Casing convention for the <code>control_words</code> category (things like <code>IF</code>,
 <code>ENDIF</code>, <code>LOOP</code>, <code>ENDLOOP</code>).</p>
 <p><strong>Values</strong>: <code>preserve</code> <strong>← default</strong>, <code>upper</code>, <code>lower</code>.</p>
 <p><strong>Default</strong>: <code>preserve</code>.</p>
-<p><strong>Also known as</strong>: CLI flag <code>--control-words-casing</code>; MCP <code>format</code> tool parameter
-<code>control_words_casing</code>.</p>
+<p><strong>Also known as</strong>: CLI flag <code>--casing-control-words</code>; MCP <code>format</code> tool parameter
+<code>casing_control_words</code>.</p>
 <p><strong>Example</strong>:</p>
 <pre><code class="language-toml">[format]
-control_words_casing = "upper"
+casing_control_words = "upper"
 </code></pre>
 <p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above.</p>
-<h3 id="pair_keywords_casing"><a class="header" href="#pair_keywords_casing"><code>pair_keywords_casing</code></a></h3>
+<h3 id="casing_pair_keywords"><a class="header" href="#casing_pair_keywords"><code>casing_pair_keywords</code></a></h3>
 <p>Casing convention for the <code>pair_keywords</code> category (keyword names inside
 a <code>Control</code> statement’s <code>keyword=value</code> pairs, e.g. <code>PATHLOAD</code>, <code>MATI</code>), same
-shape as <a href="#control_words_casing"><code>control_words_casing</code></a> above.</p>
+shape as <a href="#casing_control_words"><code>casing_control_words</code></a> above.</p>
 <p><strong>Values</strong>: <code>preserve</code> <strong>← default</strong>, <code>upper</code>, <code>lower</code>.</p>
 <p><strong>Default</strong>: <code>preserve</code>.</p>
-<p><strong>Also known as</strong>: CLI flag <code>--pair-keywords-casing</code>; MCP <code>format</code> tool parameter
-<code>pair_keywords_casing</code>.</p>
+<p><strong>Also known as</strong>: CLI flag <code>--casing-pair-keywords</code>; MCP <code>format</code> tool parameter
+<code>casing_pair_keywords</code>.</p>
 <p><strong>Example</strong>:</p>
 <pre><code class="language-toml">[format]
-pair_keywords_casing = "lower"
+casing_pair_keywords = "lower"
 </code></pre>
 <p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above.</p>
-<h3 id="data_references_casing"><a class="header" href="#data_references_casing"><code>data_references_casing</code></a></h3>
+<h3 id="casing_data_references"><a class="header" href="#casing_data_references"><code>casing_data_references</code></a></h3>
 <p>Casing for the data-reference category: Matrix/Line/Node/Zone/Database
 abbreviations (<code>MI</code>/<code>MO</code>/<code>MW</code>, <code>LI</code>/<code>LW</code>, <code>NI</code>/<code>NW</code>, <code>ZI</code>/<code>ZONES</code>/<code>Z</code>,
 <code>DBI</code>/<code>DBA</code>), <code>RO</code>, the link-endpoint fields <code>A</code>/<code>B</code>, and the reserved loop-index
 identifiers <code>I</code>/<code>J</code>.</p>
 <p><strong>Values</strong>: <code>preserve</code> <strong>← default</strong>, <code>upper</code>, <code>lower</code>.</p>
 <p><strong>Default</strong>: <code>preserve</code>.</p>
-<p><strong>Also known as</strong>: CLI flag <code>--data-references-casing</code>; MCP <code>format</code> tool
-parameter <code>data_references_casing</code>.</p>
+<p><strong>Also known as</strong>: CLI flag <code>--casing-data-references</code>; MCP <code>format</code> tool
+parameter <code>casing_data_references</code>.</p>
 <p><strong>Example</strong>:</p>
 <pre><code class="language-toml">[format]
-data_references_casing = "lower"
+casing_data_references = "lower"
 </code></pre>
 <p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above.</p>
-<h3 id="top_level_indent"><a class="header" href="#top_level_indent"><code>top_level_indent</code></a></h3>
+<h3 id="indent_top_level"><a class="header" href="#indent_top_level"><code>indent_top_level</code></a></h3>
 <p>Whether top-level (depth-0, not inside any block) statement indentation is left
 exactly as written, or normalized to column 0.</p>
 <p><strong>Values</strong>:</p>
@@ -290,11 +290,11 @@ exactly as written, or normalized to column 0.</p>
 <li><code>auto</code> — force every top-level line to column 0.</li>
 </ul>
 <p><strong>Default</strong>: <code>preserve</code>.</p>
-<p><strong>Also known as</strong>: CLI flag <code>--top-level-indent</code>; MCP <code>format</code> tool parameter
-<code>top_level_indent</code>.</p>
+<p><strong>Also known as</strong>: CLI flag <code>--indent-top-level</code>; MCP <code>format</code> tool parameter
+<code>indent_top_level</code>.</p>
 <p><strong>Example</strong>:</p>
 <pre><code class="language-toml">[format]
-top_level_indent = "auto"
+indent_top_level = "auto"
 </code></pre>
 <p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above.</p>
 <h3 id="indent_width"><a class="header" href="#indent_width"><code>indent_width</code></a></h3>
@@ -344,8 +344,8 @@ left as written or contracted down to a configured cap.</p>
 <ul>
 <li><code>preserve</code> <strong>← default</strong> — leave every blank-line run exactly as written,
 however long.</li>
-<li><code>auto</code> — contract a run down to the applicable cap (<a href="#top_level_blank_line_cap"><code>top_level_blank_line_cap</code></a>
-or <a href="#nested_blank_line_cap"><code>nested_blank_line_cap</code></a>) only when the run
+<li><code>auto</code> — contract a run down to the applicable cap (<a href="#blank_lines_top_cap"><code>blank_lines_top_cap</code></a>
+or <a href="#blank_lines_nested_cap"><code>blank_lines_nested_cap</code></a>) only when the run
 exceeds that cap — never pads a shorter run up.</li>
 </ul>
 <p><strong>Default</strong>: <code>preserve</code>.</p>
@@ -356,39 +356,39 @@ exceeds that cap — never pads a shorter run up.</li>
 blank_lines = "auto"
 </code></pre>
 <p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above.</p>
-<h3 id="top_level_blank_line_cap"><a class="header" href="#top_level_blank_line_cap"><code>top_level_blank_line_cap</code></a></h3>
+<h3 id="blank_lines_top_cap"><a class="header" href="#blank_lines_top_cap"><code>blank_lines_top_cap</code></a></h3>
 <p>The maximum number of consecutive blank lines <code>blank_lines = "auto"</code> allows
 between top-level statements/blocks before contracting the run. Only meaningful
 when <a href="#blank_lines"><code>blank_lines</code></a> is <code>"auto"</code>.</p>
 <p><strong>Values</strong>: any integer from <code>1</code> to <code>50</code> — <strong>default <code>2</code></strong>.</p>
 <p><strong>Default</strong>: <code>2</code>.</p>
-<p><strong>Also known as</strong>: CLI flag <code>--top-level-blank-line-cap</code>; MCP <code>format</code> tool
-parameter <code>top_level_blank_line_cap</code>.</p>
+<p><strong>Also known as</strong>: CLI flag <code>--blank-lines-top-cap</code>; MCP <code>format</code> tool
+parameter <code>blank_lines_top_cap</code>.</p>
 <p><strong>Example</strong>:</p>
 <pre><code class="language-toml">[format]
 blank_lines = "auto"
-top_level_blank_line_cap = 1
+blank_lines_top_cap = 1
 </code></pre>
 <p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above. An
 out-of-range value at any tier is treated as unset for
 that tier, same as <a href="#indent_width"><code>indent_width</code></a>.</p>
-<h3 id="nested_blank_line_cap"><a class="header" href="#nested_blank_line_cap"><code>nested_blank_line_cap</code></a></h3>
+<h3 id="blank_lines_nested_cap"><a class="header" href="#blank_lines_nested_cap"><code>blank_lines_nested_cap</code></a></h3>
 <p>The maximum number of consecutive blank lines <code>blank_lines = "auto"</code> allows
 inside any block’s own body, uniformly regardless of nesting depth, before
 contracting the run. Only meaningful when <a href="#blank_lines"><code>blank_lines</code></a> is
 <code>"auto"</code>.</p>
 <p><strong>Values</strong>: any integer from <code>1</code> to <code>50</code> — <strong>default <code>1</code></strong>.</p>
 <p><strong>Default</strong>: <code>1</code>.</p>
-<p><strong>Also known as</strong>: CLI flag <code>--nested-blank-line-cap</code>; MCP <code>format</code> tool
-parameter <code>nested_blank_line_cap</code>.</p>
+<p><strong>Also known as</strong>: CLI flag <code>--blank-lines-nested-cap</code>; MCP <code>format</code> tool
+parameter <code>blank_lines_nested_cap</code>.</p>
 <p><strong>Example</strong>:</p>
 <pre><code class="language-toml">[format]
 blank_lines = "auto"
-nested_blank_line_cap = 2
+blank_lines_nested_cap = 2
 </code></pre>
 <p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above. Same
 out-of-range handling as
-<a href="#top_level_blank_line_cap"><code>top_level_blank_line_cap</code></a>.</p>
+<a href="#blank_lines_top_cap"><code>blank_lines_top_cap</code></a>.</p>
 
                     </main>
 

@@ -3,7 +3,7 @@
 //! Acceptance Scenarios directly via `format()`, on real-corpus-shaped
 //! fixtures (not just the lower-level `operator_spacing.rs` unit tests).
 
-use voyager_core::format::{format, CasingSettings, FormatOptions, OperatorSpacing, TopLevelIndentMode};
+use voyager_core::format::{format, CasingSettings, FormatOptions, OperatorSpacing, IndentTopLevelMode};
 
 fn fixed() -> FormatOptions {
     FormatOptions { operator_spacing: OperatorSpacing::Fixed, ..FormatOptions::default() }
@@ -155,7 +155,7 @@ fn casing_indentation_and_operator_spacing_all_apply_independently_together() {
     let src = "if (x=1)\nzones   = 1\nendif\n";
     let options = FormatOptions {
         casing: CasingSettings { control_words: voyager_core::CasingConvention::Upper, ..CasingSettings::default() },
-        top_level_indent: TopLevelIndentMode::default(),
+        indent_top_level: IndentTopLevelMode::default(),
         indent_width: 4,
         operator_spacing: OperatorSpacing::Fixed,
         ..FormatOptions::default()

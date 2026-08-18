@@ -87,15 +87,15 @@ committed `drut.toml`:
 
 | Setting | `drut.toml` field |
 |---|---|
-| `drut.format.controlWordsCasing` | `control_words_casing` |
-| `drut.format.pairKeywordsCasing` | `pair_keywords_casing` |
-| `drut.format.dataReferencesCasing` | `data_references_casing` |
-| `drut.format.topLevelIndent` | `top_level_indent` |
+| `drut.format.casingControlWords` | `casing_control_words` |
+| `drut.format.casingPairKeywords` | `casing_pair_keywords` |
+| `drut.format.casingDataReferences` | `casing_data_references` |
+| `drut.format.indentTopLevel` | `indent_top_level` |
 | `drut.format.indentWidth` | `indent_width` |
 | `drut.format.operatorSpacing` | `operator_spacing` |
 | `drut.format.blankLines` | `blank_lines` |
-| `drut.format.topLevelBlankLineCap` | `top_level_blank_line_cap` |
-| `drut.format.nestedBlankLineCap` | `nested_blank_line_cap` |
+| `drut.format.blankLinesTopCap` | `blank_lines_top_cap` |
+| `drut.format.blankLinesNestedCap` | `blank_lines_nested_cap` |
 
 Set these through VS Code's built-in Settings UI (search for "drut"), or
 directly in `settings.json`. **A `drut.toml` value always wins** over a

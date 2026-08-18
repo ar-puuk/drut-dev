@@ -13,8 +13,8 @@ fn auto() -> FormatOptions {
 fn auto_with_caps(top_level_cap: u8, nested_cap: u8) -> FormatOptions {
     FormatOptions {
         blank_lines: BlankLineMode::Auto,
-        top_level_blank_line_cap: top_level_cap,
-        nested_blank_line_cap: nested_cap,
+        blank_lines_top_cap: top_level_cap,
+        blank_lines_nested_cap: nested_cap,
         ..FormatOptions::default()
     }
 }

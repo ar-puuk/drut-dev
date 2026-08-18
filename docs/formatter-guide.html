@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-a73fb0dd.js";
+            window.path_to_searchindex_js = "searchindex-b368c168.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c6afe1e7.js"></script>
@@ -196,12 +196,12 @@ are left with their original indentation rather than guessed at.</p>
 <em>what changes</em>, with real examples.</p>
 <h2 id="casing"><a class="header" href="#casing">Casing</a></h2>
 <p>The three independent casing fields —
-<a href="configuration-reference.html#control_words_casing"><code>control_words_casing</code></a>,
-<a href="configuration-reference.html#pair_keywords_casing"><code>pair_keywords_casing</code></a>, and
-<a href="configuration-reference.html#data_references_casing"><code>data_references_casing</code></a> —
+<a href="configuration-reference.html#casing_control_words"><code>casing_control_words</code></a>,
+<a href="configuration-reference.html#casing_pair_keywords"><code>casing_pair_keywords</code></a>, and
+<a href="configuration-reference.html#casing_data_references"><code>casing_data_references</code></a> —
 only ever touch keyword <em>names</em> — never a value, and never a category they
 aren’t scoped to. This example makes both boundaries visible at once, with
-<code>control_words_casing = "upper"</code>:</p>
+<code>casing_control_words = "upper"</code>:</p>
 <pre><code class="language-diff">-run pgm=matrix
 +RUN pgm=matrix
      mati=base.mat,mo=out.mat
@@ -209,14 +209,14 @@ aren’t scoped to. This example makes both boundaries visible at once, with
 +ENDRUN
 </code></pre>
 <p><code>run</code>/<code>endrun</code> (control words) are uppercased — but <code>pgm</code> (a pair-keyword name,
-<code>pair_keywords_casing</code>’s own scope, left unset here), <code>matrix</code> (a value, never
+<code>casing_pair_keywords</code>’s own scope, left unset here), <code>matrix</code> (a value, never
 touched), and <code>mati</code>/<code>mo</code> (data-reference tokens,
-<a href="configuration-reference.html#data_references_casing"><code>data_references_casing</code></a>’s
+<a href="configuration-reference.html#casing_data_references"><code>casing_data_references</code></a>’s
 own scope, also left unset here) all stay exactly as written. Each of the
 three fields only ever affects its own category — set the one(s) you want
 independently.</p>
 <h2 id="indentation"><a class="header" href="#indentation">Indentation</a></h2>
-<p><a href="configuration-reference.html#top_level_indent"><code>top_level_indent</code></a> controls
+<p><a href="configuration-reference.html#indent_top_level"><code>indent_top_level</code></a> controls
 depth-0 statements; <a href="configuration-reference.html#indent_width"><code>indent_width</code></a>
 controls spacing per nesting level inside a block, relative to the block’s own
 opening-statement column. See <a href="getting-started.html#3-see-what-formatting-would-change">Getting Started</a>
@@ -254,9 +254,9 @@ sections of a script.</p>
 <h2 id="blank-line-normalization"><a class="header" href="#blank-line-normalization">Blank-line normalization</a></h2>
 <p><code>preserve</code> (the default) leaves every run of consecutive blank lines exactly as
 written, however long. <code>auto</code> contracts a run down to the applicable cap
-(<a href="configuration-reference.html#top_level_blank_line_cap"><code>top_level_blank_line_cap</code></a>
+(<a href="configuration-reference.html#blank_lines_top_cap"><code>blank_lines_top_cap</code></a>
 between top-level statements/blocks, default <code>2</code>;
-<a href="configuration-reference.html#nested_blank_line_cap"><code>nested_blank_line_cap</code></a>
+<a href="configuration-reference.html#blank_lines_nested_cap"><code>blank_lines_nested_cap</code></a>
 inside any block’s body, default <code>1</code>) — only when a run <em>exceeds</em> the cap, never
 padding a shorter run up:</p>
 <pre><code class="language-diff"> RUN PGM=MATRIX

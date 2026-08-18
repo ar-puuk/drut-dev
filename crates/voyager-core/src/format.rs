@@ -48,7 +48,7 @@ use crate::{parse, Node};
 /// `014-casing-preserve-mode` FR-001). `Preserve` is the `#[default]` —
 /// `format` always either preserves, uppercases, or lowercases
 /// keyword/control-word casing, the same non-optional shape
-/// `TopLevelIndentMode` already uses.
+/// `IndentTopLevelMode` already uses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CasingConvention {
     /// Leave existing control-word/pair-keyword casing exactly as written
@@ -69,7 +69,7 @@ pub enum CasingConvention {
 /// with `OperatorSpacing`/`BlankLineMode`, which use the same shape) —
 /// behavior unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum TopLevelIndentMode {
+pub enum IndentTopLevelMode {
     /// Leave existing top-level indentation exactly as written — the
     /// `007`-era, and (since `009`) once again default, behavior.
     #[default]
@@ -104,7 +104,7 @@ pub struct CasingSettings {
 /// Whether/how `format` normalizes whitespace around operators, commas, and
 /// bracket/paren interiors (spec.md FR-001, `018-operator-spacing`).
 /// `Preserve` is the `#[default]`, same non-optional three-value shape
-/// `CasingConvention`/`TopLevelIndentMode` already use. `Auto` is
+/// `CasingConvention`/`IndentTopLevelMode` already use. `Auto` is
 /// implemented as a strict superset of `Fixed` (data-model.md §1) — never a
 /// second, independent spacing decision that could drift from `Fixed`'s.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -126,7 +126,7 @@ pub enum OperatorSpacing {
 
 /// Whether/how `format` contracts excessive runs of consecutive blank lines
 /// (spec.md FR-001, `019-blank-line-normalization`). Two-valued, matching
-/// `TopLevelIndentMode`'s own shape exactly — there is only one real
+/// `IndentTopLevelMode`'s own shape exactly — there is only one real
 /// non-`Preserve` behavior here (contract a run down to the applicable cap),
 /// so no third tier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -137,8 +137,8 @@ pub enum BlankLineMode {
     #[default]
     Preserve,
     /// Contract a run of consecutive blank lines down to the applicable cap
-    /// (`top_level_blank_line_cap` between top-level statements/blocks,
-    /// `nested_blank_line_cap` anywhere inside any block's own body) only
+    /// (`blank_lines_top_cap` between top-level statements/blocks,
+    /// `blank_lines_nested_cap` anywhere inside any block's own body) only
     /// when the run's length exceeds that cap (FR-003/FR-004).
     Auto,
 }
@@ -149,6 +149,17 @@ pub enum BlankLineMode {
 /// `indent_width`'s correct default is `4`, not `u8::default()`'s `0` — the
 /// first field on this struct whose default isn't just its own type's
 /// `Default::default()` (research.md §4). See the `impl Default` below.
+///
+/// **Field names renamed 2026-08-18** (`top_level_indent` →
+/// `indent_top_level`, `top_level_blank_line_cap` → `blank_lines_top_cap`,
+/// `nested_blank_line_cap` → `blank_lines_nested_cap`, `TopLevelIndentMode`
+/// → `IndentTopLevelMode`) so this crate's own field/type names match
+/// `drut-config`'s external `drut.toml`/CLI/MCP/editor-setting names
+/// one-for-one — no separate internal-vs-external naming scheme, no
+/// translation layer at the `drut-config` boundary. Purely a rename;
+/// behavior unchanged. `casing`, `indent_width`, `operator_spacing`, and
+/// `blank_lines` were already consistent with their external names and are
+/// unaffected.
 #[derive(Debug, Clone, Copy)]
 pub struct FormatOptions {
     /// Defaults to `CasingSettings::default()` (all three fields
@@ -158,11 +169,11 @@ pub struct FormatOptions {
     /// old single value now reads/writes `control_words`/`pair_keywords`
     /// (the two categories the old value already reached).
     pub casing: CasingSettings,
-    /// Defaults to `Preserve` (FR-001) via `TopLevelIndentMode`'s own
+    /// Defaults to `Preserve` (FR-001) via `IndentTopLevelMode`'s own
     /// `#[default]` — every call site is still individually verified
     /// (`009-top-level-indent-toggle`/research.md §2), not trusted
     /// transitively from this derive alone.
-    pub top_level_indent: TopLevelIndentMode,
+    pub indent_top_level: IndentTopLevelMode,
     /// Spaces per nesting level of block indentation, relative to the
     /// enclosing block's own opening-statement column (spec.md FR-009,
     /// `017-casing-categories-indent-width`). Defaults to `4` (see `impl
@@ -189,24 +200,24 @@ pub struct FormatOptions {
     /// `u8` here; the valid-range bound is a `drut-config`-layer policy
     /// decision, not a fact this crate enforces, the same `indent_width`
     /// precedent.
-    pub top_level_blank_line_cap: u8,
+    pub blank_lines_top_cap: u8,
     /// The maximum number of consecutive blank lines `auto` allows inside
     /// any block's own body, uniformly regardless of nesting depth, before
     /// contracting the run (spec.md FR-002/FR-008). Defaults to `1` (see
     /// `impl Default` below).
-    pub nested_blank_line_cap: u8,
+    pub blank_lines_nested_cap: u8,
 }
 
 impl Default for FormatOptions {
     fn default() -> Self {
         FormatOptions {
             casing: CasingSettings::default(),
-            top_level_indent: TopLevelIndentMode::default(),
+            indent_top_level: IndentTopLevelMode::default(),
             indent_width: 4,
             operator_spacing: OperatorSpacing::default(),
             blank_lines: BlankLineMode::default(),
-            top_level_blank_line_cap: 2,
-            nested_blank_line_cap: 1,
+            blank_lines_top_cap: 2,
+            blank_lines_nested_cap: 1,
         }
     }
 }
@@ -343,7 +354,7 @@ fn render(source: &str, nodes: &[Node], diagnostics: &[Diagnostic], options: For
         &char_lines,
         &diagnosed_openers,
         &protected,
-        options.top_level_indent,
+        options.indent_top_level,
         options.indent_width as usize,
         &mut indent_plan,
     );
@@ -432,8 +443,8 @@ fn render(source: &str, nodes: &[Node], diagnostics: &[Diagnostic], options: For
             nodes,
             &char_lines,
             &protected,
-            options.top_level_blank_line_cap,
-            options.nested_blank_line_cap,
+            options.blank_lines_top_cap,
+            options.blank_lines_nested_cap,
         );
     }
 
@@ -708,12 +719,12 @@ fn plan_indentation(
     lines: &[Vec<char>],
     diagnosed_openers: &BTreeSet<Position>,
     protected: &BTreeSet<u32>,
-    mode: TopLevelIndentMode,
+    mode: IndentTopLevelMode,
     indent_width: usize,
     plan: &mut IndentPlan,
 ) {
     for node in nodes {
-        if mode == TopLevelIndentMode::Auto {
+        if mode == IndentTopLevelMode::Auto {
             let line = node.span().start.line;
             if !protected.contains(&line) {
                 plan.insert(line, 0);
@@ -1009,24 +1020,24 @@ mod tests {
                 pair_keywords: CasingConvention::Upper,
                 data_references: CasingConvention::Preserve,
             },
-            top_level_indent: TopLevelIndentMode::default(),
+            indent_top_level: IndentTopLevelMode::default(),
             indent_width: 4,
             operator_spacing: OperatorSpacing::default(),
             blank_lines: BlankLineMode::default(),
-            top_level_blank_line_cap: 2,
-            nested_blank_line_cap: 1,
+            blank_lines_top_cap: 2,
+            blank_lines_nested_cap: 1,
         }
     }
 
-    fn auto_top_level_indent() -> FormatOptions {
+    fn auto_indent_top_level() -> FormatOptions {
         FormatOptions {
             casing: CasingSettings::default(),
-            top_level_indent: TopLevelIndentMode::Auto,
+            indent_top_level: IndentTopLevelMode::Auto,
             indent_width: 4,
             operator_spacing: OperatorSpacing::default(),
             blank_lines: BlankLineMode::default(),
-            top_level_blank_line_cap: 2,
-            nested_blank_line_cap: 1,
+            blank_lines_top_cap: 2,
+            blank_lines_nested_cap: 1,
         }
     }
 
@@ -1235,11 +1246,11 @@ mod tests {
     }
 
     #[test]
-    fn format_options_default_top_level_indent_is_preserve() {
+    fn format_options_default_indent_top_level_is_preserve() {
         // 009-top-level-indent-toggle FR-004(b): the single most direct
         // confirmation of the derived Default -- distinct from (and
         // cheaper than) the behavioral tests around it.
-        assert_eq!(FormatOptions::default().top_level_indent, TopLevelIndentMode::Preserve);
+        assert_eq!(FormatOptions::default().indent_top_level, IndentTopLevelMode::Preserve);
     }
 
     #[test]
@@ -1249,7 +1260,7 @@ mod tests {
         // mode now that Preserve is the default -- this test exists to
         // keep proving 008's guarantee still holds, opt-in.
         let src = "        RUN PGM=MATRIX\n        X = 1\n        ENDRUN\n";
-        let out = format(src, auto_top_level_indent()).text;
+        let out = format(src, auto_indent_top_level()).text;
         assert_eq!(out, "RUN PGM=MATRIX\n    X = 1\nENDRUN\n");
     }
 
@@ -1275,7 +1286,7 @@ mod tests {
         // own spec). Retargeted 2026-08-12 (009-top-level-indent-toggle) to
         // explicit Auto mode now that Preserve is the default.
         let src = "    X = 1\n";
-        let out = format(src, auto_top_level_indent()).text;
+        let out = format(src, auto_indent_top_level()).text;
         assert_eq!(out, "X = 1\n");
     }
 
@@ -1317,7 +1328,7 @@ mod tests {
         // with both its legitimate body content (FILEI) and a swallowed
         // trailing RUN block also at non-zero indentation.
         let src = "    PROCESS PHASE=INPUT\n        FILEI = ni.1\n\n    RUN PGM=HWYASSIGN\n        FILEI NETI = 'net.net'\n    ENDRUN\n";
-        let result = format(src, auto_top_level_indent());
+        let result = format(src, auto_indent_top_level());
 
         assert!(result.changed);
         assert_eq!(result.diagnostics.len(), 1);
@@ -1459,7 +1470,7 @@ mod tests {
         let src = "if (x=1)\nrun pgm=matrix\nendrun\nendif\n";
         let options = FormatOptions {
             casing: CasingSettings::default(),
-            top_level_indent: TopLevelIndentMode::default(),
+            indent_top_level: IndentTopLevelMode::default(),
             indent_width: 4,
             operator_spacing: OperatorSpacing::default(),
             ..FormatOptions::default()
@@ -1500,7 +1511,7 @@ mod tests {
                 pair_keywords: CasingConvention::Upper,
                 data_references: CasingConvention::Preserve,
             },
-            top_level_indent: TopLevelIndentMode::default(),
+            indent_top_level: IndentTopLevelMode::default(),
             indent_width: 4,
             operator_spacing: OperatorSpacing::default(),
             ..FormatOptions::default()
@@ -1514,7 +1525,7 @@ mod tests {
                 pair_keywords: CasingConvention::Preserve,
                 data_references: CasingConvention::Upper,
             },
-            top_level_indent: TopLevelIndentMode::default(),
+            indent_top_level: IndentTopLevelMode::default(),
             indent_width: 4,
             operator_spacing: OperatorSpacing::default(),
             ..FormatOptions::default()
@@ -1562,7 +1573,7 @@ mod tests {
                     pair_keywords: CasingConvention::Lower,
                     data_references: CasingConvention::Preserve,
                 },
-                top_level_indent: TopLevelIndentMode::default(),
+                indent_top_level: IndentTopLevelMode::default(),
                 indent_width: 4,
                 operator_spacing: OperatorSpacing::default(),
                 ..FormatOptions::default()
@@ -1587,7 +1598,7 @@ mod tests {
                 pair_keywords: CasingConvention::Preserve,
                 data_references: CasingConvention::Upper,
             },
-            top_level_indent: TopLevelIndentMode::default(),
+            indent_top_level: IndentTopLevelMode::default(),
             indent_width: 4,
             operator_spacing: OperatorSpacing::default(),
             ..FormatOptions::default()
@@ -1823,7 +1834,7 @@ mod tests {
         // must anchor to THAT column, not to a discarded, would-have-been-0
         // planned value.
         let src = "; FMT: OFF\n      if (x=1)\n; FMT: ON\na = 1\nendif\n";
-        let out = format(src, auto_top_level_indent()).text;
+        let out = format(src, auto_indent_top_level()).text;
         assert_eq!(
             out,
             "; FMT: OFF\n      if (x=1)\n; FMT: ON\n          a = 1\n      endif\n",
@@ -1842,7 +1853,7 @@ mod tests {
         // under Auto) must be guarded by `protected` exactly like the
         // other three gate points.
         let src = "; FMT: OFF\n      a = 1\n; FMT: ON\nb = 2\n";
-        let out = format(src, auto_top_level_indent()).text;
+        let out = format(src, auto_indent_top_level()).text;
         assert_eq!(
             out,
             "; FMT: OFF\n      a = 1\n; FMT: ON\nb = 2\n",
@@ -1863,7 +1874,7 @@ mod tests {
         // the same diagnosed subtree) sits outside the marked region
         // entirely, protected only by 007's own unchanged mechanism.
         let src = "; FMT: OFF\n    PROCESS PHASE=INPUT\n        FILEI = ni.1\n; FMT: ON\n\n    RUN PGM=HWYASSIGN\n        FILEI NETI = 'net.net'\n    ENDRUN\n";
-        let result = format(src, auto_top_level_indent());
+        let result = format(src, auto_indent_top_level());
 
         assert_eq!(
             result.diagnostics.len(),

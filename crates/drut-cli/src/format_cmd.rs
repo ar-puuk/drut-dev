@@ -4,10 +4,10 @@ use std::path::{Path, PathBuf};
 
 use drut_config::{resolve_format_options, ConfigWarning, ExplicitFormatOverride};
 use similar::TextDiff;
-use voyager_core::format::{format_bytes, CasingConvention, EncodingFidelity, OperatorSpacing, TopLevelIndentMode};
+use voyager_core::format::{format_bytes, CasingConvention, EncodingFidelity, OperatorSpacing, IndentTopLevelMode};
 use voyager_core::{BlankLineMode, Position};
 
-use crate::cli::{BlankLinesArg, CasingArg, OperatorSpacingArg, TopLevelIndentArg};
+use crate::cli::{BlankLinesArg, CasingArg, OperatorSpacingArg, IndentTopLevelArg};
 use crate::exit::ExitOutcome;
 use crate::io_util::{write_stdout, write_stdout_line};
 use crate::traverse::{traverse, ReadFailure};
@@ -22,11 +22,11 @@ impl From<CasingArg> for CasingConvention {
     }
 }
 
-impl From<TopLevelIndentArg> for TopLevelIndentMode {
-    fn from(value: TopLevelIndentArg) -> Self {
+impl From<IndentTopLevelArg> for IndentTopLevelMode {
+    fn from(value: IndentTopLevelArg) -> Self {
         match value {
-            TopLevelIndentArg::Preserve => TopLevelIndentMode::Preserve,
-            TopLevelIndentArg::Auto => TopLevelIndentMode::Auto,
+            IndentTopLevelArg::Preserve => IndentTopLevelMode::Preserve,
+            IndentTopLevelArg::Auto => IndentTopLevelMode::Auto,
         }
     }
 }
@@ -96,15 +96,15 @@ pub fn run(
     write: bool,
     check: bool,
     diff: bool,
-    control_words_casing: Option<CasingArg>,
-    pair_keywords_casing: Option<CasingArg>,
-    data_references_casing: Option<CasingArg>,
+    casing_control_words: Option<CasingArg>,
+    casing_pair_keywords: Option<CasingArg>,
+    casing_data_references: Option<CasingArg>,
     indent_width: Option<u8>,
-    top_level_indent: Option<TopLevelIndentArg>,
+    indent_top_level: Option<IndentTopLevelArg>,
     operator_spacing: Option<OperatorSpacingArg>,
     blank_lines: Option<BlankLinesArg>,
-    top_level_blank_line_cap: Option<u8>,
-    nested_blank_line_cap: Option<u8>,
+    blank_lines_top_cap: Option<u8>,
+    blank_lines_nested_cap: Option<u8>,
     isolated: bool,
 ) -> ExitOutcome {
     let mode = if write {
@@ -117,15 +117,15 @@ pub fn run(
         Mode::Default
     };
     let explicit = ExplicitFormatOverride {
-        control_words_casing: control_words_casing.map(CasingConvention::from),
-        pair_keywords_casing: pair_keywords_casing.map(CasingConvention::from),
-        data_references_casing: data_references_casing.map(CasingConvention::from),
-        top_level_indent: top_level_indent.map(TopLevelIndentMode::from),
+        casing_control_words: casing_control_words.map(CasingConvention::from),
+        casing_pair_keywords: casing_pair_keywords.map(CasingConvention::from),
+        casing_data_references: casing_data_references.map(CasingConvention::from),
+        indent_top_level: indent_top_level.map(IndentTopLevelMode::from),
         indent_width,
         operator_spacing: operator_spacing.map(OperatorSpacing::from),
         blank_lines: blank_lines.map(BlankLineMode::from),
-        top_level_blank_line_cap,
-        nested_blank_line_cap,
+        blank_lines_top_cap,
+        blank_lines_nested_cap,
     };
 
     let traversal = traverse(path);

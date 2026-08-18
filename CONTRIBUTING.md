@@ -39,10 +39,10 @@ remaining pre-publish sequence.
   census re-run against the fix — see the module doc for the fix's effect on
   the dictionary (one entry, `COST`/`PRINT`, dropped as the bug's own
   artifact; everything else unchanged). Since then, the formatter has grown: a
-  `--top-level-indent` mode (`preserve`, the default, or `auto` — force
+  `--indent-top-level` mode (`preserve`, the default, or `auto` — force
   every top-level statement to column 0) and three independent, three-valued
-  casing fields (`control_words_casing`/`pair_keywords_casing`/
-  `data_references_casing`; each `preserve`, the default, `upper`, or
+  casing fields (`casing_control_words`/`casing_pair_keywords`/
+  `casing_data_references`; each `preserve`, the default, `upper`, or
   `lower`) — see
   [`specs/009-top-level-indent-toggle/`](specs/009-top-level-indent-toggle/),
   [`specs/014-casing-preserve-mode/`](specs/014-casing-preserve-mode/), and
@@ -77,9 +77,9 @@ remaining pre-publish sequence.
   [`specs/004-mcp-server/`](specs/004-mcp-server/). `check` is fully wired
   (plain-text or SARIF 2.1.0 output); `format` supports default/`--write`/
   `--check`/`--diff` disposition modes, opt-in
-  `--control-words-casing=preserve|upper|lower` (and its
-  `--pair-keywords-casing`/`--data-references-casing` siblings),
-  `--top-level-indent=preserve|auto`, and `--isolated` (skip `drut.toml`
+  `--casing-control-words=preserve|upper|lower` (and its
+  `--casing-pair-keywords`/`--casing-data-references` siblings),
+  `--indent-top-level=preserve|auto`, and `--isolated` (skip `drut.toml`
   discovery for one run); `server` speaks the Language Server Protocol over
   stdio; `mcp` speaks the Model Context Protocol over stdio.
 - **`drut-lsp`** (`crates/drut-lsp`) — a thin LSP adapter over `voyager-core`:
@@ -121,7 +121,7 @@ remaining pre-publish sequence.
   actively-maintained Rust MCP SDK is async-only) are scoped entirely to this
   one crate; `voyager-core`, `drut-cli`'s other subcommands, and `drut-lsp`
   remain fully synchronous. `format`'s parameters now mirror the CLI's flags
-  (`control_words_casing`, `top_level_indent`, `isolated`), plus response fields for unclosed
+  (`casing_control_words`, `indent_top_level`, `isolated`), plus response fields for unclosed
   `; FMT: OFF` markers and `drut.toml` warnings. See
   [`specs/004-mcp-server/`](specs/004-mcp-server/) for the full spec/plan/
   data-model/contracts/tasks.

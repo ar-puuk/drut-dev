@@ -8,7 +8,7 @@
 use std::path::{Path, PathBuf};
 
 use drut_config::{resolve_format_options, ExplicitFormatOverride};
-use voyager_core::{CasingConvention, OperatorSpacing, TopLevelIndentMode};
+use voyager_core::{CasingConvention, OperatorSpacing, IndentTopLevelMode};
 
 fn test_file(name: &str, config: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("drut_config_client_defaults_test_{}_{name}", std::process::id()));
@@ -35,7 +35,7 @@ fn client_defaults_value_applies_with_no_drut_toml_and_no_explicit_value() {
     std::fs::write(&target, "IF (a=b)\nENDIF\n").unwrap();
 
     let client_defaults = ExplicitFormatOverride {
-        control_words_casing: Some(CasingConvention::Upper),
+        casing_control_words: Some(CasingConvention::Upper),
         indent_width: Some(2),
         operator_spacing: Some(OperatorSpacing::Fixed),
         ..Default::default()
@@ -70,14 +70,14 @@ fn client_defaults_wins_for_a_field_drut_toml_does_not_set_even_when_toml_govern
 
     let client_defaults = ExplicitFormatOverride {
         indent_width: Some(8),
-        top_level_indent: Some(TopLevelIndentMode::Auto),
+        indent_top_level: Some(IndentTopLevelMode::Auto),
         ..Default::default()
     };
     let (options, _warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), client_defaults);
     assert_eq!(options.indent_width, 2, "drut.toml still wins for the field it sets");
     assert_eq!(
-        options.top_level_indent,
-        TopLevelIndentMode::Auto,
+        options.indent_top_level,
+        IndentTopLevelMode::Auto,
         "client_defaults wins for the field drut.toml never mentions"
     );
 
@@ -112,9 +112,9 @@ fn out_of_range_client_defaults_blank_line_cap_falls_back_to_default_with_a_warn
     let target = dir.join("a.s");
     std::fs::write(&target, "IF (a=b)\nENDIF\n").unwrap();
 
-    let client_defaults = ExplicitFormatOverride { top_level_blank_line_cap: Some(200), ..Default::default() };
+    let client_defaults = ExplicitFormatOverride { blank_lines_top_cap: Some(200), ..Default::default() };
     let (options, warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), client_defaults);
-    assert_eq!(options.top_level_blank_line_cap, 2, "must fall back to the built-in default, never fail");
+    assert_eq!(options.blank_lines_top_cap, 2, "must fall back to the built-in default, never fail");
     assert_eq!(warnings.len(), 1, "expected a non-blocking notice, got: {warnings:?}");
 
     cleanup(&target);
@@ -132,7 +132,7 @@ fn client_defaults_granular_casing_field_resolves_independently() {
     let target = dir.join("a.s");
     std::fs::write(&target, "IF (a=b)\nENDIF\n").unwrap();
 
-    let client_defaults = ExplicitFormatOverride { control_words_casing: Some(CasingConvention::Upper), ..Default::default() };
+    let client_defaults = ExplicitFormatOverride { casing_control_words: Some(CasingConvention::Upper), ..Default::default() };
     let (options, _warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), client_defaults);
     assert_eq!(options.casing.control_words, CasingConvention::Upper, "client_defaults must apply with nothing else set");
     assert_eq!(
@@ -144,18 +144,18 @@ fn client_defaults_granular_casing_field_resolves_independently() {
     cleanup(&target);
 }
 
-/// A `drut.toml` that sets the granular `control_words_casing` field wins
+/// A `drut.toml` that sets the granular `casing_control_words` field wins
 /// over `client_defaults`' own value for that same field; a *different*
 /// granular field `drut.toml` never mentions still falls through to
 /// `client_defaults` — each field resolves its own four-tier chain
 /// independently.
 #[test]
 fn drut_toml_granular_field_wins_over_client_defaults_for_that_field_only() {
-    let target = test_file("toml_granular_wins", "[format]\ncontrol_words_casing = \"lower\"\n");
+    let target = test_file("toml_granular_wins", "[format]\ncasing_control_words = \"lower\"\n");
 
     let client_defaults = ExplicitFormatOverride {
-        control_words_casing: Some(CasingConvention::Upper),
-        pair_keywords_casing: Some(CasingConvention::Upper),
+        casing_control_words: Some(CasingConvention::Upper),
+        casing_pair_keywords: Some(CasingConvention::Upper),
         ..Default::default()
     };
     let (options, _warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), client_defaults);

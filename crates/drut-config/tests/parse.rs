@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use drut_config::{parse::parse, ConfigWarning};
-use voyager_core::{BlankLineMode, CasingConvention, OperatorSpacing, TopLevelIndentMode};
+use voyager_core::{BlankLineMode, CasingConvention, OperatorSpacing, IndentTopLevelMode};
 
 fn write_config(name: &str, content: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("drut_config_parse_test_{}_{name}", std::process::id()));
@@ -19,11 +19,11 @@ fn cleanup(path: &Path) {
 
 #[test]
 fn fully_valid_file_parses_both_keys_with_zero_warnings() {
-    let path = write_config("valid", "[format]\ncontrol_words_casing = \"upper\"\ntop_level_indent = \"auto\"\n");
+    let path = write_config("valid", "[format]\ncasing_control_words = \"upper\"\nindent_top_level = \"auto\"\n");
 
     let (config, warnings) = parse(&path);
-    assert_eq!(config.format.control_words_casing, Some(CasingConvention::Upper));
-    assert_eq!(config.format.top_level_indent, Some(TopLevelIndentMode::Auto));
+    assert_eq!(config.format.casing_control_words, Some(CasingConvention::Upper));
+    assert_eq!(config.format.indent_top_level, Some(IndentTopLevelMode::Auto));
     assert!(warnings.is_empty(), "expected zero warnings, got {warnings:?}");
 
     cleanup(&path);
@@ -33,10 +33,10 @@ fn fully_valid_file_parses_both_keys_with_zero_warnings() {
 fn casing_preserve_parses_cleanly_with_zero_warnings() {
     // 014-casing-preserve-mode FR-005/SC-005: "preserve" is a recognized
     // value, not an unrecognized one that happens to be a no-op.
-    let path = write_config("casing_preserve", "[format]\ncontrol_words_casing = \"preserve\"\n");
+    let path = write_config("casing_preserve", "[format]\ncasing_control_words = \"preserve\"\n");
 
     let (config, warnings) = parse(&path);
-    assert_eq!(config.format.control_words_casing, Some(CasingConvention::Preserve));
+    assert_eq!(config.format.casing_control_words, Some(CasingConvention::Preserve));
     assert!(warnings.is_empty(), "expected zero warnings, got {warnings:?}");
 
     cleanup(&path);
@@ -46,21 +46,21 @@ fn casing_preserve_parses_cleanly_with_zero_warnings() {
 fn invalid_value_for_one_key_falls_back_only_for_that_key() {
     let path = write_config(
         "invalid_value",
-        "[format]\ncontrol_words_casing = \"sideways\"\ntop_level_indent = \"auto\"\n",
+        "[format]\ncasing_control_words = \"sideways\"\nindent_top_level = \"auto\"\n",
     );
 
     let (config, warnings) = parse(&path);
     assert_eq!(
-        config.format.control_words_casing, None,
-        "invalid control_words_casing falls back to None"
+        config.format.casing_control_words, None,
+        "invalid casing_control_words falls back to None"
     );
     assert_eq!(
-        config.format.top_level_indent,
-        Some(TopLevelIndentMode::Auto),
+        config.format.indent_top_level,
+        Some(IndentTopLevelMode::Auto),
         "the other, valid key must still parse correctly"
     );
     assert_eq!(warnings.len(), 1);
-    assert!(matches!(&warnings[0], ConfigWarning::InvalidValue { key, .. } if key == "control_words_casing"));
+    assert!(matches!(&warnings[0], ConfigWarning::InvalidValue { key, .. } if key == "casing_control_words"));
 
     cleanup(&path);
 }
@@ -69,12 +69,12 @@ fn invalid_value_for_one_key_falls_back_only_for_that_key() {
 fn unrecognized_key_inside_format_warns_but_other_keys_still_apply() {
     let path = write_config(
         "unrecognized_key",
-        "[format]\ncsing = \"upper\"\ntop_level_indent = \"auto\"\n",
+        "[format]\ncsing = \"upper\"\nindent_top_level = \"auto\"\n",
     );
 
     let (config, warnings) = parse(&path);
-    assert_eq!(config.format.control_words_casing, None);
-    assert_eq!(config.format.top_level_indent, Some(TopLevelIndentMode::Auto));
+    assert_eq!(config.format.casing_control_words, None);
+    assert_eq!(config.format.indent_top_level, Some(IndentTopLevelMode::Auto));
     assert_eq!(warnings.len(), 1);
     assert!(matches!(&warnings[0], ConfigWarning::UnrecognizedKey { key, table, .. } if key == "csing" && table == "format"));
 
@@ -83,20 +83,20 @@ fn unrecognized_key_inside_format_warns_but_other_keys_still_apply() {
 
 #[test]
 fn the_removed_legacy_casing_key_is_an_unrecognized_key_not_a_hard_failure() {
-    // The flat `casing` field (superseded by control_words_casing/
-    // pair_keywords_casing/data_references_casing) was removed -- a
+    // The flat `casing` field (superseded by casing_control_words/
+    // casing_pair_keywords/casing_data_references) was removed -- a
     // drut.toml still using it degrades exactly like any other unknown
     // key: one warning, every other valid key in the same file still
     // applies.
     let path = write_config(
         "legacy_casing_removed",
-        "[format]\ncasing = \"upper\"\ntop_level_indent = \"auto\"\n",
+        "[format]\ncasing = \"upper\"\nindent_top_level = \"auto\"\n",
     );
 
     let (config, warnings) = parse(&path);
-    assert_eq!(config.format.control_words_casing, None);
-    assert_eq!(config.format.pair_keywords_casing, None);
-    assert_eq!(config.format.top_level_indent, Some(TopLevelIndentMode::Auto));
+    assert_eq!(config.format.casing_control_words, None);
+    assert_eq!(config.format.casing_pair_keywords, None);
+    assert_eq!(config.format.indent_top_level, Some(IndentTopLevelMode::Auto));
     assert_eq!(warnings.len(), 1);
     assert!(matches!(&warnings[0], ConfigWarning::UnrecognizedKey { key, table, .. } if key == "casing" && table == "format"));
 
@@ -107,11 +107,11 @@ fn the_removed_legacy_casing_key_is_an_unrecognized_key_not_a_hard_failure() {
 fn unrecognized_top_level_table_is_silently_ignored_not_warned() {
     let path = write_config(
         "unrecognized_table",
-        "[lint]\nseverity = \"error\"\n\n[format]\ncontrol_words_casing = \"lower\"\n",
+        "[lint]\nseverity = \"error\"\n\n[format]\ncasing_control_words = \"lower\"\n",
     );
 
     let (config, warnings) = parse(&path);
-    assert_eq!(config.format.control_words_casing, Some(CasingConvention::Lower));
+    assert_eq!(config.format.casing_control_words, Some(CasingConvention::Lower));
     assert!(
         warnings.is_empty(),
         "an unrecognized top-level table must not warn (forward-compat), got {warnings:?}"
@@ -122,11 +122,11 @@ fn unrecognized_top_level_table_is_silently_ignored_not_warned() {
 
 #[test]
 fn a_file_that_is_not_valid_toml_produces_one_parse_error_and_empty_config() {
-    let path = write_config("invalid_syntax", "[format\ncontrol_words_casing = \"upper\"\n");
+    let path = write_config("invalid_syntax", "[format\ncasing_control_words = \"upper\"\n");
 
     let (config, warnings) = parse(&path);
-    assert_eq!(config.format.control_words_casing, None);
-    assert_eq!(config.format.top_level_indent, None);
+    assert_eq!(config.format.casing_control_words, None);
+    assert_eq!(config.format.indent_top_level, None);
     assert_eq!(warnings.len(), 1);
     assert!(matches!(&warnings[0], ConfigWarning::ParseError { .. }));
 
@@ -138,8 +138,8 @@ fn a_file_with_no_format_table_at_all_parses_to_empty_config_with_no_warnings() 
     let path = write_config("no_format_table", "[lint]\nseverity = \"error\"\n");
 
     let (config, warnings) = parse(&path);
-    assert_eq!(config.format.control_words_casing, None);
-    assert_eq!(config.format.top_level_indent, None);
+    assert_eq!(config.format.casing_control_words, None);
+    assert_eq!(config.format.indent_top_level, None);
     assert!(warnings.is_empty());
 
     cleanup(&path);
@@ -149,7 +149,7 @@ fn a_file_with_no_format_table_at_all_parses_to_empty_config_with_no_warnings() 
 fn an_unreadable_path_produces_a_parse_error_not_a_panic() {
     let path = Path::new("this/definitely/does/not/exist/drut.toml");
     let (config, warnings) = parse(path);
-    assert_eq!(config.format.control_words_casing, None);
+    assert_eq!(config.format.casing_control_words, None);
     assert_eq!(warnings.len(), 1);
     assert!(matches!(&warnings[0], ConfigWarning::ParseError { .. }));
 }
@@ -161,13 +161,13 @@ fn an_unreadable_path_produces_a_parse_error_not_a_panic() {
 fn each_new_granular_casing_field_parses_cleanly_with_zero_warnings() {
     let path = write_config(
         "granular_casing",
-        "[format]\ncontrol_words_casing = \"upper\"\npair_keywords_casing = \"lower\"\ndata_references_casing = \"preserve\"\n",
+        "[format]\ncasing_control_words = \"upper\"\ncasing_pair_keywords = \"lower\"\ncasing_data_references = \"preserve\"\n",
     );
 
     let (config, warnings) = parse(&path);
-    assert_eq!(config.format.control_words_casing, Some(CasingConvention::Upper));
-    assert_eq!(config.format.pair_keywords_casing, Some(CasingConvention::Lower));
-    assert_eq!(config.format.data_references_casing, Some(CasingConvention::Preserve));
+    assert_eq!(config.format.casing_control_words, Some(CasingConvention::Upper));
+    assert_eq!(config.format.casing_pair_keywords, Some(CasingConvention::Lower));
+    assert_eq!(config.format.casing_data_references, Some(CasingConvention::Preserve));
     assert!(warnings.is_empty(), "expected zero warnings, got {warnings:?}");
 
     cleanup(&path);
@@ -177,14 +177,14 @@ fn each_new_granular_casing_field_parses_cleanly_with_zero_warnings() {
 fn a_malformed_granular_casing_value_falls_back_only_for_that_key() {
     let path = write_config(
         "granular_casing_invalid",
-        "[format]\ndata_references_casing = \"sideways\"\ncontrol_words_casing = \"upper\"\n",
+        "[format]\ncasing_data_references = \"sideways\"\ncasing_control_words = \"upper\"\n",
     );
 
     let (config, warnings) = parse(&path);
-    assert_eq!(config.format.data_references_casing, None);
-    assert_eq!(config.format.control_words_casing, Some(CasingConvention::Upper));
+    assert_eq!(config.format.casing_data_references, None);
+    assert_eq!(config.format.casing_control_words, Some(CasingConvention::Upper));
     assert_eq!(warnings.len(), 1);
-    assert!(matches!(&warnings[0], ConfigWarning::InvalidValue { key, .. } if key == "data_references_casing"));
+    assert!(matches!(&warnings[0], ConfigWarning::InvalidValue { key, .. } if key == "casing_data_references"));
 
     cleanup(&path);
 }
@@ -197,13 +197,13 @@ fn auto_is_rejected_as_an_unrecognized_casing_value_at_every_casing_field() {
     // three granular fields.
     let path = write_config(
         "auto_rejected",
-        "[format]\ncontrol_words_casing = \"auto\"\npair_keywords_casing = \"auto\"\ndata_references_casing = \"auto\"\n",
+        "[format]\ncasing_control_words = \"auto\"\ncasing_pair_keywords = \"auto\"\ncasing_data_references = \"auto\"\n",
     );
 
     let (config, warnings) = parse(&path);
-    assert_eq!(config.format.control_words_casing, None);
-    assert_eq!(config.format.pair_keywords_casing, None);
-    assert_eq!(config.format.data_references_casing, None);
+    assert_eq!(config.format.casing_control_words, None);
+    assert_eq!(config.format.casing_pair_keywords, None);
+    assert_eq!(config.format.casing_data_references, None);
     assert_eq!(warnings.len(), 3, "each of the three casing fields must independently warn: {warnings:?}");
     assert!(warnings.iter().all(|w| matches!(w, ConfigWarning::InvalidValue { .. })));
 
@@ -315,12 +315,12 @@ fn blank_lines_malformed_value_warns_and_falls_back_to_none() {
 fn each_blank_line_cap_parses_a_plain_integer_cleanly() {
     let path = write_config(
         "blank_line_caps_valid",
-        "[format]\ntop_level_blank_line_cap = 3\nnested_blank_line_cap = 2\n",
+        "[format]\nblank_lines_top_cap = 3\nblank_lines_nested_cap = 2\n",
     );
 
     let (config, warnings) = parse(&path);
-    assert_eq!(config.format.top_level_blank_line_cap, Some(3));
-    assert_eq!(config.format.nested_blank_line_cap, Some(2));
+    assert_eq!(config.format.blank_lines_top_cap, Some(3));
+    assert_eq!(config.format.blank_lines_nested_cap, Some(2));
     assert!(warnings.is_empty(), "expected zero warnings, got {warnings:?}");
 
     cleanup(&path);
@@ -330,14 +330,14 @@ fn each_blank_line_cap_parses_a_plain_integer_cleanly() {
 fn a_malformed_blank_line_cap_value_warns_and_falls_back_only_for_that_key() {
     let path = write_config(
         "blank_line_caps_malformed",
-        "[format]\ntop_level_blank_line_cap = \"two\"\nnested_blank_line_cap = 1\n",
+        "[format]\nblank_lines_top_cap = \"two\"\nblank_lines_nested_cap = 1\n",
     );
 
     let (config, warnings) = parse(&path);
-    assert_eq!(config.format.top_level_blank_line_cap, None);
-    assert_eq!(config.format.nested_blank_line_cap, Some(1));
+    assert_eq!(config.format.blank_lines_top_cap, None);
+    assert_eq!(config.format.blank_lines_nested_cap, Some(1));
     assert_eq!(warnings.len(), 1);
-    assert!(matches!(&warnings[0], ConfigWarning::InvalidValue { key, .. } if key == "top_level_blank_line_cap"));
+    assert!(matches!(&warnings[0], ConfigWarning::InvalidValue { key, .. } if key == "blank_lines_top_cap"));
 
     cleanup(&path);
 }

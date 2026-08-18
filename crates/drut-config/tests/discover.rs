@@ -23,7 +23,7 @@ fn cleanup(dir: &Path) {
 #[test]
 fn drut_toml_in_the_same_directory_as_the_target_wins() {
     let root = test_dir("same_dir");
-    write(&root.join("drut.toml"), "[format]\ncontrol_words_casing = \"lower\"\n");
+    write(&root.join("drut.toml"), "[format]\ncasing_control_words = \"lower\"\n");
     let target = root.join("a.s");
     write(&target, "IF (a=b)\nENDIF\n");
 
@@ -36,7 +36,7 @@ fn drut_toml_in_the_same_directory_as_the_target_wins() {
 #[test]
 fn a_drut_toml_higher_up_wins_when_nothing_closer_exists() {
     let root = test_dir("higher_up");
-    write(&root.join("drut.toml"), "[format]\ncontrol_words_casing = \"lower\"\n");
+    write(&root.join("drut.toml"), "[format]\ncasing_control_words = \"lower\"\n");
     let target = root.join("sub").join("a.s");
     write(&target, "IF (a=b)\nENDIF\n");
 
@@ -50,7 +50,7 @@ fn a_drut_toml_higher_up_wins_when_nothing_closer_exists() {
 fn target_three_directories_deep_finds_the_project_root_config() {
     // spec.md US1 Acceptance Scenario 4.
     let root = test_dir("three_deep");
-    write(&root.join("drut.toml"), "[format]\ncontrol_words_casing = \"lower\"\n");
+    write(&root.join("drut.toml"), "[format]\ncasing_control_words = \"lower\"\n");
     let target = root.join("a").join("b").join("c").join("a.s");
     write(&target, "IF (a=b)\nENDIF\n");
 
@@ -63,7 +63,7 @@ fn target_three_directories_deep_finds_the_project_root_config() {
 #[test]
 fn a_git_directory_between_the_target_and_a_further_drut_toml_stops_the_walk() {
     let root = test_dir("git_dir_boundary");
-    write(&root.join("drut.toml"), "[format]\ncontrol_words_casing = \"lower\"\n");
+    write(&root.join("drut.toml"), "[format]\ncasing_control_words = \"lower\"\n");
     let repo = root.join("repo");
     std::fs::create_dir_all(repo.join(".git")).unwrap();
     let target = repo.join("a.s");
@@ -85,7 +85,7 @@ fn a_git_file_worktree_between_the_target_and_a_further_drut_toml_stops_the_walk
     // per its own doc comment. Found missing from the original test list
     // during /speckit-analyze review.
     let root = test_dir("git_file_boundary");
-    write(&root.join("drut.toml"), "[format]\ncontrol_words_casing = \"lower\"\n");
+    write(&root.join("drut.toml"), "[format]\ncasing_control_words = \"lower\"\n");
     let repo = root.join("worktree");
     std::fs::create_dir_all(&repo).unwrap();
     write(&repo.join(".git"), "gitdir: /some/where/.git/worktrees/worktree\n");

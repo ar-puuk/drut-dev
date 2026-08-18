@@ -5,7 +5,7 @@ set the same way, in a `drut.toml` file at (or above) the file you're formatting
 
 ```toml
 [format]
-control_words_casing = "lower"
+casing_control_words = "lower"
 indent_width = 2
 ```
 
@@ -25,15 +25,15 @@ the full field list or its defaults from scratch:
 
 ```toml
 [format]
-# control_words_casing = "preserve"      # preserve | upper | lower
-# pair_keywords_casing = "preserve"      # preserve | upper | lower
-# data_references_casing = "preserve"    # preserve | upper | lower
-# top_level_indent = "preserve"          # preserve | auto
-# indent_width = 4                       # 1-16
-# operator_spacing = "preserve"          # preserve | fixed | auto
-# blank_lines = "preserve"               # preserve | auto
-# top_level_blank_line_cap = 2           # 1-50, only used when blank_lines = "auto"
-# nested_blank_line_cap = 1              # 1-50, only used when blank_lines = "auto"
+# casing_control_words = "preserve"    # preserve | upper | lower
+# casing_pair_keywords = "preserve"    # preserve | upper | lower
+# casing_data_references = "preserve"  # preserve | upper | lower
+# indent_top_level = "preserve"        # preserve | auto
+# indent_width = 4                     # 1-16
+# operator_spacing = "preserve"        # preserve | fixed | auto
+# blank_lines = "preserve"             # preserve | auto
+# blank_lines_top_cap = 2              # 1-50, only used when blank_lines = "auto"
+# blank_lines_nested_cap = 1           # 1-50, only used when blank_lines = "auto"
 ```
 
 See [Fields](#fields) below for what each one actually does, and
@@ -73,7 +73,7 @@ this same plain four-tier chain — no field has any extra fallback wrinkle.
 
 ## Fields
 
-### `control_words_casing`
+### `casing_control_words`
 
 Casing convention for the `control_words` category (things like `IF`,
 `ENDIF`, `LOOP`, `ENDLOOP`).
@@ -82,41 +82,41 @@ Casing convention for the `control_words` category (things like `IF`,
 
 **Default**: `preserve`.
 
-**Also known as**: CLI flag `--control-words-casing`; MCP `format` tool parameter
-`control_words_casing`.
+**Also known as**: CLI flag `--casing-control-words`; MCP `format` tool parameter
+`casing_control_words`.
 
 **Example**:
 
 ```toml
 [format]
-control_words_casing = "upper"
+casing_control_words = "upper"
 ```
 
 **Precedence**: follows the [four-tier chain](#precedence) above.
 
-### `pair_keywords_casing`
+### `casing_pair_keywords`
 
 Casing convention for the `pair_keywords` category (keyword names inside
 a `Control` statement's `keyword=value` pairs, e.g. `PATHLOAD`, `MATI`), same
-shape as [`control_words_casing`](#control_words_casing) above.
+shape as [`casing_control_words`](#casing_control_words) above.
 
 **Values**: `preserve` **← default**, `upper`, `lower`.
 
 **Default**: `preserve`.
 
-**Also known as**: CLI flag `--pair-keywords-casing`; MCP `format` tool parameter
-`pair_keywords_casing`.
+**Also known as**: CLI flag `--casing-pair-keywords`; MCP `format` tool parameter
+`casing_pair_keywords`.
 
 **Example**:
 
 ```toml
 [format]
-pair_keywords_casing = "lower"
+casing_pair_keywords = "lower"
 ```
 
 **Precedence**: follows the [four-tier chain](#precedence) above.
 
-### `data_references_casing`
+### `casing_data_references`
 
 Casing for the data-reference category: Matrix/Line/Node/Zone/Database
 abbreviations (`MI`/`MO`/`MW`, `LI`/`LW`, `NI`/`NW`, `ZI`/`ZONES`/`Z`,
@@ -127,19 +127,19 @@ identifiers `I`/`J`.
 
 **Default**: `preserve`.
 
-**Also known as**: CLI flag `--data-references-casing`; MCP `format` tool
-parameter `data_references_casing`.
+**Also known as**: CLI flag `--casing-data-references`; MCP `format` tool
+parameter `casing_data_references`.
 
 **Example**:
 
 ```toml
 [format]
-data_references_casing = "lower"
+casing_data_references = "lower"
 ```
 
 **Precedence**: follows the [four-tier chain](#precedence) above.
 
-### `top_level_indent`
+### `indent_top_level`
 
 Whether top-level (depth-0, not inside any block) statement indentation is left
 exactly as written, or normalized to column 0.
@@ -150,14 +150,14 @@ exactly as written, or normalized to column 0.
 
 **Default**: `preserve`.
 
-**Also known as**: CLI flag `--top-level-indent`; MCP `format` tool parameter
-`top_level_indent`.
+**Also known as**: CLI flag `--indent-top-level`; MCP `format` tool parameter
+`indent_top_level`.
 
 **Example**:
 
 ```toml
 [format]
-top_level_indent = "auto"
+indent_top_level = "auto"
 ```
 
 **Precedence**: follows the [four-tier chain](#precedence) above.
@@ -227,8 +227,8 @@ left as written or contracted down to a configured cap.
 **Values**:
 - `preserve` **← default** — leave every blank-line run exactly as written,
   however long.
-- `auto` — contract a run down to the applicable cap ([`top_level_blank_line_cap`](#top_level_blank_line_cap)
-  or [`nested_blank_line_cap`](#nested_blank_line_cap)) only when the run
+- `auto` — contract a run down to the applicable cap ([`blank_lines_top_cap`](#blank_lines_top_cap)
+  or [`blank_lines_nested_cap`](#blank_lines_nested_cap)) only when the run
   exceeds that cap — never pads a shorter run up.
 
 **Default**: `preserve`.
@@ -245,7 +245,7 @@ blank_lines = "auto"
 
 **Precedence**: follows the [four-tier chain](#precedence) above.
 
-### `top_level_blank_line_cap`
+### `blank_lines_top_cap`
 
 The maximum number of consecutive blank lines `blank_lines = "auto"` allows
 between top-level statements/blocks before contracting the run. Only meaningful
@@ -255,22 +255,22 @@ when [`blank_lines`](#blank_lines) is `"auto"`.
 
 **Default**: `2`.
 
-**Also known as**: CLI flag `--top-level-blank-line-cap`; MCP `format` tool
-parameter `top_level_blank_line_cap`.
+**Also known as**: CLI flag `--blank-lines-top-cap`; MCP `format` tool
+parameter `blank_lines_top_cap`.
 
 **Example**:
 
 ```toml
 [format]
 blank_lines = "auto"
-top_level_blank_line_cap = 1
+blank_lines_top_cap = 1
 ```
 
 **Precedence**: follows the [four-tier chain](#precedence) above. An
 out-of-range value at any tier is treated as unset for
 that tier, same as [`indent_width`](#indent_width).
 
-### `nested_blank_line_cap`
+### `blank_lines_nested_cap`
 
 The maximum number of consecutive blank lines `blank_lines = "auto"` allows
 inside any block's own body, uniformly regardless of nesting depth, before
@@ -281,17 +281,17 @@ contracting the run. Only meaningful when [`blank_lines`](#blank_lines) is
 
 **Default**: `1`.
 
-**Also known as**: CLI flag `--nested-blank-line-cap`; MCP `format` tool
-parameter `nested_blank_line_cap`.
+**Also known as**: CLI flag `--blank-lines-nested-cap`; MCP `format` tool
+parameter `blank_lines_nested_cap`.
 
 **Example**:
 
 ```toml
 [format]
 blank_lines = "auto"
-nested_blank_line_cap = 2
+blank_lines_nested_cap = 2
 ```
 
 **Precedence**: follows the [four-tier chain](#precedence) above. Same
 out-of-range handling as
-[`top_level_blank_line_cap`](#top_level_blank_line_cap).
+[`blank_lines_top_cap`](#blank_lines_top_cap).

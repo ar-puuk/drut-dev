@@ -341,15 +341,15 @@ fn handle_response(connection: &Connection, response: Response, state: &mut Serv
 fn parse_client_format_defaults(value: &serde_json::Value) -> drut_config::ExplicitFormatOverride {
     let field = |key: &str| value.get(key);
     drut_config::ExplicitFormatOverride {
-        control_words_casing: field("controlWordsCasing").and_then(parse_client_casing),
-        pair_keywords_casing: field("pairKeywordsCasing").and_then(parse_client_casing),
-        data_references_casing: field("dataReferencesCasing").and_then(parse_client_casing),
-        top_level_indent: field("topLevelIndent").and_then(parse_client_top_level_indent),
+        casing_control_words: field("casingControlWords").and_then(parse_client_casing),
+        casing_pair_keywords: field("casingPairKeywords").and_then(parse_client_casing),
+        casing_data_references: field("casingDataReferences").and_then(parse_client_casing),
+        indent_top_level: field("indentTopLevel").and_then(parse_client_indent_top_level),
         indent_width: field("indentWidth").and_then(parse_client_u8),
         operator_spacing: field("operatorSpacing").and_then(parse_client_operator_spacing),
         blank_lines: field("blankLines").and_then(parse_client_blank_lines),
-        top_level_blank_line_cap: field("topLevelBlankLineCap").and_then(parse_client_u8),
-        nested_blank_line_cap: field("nestedBlankLineCap").and_then(parse_client_u8),
+        blank_lines_top_cap: field("blankLinesTopCap").and_then(parse_client_u8),
+        blank_lines_nested_cap: field("blankLinesNestedCap").and_then(parse_client_u8),
     }
 }
 
@@ -367,10 +367,10 @@ fn parse_client_casing(value: &serde_json::Value) -> Option<voyager_core::Casing
     }
 }
 
-fn parse_client_top_level_indent(value: &serde_json::Value) -> Option<voyager_core::TopLevelIndentMode> {
+fn parse_client_indent_top_level(value: &serde_json::Value) -> Option<voyager_core::IndentTopLevelMode> {
     match value.as_str()? {
-        "preserve" => Some(voyager_core::TopLevelIndentMode::Preserve),
-        "auto" => Some(voyager_core::TopLevelIndentMode::Auto),
+        "preserve" => Some(voyager_core::IndentTopLevelMode::Preserve),
+        "auto" => Some(voyager_core::IndentTopLevelMode::Auto),
         _ => None,
     }
 }
@@ -392,7 +392,7 @@ fn parse_client_blank_lines(value: &serde_json::Value) -> Option<voyager_core::B
     }
 }
 
-/// Shared by `indentWidth`/`topLevelBlankLineCap`/`nestedBlankLineCap` — any
+/// Shared by `indentWidth`/`blankLinesTopCap`/`blankLinesNestedCap` — any
 /// JSON number that fits in a `u8` is accepted here; the 1–16 (or
 /// 1–50) valid-range bound is enforced later, at `drut_config::
 /// resolve_format_options`'s own resolve layer, the same two-stage
@@ -604,26 +604,26 @@ mod tests {
             // present here to prove it's harmlessly ignored, not that it
             // still does anything.
             "casing": "upper",
-            "controlWordsCasing": "lower",
-            "pairKeywordsCasing": "preserve",
-            "dataReferencesCasing": "upper",
-            "topLevelIndent": "auto",
+            "casingControlWords": "lower",
+            "casingPairKeywords": "preserve",
+            "casingDataReferences": "upper",
+            "indentTopLevel": "auto",
             "indentWidth": 2,
             "operatorSpacing": "fixed",
             "blankLines": "auto",
-            "topLevelBlankLineCap": 3,
-            "nestedBlankLineCap": 1
+            "blankLinesTopCap": 3,
+            "blankLinesNestedCap": 1
         });
         let result = parse_client_format_defaults(&value);
-        assert_eq!(result.control_words_casing, Some(voyager_core::CasingConvention::Lower));
-        assert_eq!(result.pair_keywords_casing, Some(voyager_core::CasingConvention::Preserve));
-        assert_eq!(result.data_references_casing, Some(voyager_core::CasingConvention::Upper));
-        assert_eq!(result.top_level_indent, Some(voyager_core::TopLevelIndentMode::Auto));
+        assert_eq!(result.casing_control_words, Some(voyager_core::CasingConvention::Lower));
+        assert_eq!(result.casing_pair_keywords, Some(voyager_core::CasingConvention::Preserve));
+        assert_eq!(result.casing_data_references, Some(voyager_core::CasingConvention::Upper));
+        assert_eq!(result.indent_top_level, Some(voyager_core::IndentTopLevelMode::Auto));
         assert_eq!(result.indent_width, Some(2));
         assert_eq!(result.operator_spacing, Some(voyager_core::OperatorSpacing::Fixed));
         assert_eq!(result.blank_lines, Some(voyager_core::BlankLineMode::Auto));
-        assert_eq!(result.top_level_blank_line_cap, Some(3));
-        assert_eq!(result.nested_blank_line_cap, Some(1));
+        assert_eq!(result.blank_lines_top_cap, Some(3));
+        assert_eq!(result.blank_lines_nested_cap, Some(1));
     }
 
     /// T010's own dedicated regression case: a malformed/partially-invalid
@@ -632,11 +632,11 @@ mod tests {
     #[test]
     fn parse_client_format_defaults_leaves_only_the_malformed_field_none() {
         let value = json!({
-            "controlWordsCasing": "sideways",
+            "casingControlWords": "sideways",
             "indentWidth": 4
         });
         let result = parse_client_format_defaults(&value);
-        assert_eq!(result.control_words_casing, None, "an unrecognized string must leave only this field None");
+        assert_eq!(result.casing_control_words, None, "an unrecognized string must leave only this field None");
         assert_eq!(result.indent_width, Some(4), "a sibling valid field must be unaffected");
     }
 
@@ -647,14 +647,14 @@ mod tests {
         // treated identically to an object with every key absent (spec.md
         // Edge Cases).
         let result = parse_client_format_defaults(&json!(null));
-        assert_eq!(result.control_words_casing, None);
+        assert_eq!(result.casing_control_words, None);
         assert_eq!(result.indent_width, None);
     }
 
     #[test]
     fn parse_client_format_defaults_of_an_empty_object_resolves_to_every_field_none() {
         let result = parse_client_format_defaults(&json!({}));
-        assert_eq!(result.control_words_casing, None);
+        assert_eq!(result.casing_control_words, None);
         assert_eq!(result.indent_width, None);
     }
 }

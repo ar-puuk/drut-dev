@@ -93,7 +93,7 @@ fn line_content_span(text: &str, line_index: u32) -> voyager_core::Span {
 
 /// Handles a `textDocument/rangeFormatting` request.
 ///
-/// Casing/top-level-indent settings are resolved via `drut_config::
+/// Casing/indent-top-level settings are resolved via `drut_config::
 /// resolve_format_options` (012-toml-configuration), same as
 /// `formatting.rs`'s whole-document handler — a `drut.toml` found from the
 /// document's own real path (falling back to the client's workspace root)
@@ -204,7 +204,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("drut_lsp_range_formatting_test_{}_governed", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("drut.toml"), "[format]\ncontrol_words_casing = \"upper\"\n").unwrap();
+        std::fs::write(dir.join("drut.toml"), "[format]\ncasing_control_words = \"upper\"\n").unwrap();
         let file = dir.join("a.s");
         let uri_str = file_uri_str(&file);
 
@@ -219,7 +219,7 @@ mod tests {
     }
 
     #[test]
-    fn non_zero_top_level_indentation_is_left_untouched_by_default() {
+    fn non_zero_indent_top_levelation_is_left_untouched_by_default() {
         // 009-top-level-indent-toggle FR-004(c)/User Story 3: same forcing-
         // function gap as formatting.rs's own default-verification test --
         // this call site is a bare FormatOptions::default(), so nothing

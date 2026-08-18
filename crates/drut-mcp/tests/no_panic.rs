@@ -39,15 +39,15 @@ fn every_tool_survives_every_edge_case_document_without_panicking() {
 
         let format_result = format(&FormatInput {
             source: source(text),
-            control_words_casing: None,
-            pair_keywords_casing: None,
-            data_references_casing: None,
+            casing_control_words: None,
+            casing_pair_keywords: None,
+            casing_data_references: None,
             indent_width: None,
-            top_level_indent: None,
+            indent_top_level: None,
             operator_spacing: None,
             blank_lines: None,
-            top_level_blank_line_cap: None,
-            nested_blank_line_cap: None,
+            blank_lines_top_cap: None,
+            blank_lines_nested_cap: None,
             isolated: None,
         });
         assert!(format_result.is_ok(), "case {name:?}: format must not error on malformed-but-valid text");

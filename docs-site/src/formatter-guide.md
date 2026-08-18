@@ -19,12 +19,12 @@ Every field below is documented in full in the
 ## Casing
 
 The three independent casing fields —
-[`control_words_casing`](configuration-reference.md#control_words_casing),
-[`pair_keywords_casing`](configuration-reference.md#pair_keywords_casing), and
-[`data_references_casing`](configuration-reference.md#data_references_casing) —
+[`casing_control_words`](configuration-reference.md#casing_control_words),
+[`casing_pair_keywords`](configuration-reference.md#casing_pair_keywords), and
+[`casing_data_references`](configuration-reference.md#casing_data_references) —
 only ever touch keyword *names* — never a value, and never a category they
 aren't scoped to. This example makes both boundaries visible at once, with
-`control_words_casing = "upper"`:
+`casing_control_words = "upper"`:
 
 ```diff
 -run pgm=matrix
@@ -35,16 +35,16 @@ aren't scoped to. This example makes both boundaries visible at once, with
 ```
 
 `run`/`endrun` (control words) are uppercased — but `pgm` (a pair-keyword name,
-`pair_keywords_casing`'s own scope, left unset here), `matrix` (a value, never
+`casing_pair_keywords`'s own scope, left unset here), `matrix` (a value, never
 touched), and `mati`/`mo` (data-reference tokens,
-[`data_references_casing`](configuration-reference.md#data_references_casing)'s
+[`casing_data_references`](configuration-reference.md#casing_data_references)'s
 own scope, also left unset here) all stay exactly as written. Each of the
 three fields only ever affects its own category — set the one(s) you want
 independently.
 
 ## Indentation
 
-[`top_level_indent`](configuration-reference.md#top_level_indent) controls
+[`indent_top_level`](configuration-reference.md#indent_top_level) controls
 depth-0 statements; [`indent_width`](configuration-reference.md#indent_width)
 controls spacing per nesting level inside a block, relative to the block's own
 opening-statement column. See [Getting Started](getting-started.md#3-see-what-formatting-would-change)
@@ -92,9 +92,9 @@ sections of a script.
 
 `preserve` (the default) leaves every run of consecutive blank lines exactly as
 written, however long. `auto` contracts a run down to the applicable cap
-([`top_level_blank_line_cap`](configuration-reference.md#top_level_blank_line_cap)
+([`blank_lines_top_cap`](configuration-reference.md#blank_lines_top_cap)
 between top-level statements/blocks, default `2`;
-[`nested_blank_line_cap`](configuration-reference.md#nested_blank_line_cap)
+[`blank_lines_nested_cap`](configuration-reference.md#blank_lines_nested_cap)
 inside any block's body, default `1`) — only when a run *exceeds* the cap, never
 padding a shorter run up:
 

@@ -16,19 +16,19 @@ pub struct FormatInput {
     /// (012-toml-configuration), same precedence CLI flags follow.
     /// `"preserve"` added by 014-casing-preserve-mode FR-007
     /// (017-casing-categories-indent-width FR-001). A flat `casing`
-    /// parameter covering this category and `pair_keywords_casing`
+    /// parameter covering this category and `casing_pair_keywords`
     /// together once existed — removed once this granular parameter and
     /// the one below fully superseded it.
-    pub control_words_casing: Option<String>,
+    pub casing_control_words: Option<String>,
     /// Independent override for the pair-keywords category
     /// (017-casing-categories-indent-width FR-001) — keyword names inside
     /// a `Control` statement's `keyword=value` pairs.
-    pub pair_keywords_casing: Option<String>,
+    pub casing_pair_keywords: Option<String>,
     /// Independent override for the data-references category — Matrix/
     /// Line/Node/Zone/Database abbreviations, the output-record and
     /// link-endpoint tokens, and the two reserved loop-index identifiers
     /// (017-casing-categories-indent-width FR-004).
-    pub data_references_casing: Option<String>,
+    pub casing_data_references: Option<String>,
     /// Spaces per nesting level of block indentation
     /// (017-casing-categories-indent-width FR-009), 1–16 if given. Same
     /// absent-means-"consult drut.toml, then default (4)" precedence as
@@ -36,12 +36,12 @@ pub struct FormatInput {
     pub indent_width: Option<u8>,
     /// `"preserve"` / `"auto"` / absent — same precedence as `casing`
     /// above. Closes the former CLI/MCP asymmetry (012-toml-configuration
-    /// FR-010): this tool previously had no way to reach `top_level_indent`
+    /// FR-010): this tool previously had no way to reach `indent_top_level`
     /// at all.
-    pub top_level_indent: Option<String>,
+    pub indent_top_level: Option<String>,
     /// `"preserve"` / `"fixed"` / `"auto"` / absent — same absent-means-
     /// "consult drut.toml, then default (preserve)" precedence as `casing`/
-    /// `top_level_indent` above (018-operator-spacing). `"preserve"` leaves
+    /// `indent_top_level` above (018-operator-spacing). `"preserve"` leaves
     /// operator/comma/bracket-paren spacing exactly as written; `"fixed"`
     /// normalizes it; `"auto"` does everything `"fixed"` does plus aligning
     /// consecutive `Assignment` statements' `=`.
@@ -58,15 +58,15 @@ pub struct FormatInput {
     /// (019-blank-line-normalization FR-002), 1–50 if given. Same
     /// absent-means-"consult drut.toml, then default (2)" precedence as
     /// every other setting here.
-    pub top_level_blank_line_cap: Option<u8>,
+    pub blank_lines_top_cap: Option<u8>,
     /// The maximum number of consecutive blank lines `auto` allows inside
     /// any block's own body, uniformly regardless of nesting depth, before
     /// contracting the run (019-blank-line-normalization FR-002/FR-008),
-    /// 1–50 if given. Same precedence as `top_level_blank_line_cap` above,
+    /// 1–50 if given. Same precedence as `blank_lines_top_cap` above,
     /// independently — built-in default `1`.
-    pub nested_blank_line_cap: Option<u8>,
+    pub blank_lines_nested_cap: Option<u8>,
     /// Skip `drut.toml` discovery entirely for this call, using built-in
-    /// defaults plus `control_words_casing`/`top_level_indent` above if
+    /// defaults plus `casing_control_words`/`indent_top_level` above if
     /// given (012-toml-configuration US3, mirroring the CLI's
     /// `--isolated`). Absent is treated as `false`.
     pub isolated: Option<bool>,
@@ -118,22 +118,22 @@ fn parse_casing_param(field: &str, value: Option<&str>) -> Result<Option<voyager
 }
 
 fn explicit_override(input: &FormatInput) -> Result<drut_config::ExplicitFormatOverride, String> {
-    let control_words_casing = parse_casing_param("control_words_casing", input.control_words_casing.as_deref())?;
-    let pair_keywords_casing = parse_casing_param("pair_keywords_casing", input.pair_keywords_casing.as_deref())?;
-    let data_references_casing =
-        parse_casing_param("data_references_casing", input.data_references_casing.as_deref())?;
+    let casing_control_words = parse_casing_param("casing_control_words", input.casing_control_words.as_deref())?;
+    let casing_pair_keywords = parse_casing_param("casing_pair_keywords", input.casing_pair_keywords.as_deref())?;
+    let casing_data_references =
+        parse_casing_param("casing_data_references", input.casing_data_references.as_deref())?;
     if let Some(width) = input.indent_width {
         if !(1..=16).contains(&width) {
             return Err(format!("`indent_width` must be between 1 and 16 if given, got {width}"));
         }
     }
-    let top_level_indent = match input.top_level_indent.as_deref() {
+    let indent_top_level = match input.indent_top_level.as_deref() {
         None => None,
-        Some("preserve") => Some(voyager_core::TopLevelIndentMode::Preserve),
-        Some("auto") => Some(voyager_core::TopLevelIndentMode::Auto),
+        Some("preserve") => Some(voyager_core::IndentTopLevelMode::Preserve),
+        Some("auto") => Some(voyager_core::IndentTopLevelMode::Auto),
         Some(other) => {
             return Err(format!(
-                "`top_level_indent` must be \"preserve\" or \"auto\" if given, got {other:?}"
+                "`indent_top_level` must be \"preserve\" or \"auto\" if given, got {other:?}"
             ))
         }
     };
@@ -156,26 +156,26 @@ fn explicit_override(input: &FormatInput) -> Result<drut_config::ExplicitFormatO
             return Err(format!("`blank_lines` must be \"preserve\" or \"auto\" if given, got {other:?}"))
         }
     };
-    if let Some(cap) = input.top_level_blank_line_cap {
+    if let Some(cap) = input.blank_lines_top_cap {
         if !(1..=50).contains(&cap) {
-            return Err(format!("`top_level_blank_line_cap` must be between 1 and 50 if given, got {cap}"));
+            return Err(format!("`blank_lines_top_cap` must be between 1 and 50 if given, got {cap}"));
         }
     }
-    if let Some(cap) = input.nested_blank_line_cap {
+    if let Some(cap) = input.blank_lines_nested_cap {
         if !(1..=50).contains(&cap) {
-            return Err(format!("`nested_blank_line_cap` must be between 1 and 50 if given, got {cap}"));
+            return Err(format!("`blank_lines_nested_cap` must be between 1 and 50 if given, got {cap}"));
         }
     }
     Ok(drut_config::ExplicitFormatOverride {
-        control_words_casing,
-        pair_keywords_casing,
-        data_references_casing,
-        top_level_indent,
+        casing_control_words,
+        casing_pair_keywords,
+        casing_data_references,
+        indent_top_level,
         indent_width: input.indent_width,
         operator_spacing,
         blank_lines,
-        top_level_blank_line_cap: input.top_level_blank_line_cap,
-        nested_blank_line_cap: input.nested_blank_line_cap,
+        blank_lines_top_cap: input.blank_lines_top_cap,
+        blank_lines_nested_cap: input.blank_lines_nested_cap,
     })
 }
 
@@ -184,7 +184,7 @@ fn explicit_override(input: &FormatInput) -> Result<drut_config::ExplicitFormatO
 /// result into a `FormatResultDto` (FR-004: text, `changed`, and
 /// `encoding_fidelity` always together).
 ///
-/// `control_words_casing`/`top_level_indent` settings are resolved via `drut_config::
+/// `casing_control_words`/`indent_top_level` settings are resolved via `drut_config::
 /// resolve_format_options` (012-toml-configuration): explicit parameters
 /// above win, else a `drut.toml` discovered from `input.source.path` (if
 /// set — a `text`-sourced call has no real location, so no discovery is
@@ -226,43 +226,43 @@ mod tests {
                 text: Some(text.to_string()),
                 path: None,
             },
-            control_words_casing: None,
-            pair_keywords_casing: None,
-            data_references_casing: None,
+            casing_control_words: None,
+            casing_pair_keywords: None,
+            casing_data_references: None,
             indent_width: None,
-            top_level_indent: None,
+            indent_top_level: None,
             operator_spacing: None,
             blank_lines: None,
-            top_level_blank_line_cap: None,
-            nested_blank_line_cap: None,
+            blank_lines_top_cap: None,
+            blank_lines_nested_cap: None,
             isolated: None,
         }
     }
 
-    fn path_input(path: &str, control_words_casing: Option<&str>, top_level_indent: Option<&str>, isolated: Option<bool>) -> FormatInput {
+    fn path_input(path: &str, casing_control_words: Option<&str>, indent_top_level: Option<&str>, isolated: Option<bool>) -> FormatInput {
         FormatInput {
             source: ScriptSource {
                 text: None,
                 path: Some(path.to_string()),
             },
-            control_words_casing: control_words_casing.map(str::to_string),
-            pair_keywords_casing: None,
-            data_references_casing: None,
+            casing_control_words: casing_control_words.map(str::to_string),
+            casing_pair_keywords: None,
+            casing_data_references: None,
             indent_width: None,
-            top_level_indent: top_level_indent.map(str::to_string),
+            indent_top_level: indent_top_level.map(str::to_string),
             operator_spacing: None,
             blank_lines: None,
-            top_level_blank_line_cap: None,
-            nested_blank_line_cap: None,
+            blank_lines_top_cap: None,
+            blank_lines_nested_cap: None,
             isolated,
         }
     }
 
     fn granular_input(
         text: &str,
-        control_words_casing: Option<&str>,
-        pair_keywords_casing: Option<&str>,
-        data_references_casing: Option<&str>,
+        casing_control_words: Option<&str>,
+        casing_pair_keywords: Option<&str>,
+        casing_data_references: Option<&str>,
         indent_width: Option<u8>,
     ) -> FormatInput {
         FormatInput {
@@ -270,15 +270,15 @@ mod tests {
                 text: Some(text.to_string()),
                 path: None,
             },
-            control_words_casing: control_words_casing.map(str::to_string),
-            pair_keywords_casing: pair_keywords_casing.map(str::to_string),
-            data_references_casing: data_references_casing.map(str::to_string),
+            casing_control_words: casing_control_words.map(str::to_string),
+            casing_pair_keywords: casing_pair_keywords.map(str::to_string),
+            casing_data_references: casing_data_references.map(str::to_string),
             indent_width,
-            top_level_indent: None,
+            indent_top_level: None,
             operator_spacing: None,
             blank_lines: None,
-            top_level_blank_line_cap: None,
-            nested_blank_line_cap: None,
+            blank_lines_top_cap: None,
+            blank_lines_nested_cap: None,
             isolated: None,
         }
     }
@@ -310,7 +310,7 @@ mod tests {
     #[test]
     fn casing_defaults_to_preserve_not_upper_or_lower() {
         // 014-casing-preserve-mode FR-008/SC-003 (point 3 of 3)/User Story
-        // 3 -- mirrors top_level_indentation_defaults_to_preserve_not_
+        // 3 -- mirrors indent_top_levelation_defaults_to_preserve_not_
         // auto's shape for the sibling setting. No casing param, no
         // governing drut.toml.
         let text = "if (a=b)\nendif\n";
@@ -320,9 +320,9 @@ mod tests {
     }
 
     #[test]
-    fn top_level_indentation_defaults_to_preserve_not_auto() {
+    fn indent_top_levelation_defaults_to_preserve_not_auto() {
         // 009-top-level-indent-toggle FR-004(c): the MCP format tool has
-        // no top-level-indent toggle of its own, so it must pick up
+        // no indent-top-level toggle of its own, so it must pick up
         // FormatOptions::default() -- confirmed here directly, not
         // inferred from any other adapter's own test passing.
         let text = "    IF (a=b)\n        PRINT LIST=1\n    ENDIF\n";
@@ -382,7 +382,7 @@ mod tests {
     #[test]
     fn path_sourced_call_is_governed_by_a_nearby_drut_toml_with_no_params_passed() {
         let dir = temp_project("governed");
-        write_config(&dir, "[format]\ncontrol_words_casing = \"upper\"\n");
+        write_config(&dir, "[format]\ncasing_control_words = \"upper\"\n");
         let file = dir.join("x.s");
         std::fs::write(&file, "if (a=b)\nendif\n").unwrap();
 
@@ -408,9 +408,9 @@ mod tests {
     }
 
     #[test]
-    fn explicit_control_words_casing_param_overrides_a_present_drut_toml() {
+    fn explicit_casing_control_words_param_overrides_a_present_drut_toml() {
         let dir = temp_project("override");
-        write_config(&dir, "[format]\ncontrol_words_casing = \"lower\"\n");
+        write_config(&dir, "[format]\ncasing_control_words = \"lower\"\n");
         let file = dir.join("x.s");
         std::fs::write(&file, "IF (X=1)\nENDIF\n").unwrap();
 
@@ -424,10 +424,10 @@ mod tests {
     }
 
     #[test]
-    fn explicit_control_words_casing_preserve_param_overrides_a_present_drut_toml() {
+    fn explicit_casing_control_words_preserve_param_overrides_a_present_drut_toml() {
         // 014-casing-preserve-mode FR-007/FR-009/User Story 1.
         let dir = temp_project("override_preserve");
-        write_config(&dir, "[format]\ncontrol_words_casing = \"upper\"\n");
+        write_config(&dir, "[format]\ncasing_control_words = \"upper\"\n");
         let file = dir.join("x.s");
         std::fs::write(&file, "if (x=1)\nendif\n").unwrap();
 
@@ -443,9 +443,9 @@ mod tests {
     // -- 017-casing-categories-indent-width (tasks.md T017/T030/T039) --
 
     #[test]
-    fn granular_data_references_casing_reaches_previously_unreachable_tokens() {
+    fn granular_casing_data_references_reaches_previously_unreachable_tokens() {
         // US2: mw/li/ni/i/j -- unreachable by any casing setting before
-        // this feature -- become reachable via data_references_casing.
+        // this feature -- become reachable via casing_data_references.
         let input = granular_input("mw[1] = mi.1.1\nx = li.FT\nif (i=25) y = j\n", None, None, Some("upper"), None);
         let result = format(&input).unwrap();
         assert_eq!(result.text, "MW[1] = MI.1.1\nx = LI.FT\nif (I=25) y = J\n");
@@ -504,7 +504,7 @@ mod tests {
     #[test]
     fn isolated_true_ignores_a_present_drut_toml_entirely() {
         let dir = temp_project("isolated");
-        write_config(&dir, "[format]\ncontrol_words_casing = \"upper\"\ntop_level_indent = \"auto\"\n");
+        write_config(&dir, "[format]\ncasing_control_words = \"upper\"\nindent_top_level = \"auto\"\n");
         let file = dir.join("x.s");
         std::fs::write(&file, "    if (x=1)\n        y = 2\n    endif\n").unwrap();
 
@@ -520,14 +520,14 @@ mod tests {
     #[test]
     fn malformed_drut_toml_is_reported_but_format_still_completes() {
         let dir = temp_project("malformed");
-        write_config(&dir, "[format]\ncontrol_words_casing = \"sideways\"\n");
+        write_config(&dir, "[format]\ncasing_control_words = \"sideways\"\n");
         let file = dir.join("x.s");
         std::fs::write(&file, MESSY_FOR_CONFIG_TEST).unwrap();
 
         let result = format(&path_input(file.to_str().unwrap(), None, None, None)).unwrap();
         assert_eq!(result.text, CLEAN_FOR_CONFIG_TEST, "formatting must still complete using the built-in default");
         assert_eq!(result.config_warnings.len(), 1);
-        assert!(result.config_warnings[0].contains("control_words_casing"));
+        assert!(result.config_warnings[0].contains("casing_control_words"));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -554,7 +554,7 @@ mod tests {
 
     #[test]
     fn operator_spacing_invalid_value_is_a_clean_error() {
-        // FR-011/SC-004: same closed-set shape as casing/top_level_indent --
+        // FR-011/SC-004: same closed-set shape as casing/indent_top_level --
         // an invalid value is a clean tool-call error, not a silent
         // fallback (that softer behavior is drut.toml-only).
         let mut input = text_input("ZONES   = 1\n");
@@ -584,7 +584,7 @@ mod tests {
     fn blank_line_cap_params_override_the_built_in_defaults() {
         let mut input = text_input("X = 1\n\n\n\n\n\nY = 2\n");
         input.blank_lines = Some("auto".to_string());
-        input.top_level_blank_line_cap = Some(1);
+        input.blank_lines_top_cap = Some(1);
         let result = format(&input).unwrap();
         assert_eq!(result.text, "X = 1\n\nY = 2\n");
     }
@@ -603,11 +603,11 @@ mod tests {
     #[test]
     fn blank_line_cap_out_of_range_is_a_clean_error_not_a_silent_clamp() {
         let mut input = text_input("X = 1\n");
-        input.top_level_blank_line_cap = Some(0);
-        assert!(format(&input).is_err(), "an explicit out-of-range top_level_blank_line_cap must be a clean error");
+        input.blank_lines_top_cap = Some(0);
+        assert!(format(&input).is_err(), "an explicit out-of-range blank_lines_top_cap must be a clean error");
 
         let mut input = text_input("X = 1\n");
-        input.nested_blank_line_cap = Some(51);
-        assert!(format(&input).is_err(), "an explicit out-of-range nested_blank_line_cap must be a clean error");
+        input.blank_lines_nested_cap = Some(51);
+        assert!(format(&input).is_err(), "an explicit out-of-range blank_lines_nested_cap must be a clean error");
     }
 }

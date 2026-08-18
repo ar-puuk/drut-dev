@@ -7,7 +7,8 @@ parameters.
 
 ## What it resolves
 
-A `drut.toml` file's `[format]` table (`casing`, `top_level_indent`) is
+A `drut.toml` file's `[format]` table (`casing_control_words`,
+`indent_top_level`, and the rest) is
 merged with any explicit override the caller provides — an explicit flag or
 parameter always wins over the config file. A malformed value in one field
 warns (via `ConfigWarning`) and falls back to that field's built-in default

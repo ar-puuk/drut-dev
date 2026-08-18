@@ -35,7 +35,7 @@ fn cli_lsp_and_mcp_resolve_the_same_drut_toml_identically() {
     let dir = temp_project("core_fields");
     std::fs::write(
         dir.join("drut.toml"),
-        "[format]\ncontrol_words_casing = \"upper\"\ntop_level_indent = \"auto\"\n",
+        "[format]\ncasing_control_words = \"upper\"\nindent_top_level = \"auto\"\n",
     )
     .unwrap();
     let file = dir.join("a.s");
@@ -74,15 +74,15 @@ fn cli_lsp_and_mcp_resolve_the_same_drut_toml_identically() {
             text: None,
             path: Some(file.to_str().unwrap().to_string()),
         },
-        control_words_casing: None,
-        pair_keywords_casing: None,
-        data_references_casing: None,
+        casing_control_words: None,
+        casing_pair_keywords: None,
+        casing_data_references: None,
         indent_width: None,
-        top_level_indent: None,
+        indent_top_level: None,
         operator_spacing: None,
         blank_lines: None,
-        top_level_blank_line_cap: None,
-        nested_blank_line_cap: None,
+        blank_lines_top_cap: None,
+        blank_lines_nested_cap: None,
         isolated: None,
     })
     .unwrap();
@@ -91,7 +91,7 @@ fn cli_lsp_and_mcp_resolve_the_same_drut_toml_identically() {
     assert_eq!(cli_text, lsp_text, "CLI and LSP must produce byte-identical output for the same drut.toml");
     assert_eq!(lsp_text, mcp_text, "LSP and MCP must produce byte-identical output for the same drut.toml");
     // Sanity check: this must actually be the config-driven result
-    // (control_words_casing upper + top_level_indent auto), not a
+    // (casing_control_words upper + indent_top_level auto), not a
     // coincidental three-way match on unrelated/default output.
     assert_eq!(
         cli_text, "IF (x=1)\n    y = 2\nENDIF\n",
@@ -110,7 +110,7 @@ fn cli_lsp_and_mcp_resolve_the_new_granular_settings_identically() {
     let dir = temp_project("granular_fields");
     std::fs::write(
         dir.join("drut.toml"),
-        "[format]\ndata_references_casing = \"upper\"\nindent_width = 2\n",
+        "[format]\ncasing_data_references = \"upper\"\nindent_width = 2\n",
     )
     .unwrap();
     let file = dir.join("a.s");
@@ -149,15 +149,15 @@ fn cli_lsp_and_mcp_resolve_the_new_granular_settings_identically() {
             text: None,
             path: Some(file.to_str().unwrap().to_string()),
         },
-        control_words_casing: None,
-        pair_keywords_casing: None,
-        data_references_casing: None,
+        casing_control_words: None,
+        casing_pair_keywords: None,
+        casing_data_references: None,
         indent_width: None,
-        top_level_indent: None,
+        indent_top_level: None,
         operator_spacing: None,
         blank_lines: None,
-        top_level_blank_line_cap: None,
-        nested_blank_line_cap: None,
+        blank_lines_top_cap: None,
+        blank_lines_nested_cap: None,
         isolated: None,
     })
     .unwrap();

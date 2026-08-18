@@ -29,7 +29,7 @@ pub use data_reference::{data_reference_entries, data_reference_occurrences, Dat
 pub use diagnostic::{Diagnostic, DiagnosticKind};
 pub use format::{
     format, format_bytes, unclosed_fmt_off_markers, BlankLineMode, CasingConvention, CasingSettings, EncodingFidelity,
-    FormatOptions, FormatResult, OperatorSpacing, TopLevelIndentMode,
+    FormatOptions, FormatResult, OperatorSpacing, IndentTopLevelMode,
 };
 pub use keywords::{completion_candidates, did_you_mean, CompletionContext, KeywordEntry, KeywordRole};
 pub use span::{Position, Span};
