@@ -36,8 +36,8 @@ pub use span::{Position, Span};
 pub use statement::{Statement, StatementKind};
 pub use token::{Token, TokenKind};
 pub use token_resolution::{
-    all_assignments, read_file_refs, resolve_token_value, variable_ref_at, Assignment, ReadFileRef,
-    ResolvedTokenValue, Source as TokenValueSource, VariableRefAt,
+    all_assignments, all_variable_refs, read_file_refs, resolve_token_value, variable_ref_at,
+    Assignment, ReadFileRef, ResolvedTokenValue, Source as TokenValueSource, VariableRefAt,
 };
 
 /// Tokenizes `source` into a flat, position-tracked token stream.

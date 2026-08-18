@@ -302,6 +302,52 @@ already been researched or partially unblocked; see the note per item.
       not fixed here — same additive-only, never-breaking-an-existing-
       surface discipline every prior formatting axis in this project has
       followed.
+14. **Undefined `@token@` diagnostic** — ✅ *done, implemented 2026-08-17 as
+    `020-undefined-token-diagnostic`* (added 2026-08-17). Originally
+    requested as "a red squiggly" for any variable used without being
+    defined; scoped down
+    through direct conversation once grounded against `token_resolution.rs`
+    (the `016-token-hover-value` resolver — the only existing resolution
+    logic remotely relevant here):
+    - **Scope: `@token@` substitution references only.** Plain assignment
+      identifiers (`X` used with no prior `X = value`) and data-reference
+      tokens (`MI`/`MW`/etc., bound by a `FILEI`/`FILEO` pair-keyword
+      statement rather than a plain assignment) are explicitly out of
+      scope — neither has any existing resolution logic, and the latter's
+      binding mechanism is structurally different from `@token@`'s.
+    - **Confidence bar: never claim non-existence beyond hover's own
+      reach.** `token_resolution.rs` has deliberate, accepted gaps (a
+      `@token@` on a block-opener line, more than one level of `READ FILE`
+      inclusion, a token-built `READ FILE` path) that are harmless for
+      hover (silent fallback to nothing) but would become false-positive
+      sources if "resolution failed" were treated as "doesn't exist." This
+      diagnostic only fires when it sits within the *same* resolution
+      boundary hover already covers — a resolver blind spot is never
+      itself treated as evidence a token is undefined.
+    - **Severity: Hint or Information, not Error** — a deliberate downgrade
+      from the original "red squiggly" ask, decided directly in
+      conversation. Constitution Principle IV states false positives are
+      worse than false negatives ("an unflagged bug is forgivable; a false
+      flag on working code is not") — Error severity would overstate the
+      confidence this check can actually have, given real cross-file
+      Voyager scripts routinely exceed the resolver's one-level-of-
+      inclusion reach.
+    - **Update 2026-08-17**: checked against the actual precedent rather
+      than assumed — `drut-lsp/src/diagnostics.rs` already has this exact
+      shape *twice* (the unclosed `; FMT: OFF` marker, `010-fmt-region-
+      markers`; a malformed `drut.toml` warning, `012-toml-configuration`),
+      each a standalone function outside `voyager-core::Diagnostic`/
+      `DiagnosticKind` entirely, published at HINT severity with its own
+      distinct `source` string, chained alongside the six real
+      `DiagnosticKind`-based diagnostics. Neither prior feature amended
+      `001-voyager-script-parser`'s spec, because neither is a
+      `DiagnosticKind` value — this feature follows the identical shape, a
+      third such stream, so it needs no amendment there either. (Original
+      framing below, superseded by this finding.)
+    - **Surface reach, decided 2026-08-17**: LSP-only, matching both prior
+      Hint-severity streams exactly — never reaches CLI `check` or MCP
+      `diagnose`, which stay strictly `DiagnosticKind`-only ("never a
+      narrowed subset," `002-cli-check-format` FR-003) unchanged.
 
 ## Resolved queued items (historical log, not part of the pre-publish sequence)
 

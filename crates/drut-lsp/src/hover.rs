@@ -82,11 +82,11 @@ pub fn handle(state: &ServerState, params: &lsp_types::HoverParams) -> Option<ls
 /// discards it) so a resolved value's `value_span` can be sliced back into
 /// real display text, and keeps the literal path as written for FR-009's
 /// "name the source file" requirement.
-struct IncludedFile {
-    read_file_statement_span: Span,
-    display_name: String,
-    text: String,
-    nodes: Vec<Node>,
+pub(crate) struct IncludedFile {
+    pub(crate) read_file_statement_span: Span,
+    pub(crate) display_name: String,
+    pub(crate) text: String,
+    pub(crate) nodes: Vec<Node>,
 }
 
 /// Strips one leading and one trailing quote character from `s`, if both are
@@ -113,7 +113,7 @@ fn strip_matching_quotes(s: &str) -> &str {
 /// buffer — research.md §7; the target doesn't exist or can't be read; it
 /// doesn't parse meaningfully) simply omits that one entry — never an error,
 /// never a panic.
-fn collect_included_files(uri: &lsp_types::Uri, doc: &OpenDocument) -> Vec<IncludedFile> {
+pub(crate) fn collect_included_files(uri: &lsp_types::Uri, doc: &OpenDocument) -> Vec<IncludedFile> {
     let Some(base_dir) = workspace::uri_to_path(uri).and_then(|p| p.parent().map(|p| p.to_path_buf())) else {
         return Vec::new();
     };

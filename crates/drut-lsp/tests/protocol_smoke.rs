@@ -243,6 +243,78 @@ fn did_open_publishes_zero_fmt_off_hints_for_a_clean_document() {
     shutdown(&client);
 }
 
+#[test]
+fn did_open_publishes_an_undefined_token_hint_distinct_from_structural_diagnostics() {
+    // 020-undefined-token-diagnostic: a @token@ reference with no
+    // resolvable definition publishes through the same
+    // textDocument/publishDiagnostics cycle as structural diagnostics, but
+    // as its own additive, HINT-severity, "drut-token"-sourced stream —
+    // never a voyager_core::DiagnosticKind, same shape as "drut-fmt"/
+    // "drut-config" above. The document also contains a real unmatched IF,
+    // to prove the two streams coexist without either affecting the other
+    // (SC-004).
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+
+    let note = did_open(
+        &client,
+        "file:///undefined_token.s",
+        "IF (X=1)\nMSG = @ScenarioDir@\n; no ENDIF\n",
+    );
+    let diagnostics = note.params["diagnostics"].as_array().unwrap();
+    assert_eq!(diagnostics.len(), 2, "expected exactly two diagnostics, got: {diagnostics:?}");
+
+    let structural = diagnostics.iter().find(|d| d["code"] == json!("UnmatchedIf")).expect("UnmatchedIf missing");
+    assert_eq!(structural["source"], json!("drut"));
+    assert_eq!(structural["severity"], json!(1), "ERROR is severity 1 in the LSP spec");
+
+    let token = diagnostics.iter().find(|d| d["code"] == json!("UndefinedToken")).expect("UndefinedToken missing");
+    assert_eq!(token["source"], json!("drut-token"));
+    assert_eq!(token["severity"], json!(4), "HINT is severity 4 in the LSP spec, distinct from ERROR (1)");
+    assert!(
+        token["message"].as_str().unwrap().contains("ScenarioDir"),
+        "expected the message to name the unresolved token, got: {token:?}"
+    );
+
+    shutdown(&client);
+}
+
+#[test]
+fn did_open_publishes_zero_undefined_token_hints_for_a_resolvable_reference() {
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+
+    let note = did_open(&client, "file:///resolvable_token.s", "Prog = MATRIX\nMSG = @Prog@\n");
+    let diagnostics = note.params["diagnostics"].as_array().unwrap();
+    assert!(diagnostics.is_empty(), "Prog resolves via a same-file assignment -- expected zero diagnostics, got: {diagnostics:?}");
+
+    shutdown(&client);
+}
+
+#[test]
+fn editing_in_the_missing_assignment_clears_the_undefined_token_hint() {
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+    let note = did_open(&client, "file:///live_update.s", "MSG = @Prog@\n");
+    let diagnostics = note.params["diagnostics"].as_array().unwrap();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0]["code"], json!("UndefinedToken"));
+
+    send_notification(
+        &client,
+        "textDocument/didChange",
+        json!({
+            "textDocument": {"uri": "file:///live_update.s", "version": 2},
+            "contentChanges": [{"text": "Prog = MATRIX\nMSG = @Prog@\n"}]
+        }),
+    );
+    let note = recv_notification(&client, "textDocument/publishDiagnostics");
+    let diagnostics = note.params["diagnostics"].as_array().unwrap();
+    assert!(diagnostics.is_empty(), "adding the missing assignment should clear the hint without reopening, got: {diagnostics:?}");
+
+    shutdown(&client);
+}
+
 fn folding_ranges(client: &Connection, id: i32, uri: &str) -> Vec<serde_json::Value> {
     send_request(client, id, "textDocument/foldingRange", json!({"textDocument": {"uri": uri}}));
     let response = recv_response(client);

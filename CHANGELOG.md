@@ -59,6 +59,15 @@ CONTRIBUTING.md's "Versioning" section).
   `top_level_blank_line_cap`, `nested_blank_line_cap`); `preserve` remains
   the default, so a project with nothing configured sees zero behavior
   change.
+- The editor now shows a subtle Hint-level underline on an `@token@`
+  reference with no assignment findable in the same file or a directly
+  included one — never a hard Error, since a resolver blind spot (a
+  `@token@` on a block-opener line, more than one level of `READ FILE`
+  inclusion, or a token-built inclusion path) is never itself treated as
+  evidence a token is undefined. LSP-only — never reaches the `check`
+  command or the MCP `diagnose` tool, matching how the existing unclosed
+  `; FMT: OFF` and malformed `drut.toml` hints already behave. No
+  configuration surface; always on.
 
 ### Fixed
 

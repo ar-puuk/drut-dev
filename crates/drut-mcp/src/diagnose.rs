@@ -97,6 +97,20 @@ mod tests {
     }
 
     #[test]
+    fn undefined_token_hint_never_surfaces_here() {
+        // 020-undefined-token-diagnostic SC-005: this stream is LSP-only,
+        // built and published entirely inside drut-lsp/src/diagnostics.rs —
+        // diagnose() must keep exposing exactly the six/seven real
+        // DiagnosticKind names, even on a script with an unresolvable
+        // @token@ reference.
+        let result = diagnose(&text_input("MSG = @ScenarioDir@\n")).unwrap();
+        assert!(
+            result.is_empty(),
+            "an unresolvable @token@ must never appear in diagnose()'s output, got: {result:?}"
+        );
+    }
+
+    #[test]
     fn empty_input_has_zero_diagnostics_not_an_error() {
         let result = diagnose(&text_input("")).unwrap();
         assert!(result.is_empty());

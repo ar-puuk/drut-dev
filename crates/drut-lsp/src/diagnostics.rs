@@ -14,6 +14,7 @@ use voyager_core::{Position, Span};
 
 use crate::document_store::ServerState;
 use crate::position::to_lsp_range;
+use crate::undefined_token;
 use crate::workspace::resolve_path;
 
 fn kind_name(kind: voyager_core::DiagnosticKind) -> &'static str {
@@ -99,9 +100,40 @@ pub fn publish(connection: &Connection, state: &ServerState, uri: &Uri) {
         })
         .collect();
 
+    // 020-undefined-token-diagnostic: a fourth, independently-sourced stream
+    // for @token@ references with no resolvable definition — same
+    // "additive, non-Diagnostic-kind, distinct source/severity" treatment
+    // the two streams above already established. Never a broader claim of
+    // non-existence than the resolver itself can back up (constitution
+    // Principle IV): every one of the resolver's own documented blind spots
+    // (block-opener position, multi-level READ FILE inclusion, a
+    // token-built inclusion path) is inherited automatically by reusing
+    // `undefined_token_positions` unmodified, not suppressed by a separate
+    // rule here (research.md §3).
+    let undefined_token_diagnostics: Vec<lsp_types::Diagnostic> =
+        undefined_token::undefined_token_positions(uri, doc)
+            .into_iter()
+            .map(|var_ref| lsp_types::Diagnostic {
+                range: to_lsp_range(&doc.text, var_ref.span),
+                severity: Some(DiagnosticSeverity::HINT),
+                code: Some(lsp_types::NumberOrString::String("UndefinedToken".to_string())),
+                code_description: None,
+                source: Some("drut-token".to_string()),
+                message: format!(
+                    "'@{}@' has no assignment this tool can find in this file or a directly \
+                     included one — it may still be defined elsewhere Drut can't see",
+                    var_ref.name
+                ),
+                related_information: None,
+                tags: None,
+                data: None,
+            })
+            .collect();
+
     let diagnostics = structural_diagnostics
         .chain(fmt_marker_diagnostics)
         .chain(config_warnings)
+        .chain(undefined_token_diagnostics)
         .collect();
 
     send(connection, uri.clone(), diagnostics, Some(doc.version));

@@ -148,6 +148,48 @@ pub fn variable_ref_at(nodes: &[Node], pos: Position) -> Option<VariableRefAt> {
     None
 }
 
+fn push_variable_refs_in_tokens(tokens: &[Token], out: &mut Vec<VariableRefAt>) {
+    for t in tokens {
+        if let TokenKind::VariableRef { name } = &t.kind {
+            out.push(VariableRefAt {
+                name: name.clone(),
+                span: t.span,
+            });
+        }
+    }
+}
+
+/// Every `@name@` reference in `nodes`, source order, at any nesting depth
+/// (020-undefined-token-diagnostic data-model.md §1) — the "all matches"
+/// counterpart to [`variable_ref_at`]'s "first match at a position", same
+/// traversal (a block-opener `@token@` is therefore absent from the result,
+/// for the same reason `variable_ref_at` can't find it either — `Block`
+/// discards its opener statement's value tokens once matched). Never panics
+/// for any `nodes`.
+pub fn all_variable_refs(nodes: &[Node]) -> Vec<VariableRefAt> {
+    let mut statements = Vec::new();
+    collect_statements(nodes, &mut statements);
+    let mut out = Vec::new();
+    for s in &statements {
+        push_variable_refs_in_tokens(&s.tokens, &mut out);
+    }
+
+    let mut condition_slices = Vec::new();
+    collect_if_condition_token_slices(nodes, &mut condition_slices);
+    for tokens in condition_slices {
+        push_variable_refs_in_tokens(tokens, &mut out);
+    }
+
+    // Statements and if-condition slices are collected as two separate
+    // passes above, so a naive concatenation wouldn't be true source order
+    // (a condition physically precedes its own branch's child statements,
+    // but conditions are appended after every statement here) — sorted
+    // explicitly so callers can rely on the "source order" guarantee this
+    // function documents.
+    out.sort_by_key(|r| r.span.start);
+    out
+}
+
 fn span_of_tokens(tokens: &[Token], fallback_end: Position) -> Span {
     match (tokens.first(), tokens.last()) {
         (Some(first), Some(last)) => first.span.merge(last.span),
@@ -309,6 +351,38 @@ mod tests {
     fn all_assignments_empty_for_document_with_none() {
         let result = parse("PRINT LIST='hello'\n");
         assert!(all_assignments(&result.nodes).is_empty());
+    }
+
+    #[test]
+    fn all_variable_refs_finds_every_reference_in_source_order() {
+        let result = parse("MSG1 = @First@\nIF (@Second@ = 1)\nMSG2 = @Third@\nENDIF\n");
+        let refs = all_variable_refs(&result.nodes);
+        let names: Vec<&str> = refs.iter().map(|r| r.name.as_str()).collect();
+        assert_eq!(names, vec!["First", "Second", "Third"]);
+        // Confirms the explicit sort-by-position in all_variable_refs is
+        // actually doing something: statements and if-condition slices are
+        // collected as two separate passes internally, so without the sort
+        // this would come back as ["First", "Third", "Second"] instead.
+        for pair in refs.windows(2) {
+            assert!(pair[0].span.start < pair[1].span.start);
+        }
+    }
+
+    #[test]
+    fn all_variable_refs_excludes_a_block_opener_reference() {
+        // No Prog = ... assignment anywhere; @Prog@ appears only on the
+        // RUN block-opener line, which Block discards its opener
+        // statement's value tokens for once matched -- so this reference
+        // must be structurally absent from the result (research.md §3),
+        // the same reason variable_ref_at can't find it either.
+        let result = parse("RUN PGM=@Prog@\nENDRUN\n");
+        assert!(all_variable_refs(&result.nodes).is_empty());
+    }
+
+    #[test]
+    fn all_variable_refs_empty_for_document_with_none() {
+        let result = parse("X = 1\n");
+        assert!(all_variable_refs(&result.nodes).is_empty());
     }
 
     #[test]

@@ -68,3 +68,28 @@ fn broken_fixture_set_produces_schema_valid_sarif_with_results() {
         );
     }
 }
+
+#[test]
+fn check_never_surfaces_the_lsp_only_undefined_token_hint() {
+    // 020-undefined-token-diagnostic SC-005: this stream is LSP-only, built
+    // and published entirely inside drut-lsp/src/diagnostics.rs — `check`
+    // must keep exposing exactly the six/seven real DiagnosticKind names
+    // and nothing else, even on a document containing an unresolvable
+    // @token@ reference.
+    let dir = std::env::temp_dir().join(format!(
+        "drut-cli-sarif-undefined-token-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("a.s"), "MSG = @ScenarioDir@\n").unwrap();
+
+    let log = run_check_sarif(dir.to_str().unwrap());
+    let results = log["runs"][0]["results"].as_array().expect("runs[0].results is an array");
+    assert!(
+        results.is_empty(),
+        "an unresolvable @token@ must never appear in check's output, got: {results:#?}"
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
