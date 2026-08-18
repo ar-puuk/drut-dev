@@ -93,6 +93,20 @@ CONTRIBUTING.md's "Versioning" section).
   built-in Settings UI. Scoped entirely to the LSP surface — `drut-cli`
   and the MCP `format` tool gain no new capability and are behaviorally
   unaffected.
+- A published, searchable user guide, built with [mdBook](https://rust-lang.github.io/mdBook/):
+  an introduction, install instructions (CLI and the VS Code/Open VSX
+  extension), a getting-started walkthrough, a CLI reference, an editor (LSP)
+  guide, an MCP guide, a formatter behavior guide with real before/after
+  examples for every formatting axis, and — the specific gap that prompted
+  this — a complete, field-by-field `drut.toml` configuration reference
+  covering all 10 `[format]` fields (values, defaults, effect, examples, and
+  the shared four-tier precedence chain), replacing `CONTRIBUTING.md`'s old
+  two-of-ten-field "Configuration" section. Hosted on GitHub Pages, served
+  directly from a committed `docs/` folder — no GitHub Actions deploy step; a
+  single build-check CI job (`mdbook build` plus a coverage check tying the
+  configuration reference to `drut-config`'s real field list, plus a
+  freshness check catching a forgotten rebuild) still gates every push/PR.
+  `README.md` now links to the site as the documentation home.
 
 ### Fixed
 

@@ -376,6 +376,40 @@ already been researched or partially unblocked; see the note per item.
     - Exact settings namespace/naming (e.g. `drut.format.controlWordsCasing`
       mapped from `control_words_casing`, VS Code's camelCase convention)
       is a planning-phase decision, not fixed here.
+16. **Published documentation site** — ✅ *done, implemented 2026-08-17 as
+    `022-docs-site`* (added 2026-08-17; see `specs/022-docs-site/` for the
+    full spec/plan/tasks/research). Prompted directly: "even I struggle to
+    find what the options are for each toml item" — `CONTRIBUTING.md`'s old
+    "Configuration" section had drifted to documenting only 2 of the
+    eventual 10 real `[format]` fields (items 9/10/12/13/15 above each added
+    a field without anyone circling back to that section). Built with
+    [mdBook](https://rust-lang.github.io/mdBook/), covering an introduction,
+    install, a getting-started walkthrough, a CLI reference, an editor (LSP)
+    guide, an MCP guide, a formatter guide, and a complete field-by-field
+    configuration reference (every field's values/default/effect/example
+    plus the shared precedence chain). `README.md` now links to it as the
+    documentation home; `CONTRIBUTING.md`'s "Configuration" and "Editor
+    behavior" sections were replaced with pointers.
+    - **Deployment reversed mid-cycle, owner correction**: the original plan
+      used an Actions-native `deploy-pages` workflow. Corrected directly:
+      classic GitHub Pages ("Deploy from a branch") only serves a branch's
+      repo-root `/` or `/docs`, and the owner wants GitHub Actions usage
+      minimized. Shipped instead: mdBook's build output is redirected
+      (`book.toml`'s `build-dir`) to a committed repo-root `docs/`, which
+      Pages serves directly — **zero deploy Actions, zero secrets, zero
+      Pages permissions**. One CI job survives (`docs.yml`): build + a
+      config-field coverage check + a freshness check (diffs a fresh build
+      against the committed `docs/`, catching a forgotten rebuild before
+      merge) — no deploy job. The pre-existing `docs/known-environment-
+      quirks.md` moved to a new `dev-notes/` directory, since `docs/` is now
+      reserved for published output.
+    - **Process fix, not just a one-time write-up**: `CONTRIBUTING.md`'s
+      Workflow section now states explicitly that a feature changing a
+      `[format]` field, CLI flag, MCP tool, or LSP-visible behavior updates
+      `docs-site/` as part of that same change — a direct fix for the exact
+      staleness mechanism that prompted this item, surfaced during this
+      feature's own `/speckit-analyze` pass rather than left as spec prose
+      nobody but this feature's author would read.
 
 ## Resolved queued items (historical log, not part of the pre-publish sequence)
 

@@ -1,0 +1,19 @@
+[book]
+title = "Drut"
+description = "User guide for Drut: a linter, formatter, and editor tooling suite for Cube Voyager control-statement scripts."
+authors = ["Drut contributors"]
+language = "en"
+src = "src"
+
+[build]
+build-dir = "../docs"
+
+[output.html]
+site-url = "/drut-dev/"
+git-repository-url = "https://github.com/ar-puuk/drut-dev"
+edit-url-template = "https://github.com/ar-puuk/drut-dev/edit/main/docs-site/{path}"
+default-theme = "light"
+preferred-dark-theme = "navy"
+
+[output.html.search]
+enable = true

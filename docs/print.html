@@ -1,0 +1,948 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Drut</title>
+        <meta name="robots" content="noindex">
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="User guide for Drut: a linter, formatter, and editor tooling suite for Cube Voyager control-statement scripts.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-04f19ed7.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-c6afe1e7.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Drut</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/ar-puuk/drut-dev" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
+<p>Drut is a linter, formatter, and editor tooling suite for <strong>Cube Voyager
+control-statement scripts</strong> (<code>.s</code> / <code>.block</code> files) — the script language
+transportation planners use to write travel-demand model logic.</p>
+<p>Editing these scripts without Drut usually means no syntax highlighting, no
+error checking until the model actually runs, and no consistent formatting
+across a team. Drut catches structural mistakes as you type, keeps scripts
+formatted consistently, and adds real editor support — syntax highlighting,
+hover help, autocomplete — to VS Code and any other editor that speaks the
+Language Server Protocol.</p>
+<h2 id="what-drut-does"><a class="header" href="#what-drut-does">What Drut does</a></h2>
+<ul>
+<li><strong>Structural diagnostics</strong> — unmatched <code>IF</code>/<code>LOOP</code>/<code>RUN</code>/<code>PROCESS</code> blocks,
+unclosed comments, and other real mistakes, flagged before you run the model.
+See the <a href="#editor-lsp-guide">Editor Guide</a> for the full list.</li>
+<li><strong>Formatting</strong> — consistent indentation and, optionally, keyword casing,
+operator spacing, and blank-line normalization — on save, on paste, or from
+the CLI. See the <a href="#formatter-guide">Formatter Guide</a>.</li>
+<li><strong>Hover, autocomplete, and “did you mean” spell-check</strong> for control words and
+keyword names.</li>
+<li><strong>Shared project configuration</strong> via a <code>drut.toml</code> file, so a team doesn’t
+need to agree on CLI flags or editor settings individually. See the
+<a href="#configuration-reference">Configuration Reference</a>.</li>
+<li><strong>Three ways in</strong>: a <code>drut</code> CLI, a VS Code/Open VSX extension (built on the
+Language Server Protocol, so it works in any LSP-capable editor, not only VS
+Code), and a Model Context Protocol server for AI coding assistants — all
+built on one shared engine, so every surface agrees on what’s valid.</li>
+</ul>
+<h2 id="what-drut-does-not-do"><a class="header" href="#what-drut-does-not-do">What Drut does not do</a></h2>
+<p>Drut is a <strong>structural</strong> and <strong>formatting</strong> tool, not a full semantic validator.
+It does not:</p>
+<ul>
+<li>Validate program-box-specific keyword combinations (e.g. whether a particular
+<code>PATHLOAD</code> parameter combination is meaningful for the model you’re running).</li>
+<li>Check cross-file/repo-wide semantics beyond the direct <code>READ FILE</code> inclusion
+hover already reaches.</li>
+<li>Run or simulate your model in any way.</li>
+</ul>
+<p>These are explicit, current scope boundaries — not oversights.</p>
+<h2 id="who-this-is-for"><a class="header" href="#who-this-is-for">Who this is for</a></h2>
+<p>Anyone writing or reviewing Cube Voyager <code>.s</code>/<code>.block</code> scripts: transportation
+model developers, analysts maintaining a shared script library, and teams that
+want consistent formatting without hand-enforcing a style guide.</p>
+<h2 id="where-to-go-next"><a class="header" href="#where-to-go-next">Where to go next</a></h2>
+<ul>
+<li>New to Drut? Start with <a href="#install">Install</a>, then
+<a href="#getting-started">Getting Started</a>.</li>
+<li>Looking for a specific <code>drut.toml</code> field? Jump straight to the
+<a href="#configuration-reference">Configuration Reference</a>.</li>
+<li>Integrating an AI coding assistant? See the <a href="#mcp-guide">MCP Guide</a>.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="install"><a class="header" href="#install">Install</a></h1>
+<p>Pick one or both — they’re independent, and the extension doesn’t require you to
+separately install the CLI.</p>
+<h2 id="vs-code--any-vs-code-compatible-editor-recommended-for-editing"><a class="header" href="#vs-code--any-vs-code-compatible-editor-recommended-for-editing">VS Code / any VS Code-compatible editor (recommended for editing)</a></h2>
+<p>Install <a href="https://marketplace.visualstudio.com/items?itemName=arpuuk.drut">Drut for Cube Voyager</a>
+from the VS Code Marketplace, or <a href="https://open-vsx.org/extension/arpuuk/drut">from Open VSX</a>
+on VS Code-compatible editors that use it instead (Cursor, VSCodium, and
+similar).</p>
+<p><strong>Nothing else to install.</strong> On first activation, the extension resolves a
+working <code>drut</code> language server binary automatically: it checks <code>PATH</code> first,
+then its own persistent extension storage from a prior activation, then — if
+neither is present — downloads the correct binary for your platform from the
+latest GitHub Release and verifies it against its published SHA-256 checksum
+before trusting it. If every option is unavailable (offline, an unsupported
+platform, a failed download), the extension degrades to syntax-highlighting-only
+rather than failing outright, and tells you why once.</p>
+<p>Once installed this way, a throttled (at most once per 24 hours), non-blocking
+background check offers a dismissible notification when a newer release is
+available — it never silently replaces a running binary.</p>
+<h2 id="just-the-cli-for-scripting-or-ci"><a class="header" href="#just-the-cli-for-scripting-or-ci">Just the CLI (for scripting or CI)</a></h2>
+<pre><code class="language-sh">cargo install drut-cli
+</code></pre>
+<p>Or build from source:</p>
+<pre><code class="language-powershell">cargo build --release -p drut-cli
+# binary at target/release/drut(.exe) -- put it on PATH
+</code></pre>
+<p>Confirm it’s working:</p>
+<pre><code class="language-powershell">drut --help
+</code></pre>
+<p>Continue to <a href="#getting-started">Getting Started</a> to run it against a real
+script.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="getting-started"><a class="header" href="#getting-started">Getting Started</a></h1>
+<p>This walks through the CLI against a small sample script. If you’re only using
+the VS Code/Open VSX extension, the same <code>check</code>/<code>format</code> behavior happens
+automatically as you type and save — skip ahead to the
+<a href="#editor-lsp-guide">Editor Guide</a>.</p>
+<h2 id="1-a-sample-script"><a class="header" href="#1-a-sample-script">1. A sample script</a></h2>
+<p>Save this as <code>sample.s</code>:</p>
+<pre><code class="language-text">run pgm=matrix
+  mati=base.mat,mo=out.mat
+  if(i==1)
+       ZONES = 100
+  endif
+endrun
+</code></pre>
+<p>It’s structurally valid Cube Voyager — but the indentation is inconsistent (2
+spaces under <code>RUN</code>, then 7 under <code>IF</code>) and <code>IF(i==1)</code> has no space before its
+condition.</p>
+<h2 id="2-check-it"><a class="header" href="#2-check-it">2. Check it</a></h2>
+<pre><code class="language-powershell">drut check sample.s
+</code></pre>
+<p><strong>Expected output</strong>: nothing, and an exit code of <code>0</code>. <code>check</code> only prints when
+it finds a real structural problem (an unmatched <code>IF</code>/<code>LOOP</code>/<code>RUN</code>/<code>PROCESS</code>, an
+unclosed comment, and similar) — a clean script produces no output at all, the
+same way a passing test suite often does.</p>
+<h2 id="3-see-what-formatting-would-change"><a class="header" href="#3-see-what-formatting-would-change">3. See what formatting would change</a></h2>
+<pre><code class="language-powershell">drut format sample.s --diff --isolated
+</code></pre>
+<p>(<code>--isolated</code> skips <code>drut.toml</code> discovery for this one run, so the output below
+is reproducible regardless of any config file elsewhere on your machine — see
+the <a href="#configuration-reference">Configuration Reference</a> for what <code>--isolated</code>
+skips.)</p>
+<p><strong>Expected output</strong>:</p>
+<pre><code class="language-diff">--- sample.s
++++ sample.s
+@@ -1,6 +1,6 @@
+ run pgm=matrix
+-  mati=base.mat,mo=out.mat
+-  if(i==1)
+-       ZONES = 100
+-  endif
++    mati=base.mat,mo=out.mat
++    if(i==1)
++        ZONES = 100
++    endif
+ endrun
+</code></pre>
+<p>Every nested line is now indented to a consistent 4 spaces per level (the
+built-in default — see <a href="#indent_width"><code>indent_width</code></a>
+to change it). Nothing about the script’s meaning changed — no line was
+reordered, no keyword was invented or removed.</p>
+<h2 id="4-write-the-change"><a class="header" href="#4-write-the-change">4. Write the change</a></h2>
+<pre><code class="language-powershell">drut format sample.s --write --isolated
+</code></pre>
+<p>Reformats <code>sample.s</code> in place. <code>--write</code>, <code>--check</code> (report which files would
+change, write nothing), and <code>--diff</code> (shown above) are mutually exclusive — see
+the <a href="#format">CLI Reference</a> for the full flag list, including
+<code>--casing</code>, <code>--operator-spacing</code>, and every other formatting axis.</p>
+<h2 id="next-steps"><a class="header" href="#next-steps">Next steps</a></h2>
+<ul>
+<li>Set up your editor for live diagnostics/formatting: <a href="#editor-lsp-guide">Editor Guide</a>.</li>
+<li>Share these settings with your team via <code>drut.toml</code>: <a href="#configuration-reference">Configuration Reference</a>.</li>
+<li>Wire an AI coding assistant to Drut: <a href="#mcp-guide">MCP Guide</a>.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="cli-reference"><a class="header" href="#cli-reference">CLI Reference</a></h1>
+<p><code>drut</code> has four subcommands: <code>check</code>, <code>format</code>, <code>server</code>, and <code>mcp</code>.</p>
+<h2 id="check"><a class="header" href="#check"><code>check</code></a></h2>
+<pre><code class="language-powershell">drut check &lt;PATH&gt;
+</code></pre>
+<p>Reports every structural diagnostic found for each <code>.s</code>/<code>.block</code> file under
+<code>&lt;PATH&gt;</code> (a single file or a directory, scanned recursively). Prints nothing and
+exits <code>0</code> for a clean run.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Flag</th><th>Values</th><th>Default</th><th>Effect</th></tr>
+</thead>
+<tbody>
+<tr><td><code>--format</code></td><td><code>text</code>, <code>sarif</code></td><td><code>text</code></td><td>Output format. <code>sarif</code> emits <a href="https://sarifweb.azurewebsites.net/">SARIF 2.1.0</a>, for CI/tooling integration.</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="format"><a class="header" href="#format"><code>format</code></a></h2>
+<pre><code class="language-powershell">drut format &lt;PATH&gt; [flags]
+</code></pre>
+<p>Normalizes whitespace (and, opt-in, keyword casing/operator spacing/blank-line
+runs) for each <code>.s</code>/<code>.block</code> file under <code>&lt;PATH&gt;</code>. With none of <code>--write</code>,
+<code>--check</code>, or <code>--diff</code>, defaults to printing the reformatted result to stdout.</p>
+<p><strong>Disposition flags</strong> (mutually exclusive):</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Flag</th><th>Effect</th></tr>
+</thead>
+<tbody>
+<tr><td><code>--write</code></td><td>Overwrite each matched file in place.</td></tr>
+<tr><td><code>--check</code></td><td>Report which files would change; write nothing.</td></tr>
+<tr><td><code>--diff</code></td><td>Print a unified diff per changed file; write nothing.</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Formatting-axis flags</strong> — every one of these mirrors a <code>drut.toml</code> <code>[format]</code>
+field one-to-one; see the <a href="#configuration-reference">Configuration Reference</a>
+for accepted values, defaults, and what each actually does:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Flag</th><th><code>drut.toml</code> field</th></tr>
+</thead>
+<tbody>
+<tr><td><code>--casing</code></td><td><a href="#casing-1"><code>casing</code></a></td></tr>
+<tr><td><code>--control-words-casing</code></td><td><a href="#control_words_casing"><code>control_words_casing</code></a></td></tr>
+<tr><td><code>--pair-keywords-casing</code></td><td><a href="#pair_keywords_casing"><code>pair_keywords_casing</code></a></td></tr>
+<tr><td><code>--data-references-casing</code></td><td><a href="#data_references_casing"><code>data_references_casing</code></a></td></tr>
+<tr><td><code>--top-level-indent</code></td><td><a href="#top_level_indent"><code>top_level_indent</code></a></td></tr>
+<tr><td><code>--indent-width</code></td><td><a href="#indent_width"><code>indent_width</code></a></td></tr>
+<tr><td><code>--operator-spacing</code></td><td><a href="#operator_spacing"><code>operator_spacing</code></a></td></tr>
+<tr><td><code>--blank-lines</code></td><td><a href="#blank_lines"><code>blank_lines</code></a></td></tr>
+<tr><td><code>--top-level-blank-line-cap</code></td><td><a href="#top_level_blank_line_cap"><code>top_level_blank_line_cap</code></a></td></tr>
+<tr><td><code>--nested-blank-line-cap</code></td><td><a href="#nested_blank_line_cap"><code>nested_blank_line_cap</code></a></td></tr>
+</tbody>
+</table>
+</div>
+<p>An explicit flag here always wins over <code>drut.toml</code> and any editor setting for
+that one run — see the Configuration Reference’s
+<a href="#precedence">Precedence</a> section.</p>
+<p><strong>Other flags</strong>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Flag</th><th>Effect</th></tr>
+</thead>
+<tbody>
+<tr><td><code>--isolated</code></td><td>Skip <code>drut.toml</code> discovery entirely for this run — built-in defaults plus whatever other flags you passed. Useful for CI reproducibility or a one-off sanity check.</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="server"><a class="header" href="#server"><code>server</code></a></h2>
+<pre><code class="language-powershell">drut server
+</code></pre>
+<p>Speaks the Language Server Protocol over stdio. No flags — launched by an LSP
+client (like the VS Code extension), not run interactively. See the
+<a href="#editor-lsp-guide">Editor Guide</a>.</p>
+<h2 id="mcp"><a class="header" href="#mcp"><code>mcp</code></a></h2>
+<pre><code class="language-powershell">drut mcp
+</code></pre>
+<p>Speaks the Model Context Protocol over stdio. No flags — launched by an
+MCP-capable client (an AI coding assistant), not run interactively. Exposes four
+read-only tools, entirely independent of <code>server</code> above (no shared state). See
+the <a href="#mcp-guide">MCP Guide</a>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="editor-lsp-guide"><a class="header" href="#editor-lsp-guide">Editor (LSP) Guide</a></h1>
+<p>Everything here comes from <code>drut server</code>, launched automatically by the VS
+Code/Open VSX extension — and, since it’s a standard Language Server Protocol
+implementation, usable from any LSP-capable editor, not only VS Code.</p>
+<h2 id="diagnostics"><a class="header" href="#diagnostics">Diagnostics</a></h2>
+<p>Two kinds of diagnostics are published, at different severities.</p>
+<p><strong>Structural diagnostics</strong> (real problems, <code>Error</code> severity) — seven categories,
+covering unmatched blocks and a few other real structural defects:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Diagnostic</th><th>Fires on</th></tr>
+</thead>
+<tbody>
+<tr><td><code>UnmatchedIf</code></td><td>An <code>IF</code> with no matching <code>ENDIF</code>, or a dangling <code>ENDIF</code>/<code>ELSEIF</code>/<code>ELSE</code>.</td></tr>
+<tr><td><code>UnmatchedLoop</code></td><td>A <code>LOOP</code> with no matching <code>ENDLOOP</code>, or a dangling <code>ENDLOOP</code>.</td></tr>
+<tr><td><code>UnclosedBlockComment</code></td><td>A block comment with no matching <code>*/</code> before end of file.</td></tr>
+<tr><td><code>InvalidContinuation</code></td><td>A continuation character with no valid following line.</td></tr>
+<tr><td><code>UnmatchedRun</code></td><td>A non-disabled <code>RUN</code> with no <code>ENDRUN</code> and no implicit closer (a following <code>RUN</code> or shell-escape statement), a disabled <code>!RUN</code> missing its required explicit <code>ENDRUN</code>, or a dangling <code>ENDRUN</code>.</td></tr>
+<tr><td><code>UnmatchedProcess</code></td><td>A <code>PROCESS</code>/<code>PHASE=</code> with no matching <code>ENDPROCESS</code>/<code>ENDPHASE</code> and no following <code>PROCESS</code>/<code>PHASE=</code> (the legitimate implicit-close pattern).</td></tr>
+<tr><td><code>MisplacedBreak</code></td><td>A <code>BREAK</code> with no enclosing block of any kind.</td></tr>
+</tbody>
+</table>
+</div>
+<p>(An eighth category, <code>InvalidEncoding</code>, exists in <code>voyager-core</code> for raw-byte
+input but is unreachable through live editing — the LSP transport only ever
+delivers already-decoded text.)</p>
+<p><strong>Hint-level diagnostics</strong> (best-effort signals, not hard errors, <code>Hint</code>
+severity) — three of these, each its own distinct source so they’re visually
+and programmatically distinguishable from the structural set above:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Diagnostic</th><th>Source</th><th>Fires on</th></tr>
+</thead>
+<tbody>
+<tr><td>Unclosed <code>; FMT: OFF</code></td><td><code>drut-fmt</code></td><td>A <code>; FMT: OFF</code> marker with no matching <code>; FMT: ON</code> before end of file — the rest of the file stays unformatted, and this tells you why.</td></tr>
+<tr><td>Malformed <code>drut.toml</code></td><td><code>drut-config</code></td><td>An unrecognized key or an out-of-range value in the resolved <code>drut.toml</code> — formatting still completes using the built-in default for just that field.</td></tr>
+<tr><td>Undefined <code>@token@</code></td><td><code>drut-token</code></td><td>An <code>@token@</code> reference with no assignment findable in the same file or a directly included one. <strong>Never a hard error</strong> — a resolver blind spot (a reference on a block-opener line, more than one level of <code>READ FILE</code> inclusion, or a token-built inclusion path) is never itself treated as evidence the token doesn’t exist; it may still be defined somewhere Drut can’t see.</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="hover"><a class="header" href="#hover">Hover</a></h2>
+<p>Hovering a block keyword (<code>IF</code>, <code>LOOP</code>, <code>RUN</code>, …) shows its kind and where its
+matched counterpart is — correctly resolved even through <code>RUN</code>/<code>PROCESS</code>’s
+implicit-close quirk. Hovering an <code>@token@</code> reference shows the value it
+currently resolves to and where that value was assigned (the most recent
+same-file assignment before the reference, or one found via a directly-included
+<code>READ FILE</code>).</p>
+<h2 id="completion-and-spell-check"><a class="header" href="#completion-and-spell-check">Completion and spell-check</a></h2>
+<p>Autocomplete for control words and <code>keyword=value</code> pair names is scoped to the
+enclosing control word (e.g. completing inside <code>RUN PGM=...</code> only offers
+<code>PGM</code>-relevant pair keywords). A misspelled keyword gets a “did you mean”
+suggestion riding on the same hover mechanism.</p>
+<h2 id="folding"><a class="header" href="#folding">Folding</a></h2>
+<p>Every block kind (<code>IF</code>/<code>LOOP</code>/<code>RUN</code>/<code>PROCESS</code>/<code>JLOOP</code>/<code>LINKLOOP</code>/
+<code>DISTRIBUTEMULTISTEP</code>) and block comment can be collapsed/expanded like any
+other language.</p>
+<h2 id="format-on-save-and-format-on-paste"><a class="header" href="#format-on-save-and-format-on-paste">Format-on-save and format-on-paste</a></h2>
+<p><strong>Format-on-save</strong> is auto-enabled the first time the extension activates in a
+workspace (workspace-scoped, one-time — it won’t silently turn itself back on
+if you disable it afterward). Saving a <code>.s</code>/<code>.block</code> file reformats it
+automatically.</p>
+<p><strong>Format-on-paste</strong> stays off by default. Turn it on with:</p>
+<pre><code class="language-json">{
+  "[drut]": {
+    "editor.formatOnPaste": true
+  }
+}
+</code></pre>
+<p>in your workspace’s <code>.vscode/settings.json</code>. Once enabled, pasting Cube Voyager
+script text into a <code>.s</code>/<code>.block</code> file reindents it to match its new surrounding
+structure immediately — correctly handling a paste that opens or closes a
+block.</p>
+<h2 id="editor-client-settings"><a class="header" href="#editor-client-settings">Editor client settings</a></h2>
+<p>All 10 <code>[format]</code> fields (see the <a href="#configuration-reference">Configuration Reference</a>)
+are also available as personal VS Code settings, not only via a project’s
+committed <code>drut.toml</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Setting</th><th><code>drut.toml</code> field</th></tr>
+</thead>
+<tbody>
+<tr><td><code>drut.format.casing</code></td><td><code>casing</code></td></tr>
+<tr><td><code>drut.format.controlWordsCasing</code></td><td><code>control_words_casing</code></td></tr>
+<tr><td><code>drut.format.pairKeywordsCasing</code></td><td><code>pair_keywords_casing</code></td></tr>
+<tr><td><code>drut.format.dataReferencesCasing</code></td><td><code>data_references_casing</code></td></tr>
+<tr><td><code>drut.format.topLevelIndent</code></td><td><code>top_level_indent</code></td></tr>
+<tr><td><code>drut.format.indentWidth</code></td><td><code>indent_width</code></td></tr>
+<tr><td><code>drut.format.operatorSpacing</code></td><td><code>operator_spacing</code></td></tr>
+<tr><td><code>drut.format.blankLines</code></td><td><code>blank_lines</code></td></tr>
+<tr><td><code>drut.format.topLevelBlankLineCap</code></td><td><code>top_level_blank_line_cap</code></td></tr>
+<tr><td><code>drut.format.nestedBlankLineCap</code></td><td><code>nested_blank_line_cap</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Set these through VS Code’s built-in Settings UI (search for “drut”), or
+directly in <code>settings.json</code>. <strong>A <code>drut.toml</code> value always wins</strong> over a
+conflicting client setting for the same field — a client setting is a personal
+fallback default, never a way to override a project’s own committed
+configuration. See the Configuration Reference’s
+<a href="#precedence">Precedence</a> section for the full
+four-tier chain. A changed setting takes effect on the very next format request
+against an already-open document — no reopen or editor restart needed.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="mcp-guide"><a class="header" href="#mcp-guide">MCP Guide</a></h1>
+<p><code>drut mcp</code> speaks the <a href="https://modelcontextprotocol.io/">Model Context Protocol</a>
+over stdio — a way for an AI coding assistant to query Drut’s understanding of a
+Cube Voyager script directly, instead of guessing from raw text. All four tools
+are <strong>read-only</strong>: none of them write to disk.</p>
+<p>Launch it the same way any MCP client launches a stdio server: point your
+client’s MCP configuration at the <code>drut</code> binary with the <code>mcp</code> argument.</p>
+<h2 id="diagnose"><a class="header" href="#diagnose"><code>diagnose</code></a></h2>
+<p>Reports every structural diagnostic <code>voyager-core</code> can find for a script (given
+as inline text or a file path). Returns an empty list for a structurally valid
+script. Same diagnostic categories as the <a href="#diagnostics">Editor Guide</a>’s
+structural set — the Hint-level streams (unclosed <code>; FMT: OFF</code>, malformed
+<code>drut.toml</code>, undefined <code>@token@</code>) are LSP-only and never appear here.</p>
+<p><strong>Use it when</strong>: an assistant needs to check whether a script (or a change it’s
+about to propose) is structurally valid before suggesting it.</p>
+<h2 id="format-1"><a class="header" href="#format-1"><code>format</code></a></h2>
+<p>Reformats a script’s whitespace/indentation (and, opt-in via the same
+parameters <code>drut format</code>/<code>drut.toml</code> accept — <code>casing</code>, <code>operator_spacing</code>,
+<code>blank_lines</code>, and the rest) and returns the result plus whether anything
+changed. Idempotent: formatting an already-formatted script reports
+<code>changed=false</code>.</p>
+<p><strong>Use it when</strong>: an assistant is about to write or hand back Cube Voyager script
+text and wants it consistently formatted first.</p>
+<h2 id="query_structure"><a class="header" href="#query_structure"><code>query_structure</code></a></h2>
+<p>Reports which of the seven block kinds (<code>If</code>/<code>Loop</code>/<code>Run</code>/<code>Process</code>/<code>JLoop</code>/
+<code>LinkLoop</code>/<code>DistributeMultistep</code>), if any, encloses a given 1-based line/column
+position in a script, and where its matched counterpart is — correctly resolved
+even through <code>Run</code>/<code>Process</code>’s implicit-close quirk. Reports <code>kind: null</code>, not
+an error, when no block encloses the position.</p>
+<p><strong>Use it when</strong>: an assistant needs to understand the block structure around a
+specific position — e.g. “is this line inside an <code>IF</code>, and if so, where does
+that <code>IF</code> end?”</p>
+<h2 id="lookup_keyword"><a class="header" href="#lookup_keyword"><code>lookup_keyword</code></a></h2>
+<p>Looks up real, corpus-evidenced <code>keyword=value</code> pair-name candidates for a given
+enclosing control word (e.g. <code>RUN</code>), falling back to the general control-word
+list when none is given. Optionally also runs a “did you mean” spell-check
+against a supplied token.</p>
+<p><strong>Use it when</strong>: an assistant is generating or validating a <code>keyword=value</code> pair
+and wants to confirm the keyword name is real (or find the likely intended one
+for a typo).</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="formatter-guide"><a class="header" href="#formatter-guide">Formatter Guide</a></h1>
+<h2 id="what-formatting-guarantees"><a class="header" href="#what-formatting-guarantees">What formatting guarantees</a></h2>
+<p>The formatter is <strong>idempotent</strong> — running it twice produces the same result as
+running it once (<code>format(format(x)) == format(x)</code>). It is <strong>strictly
+behavior-preserving</strong>: it never reorders statements, never changes which lines
+are continuations of a prior statement, and never alters program meaning. It
+only ever changes whitespace and, opt-in, keyword casing. If a script is
+structurally broken (see the <a href="#diagnostics">Editor Guide</a>’s
+diagnostic list), the formatter still does its best on the parts it understands
+rather than refusing outright — but a diagnosed/unmatched block’s own children
+are left with their original indentation rather than guessed at.</p>
+<p>Every field below is documented in full in the
+<a href="#configuration-reference">Configuration Reference</a> — this page focuses on
+<em>what changes</em>, with real examples.</p>
+<h2 id="casing"><a class="header" href="#casing">Casing</a></h2>
+<p><code>casing</code> (and its three granular counterparts,
+<a href="#control_words_casing"><code>control_words_casing</code></a>/
+<a href="#pair_keywords_casing"><code>pair_keywords_casing</code></a>/
+<a href="#data_references_casing"><code>data_references_casing</code></a>)
+only ever touches keyword <em>names</em> — never a value, and never a category it
+isn’t scoped to. This example makes both boundaries visible at once, with
+<code>casing = "upper"</code>:</p>
+<pre><code class="language-diff">-run pgm=matrix
++RUN PGM=matrix
+     mati=base.mat,mo=out.mat
+-endrun
++ENDRUN
+</code></pre>
+<p><code>run</code>/<code>endrun</code> (control words) and <code>pgm</code> (a pair-keyword name) are uppercased —
+but <code>matrix</code> (a value, never touched) and <code>mati</code>/<code>mo</code> (data-reference tokens,
+<code>casing</code>’s legacy scope can’t reach them) stay exactly as written. Set
+<a href="#data_references_casing"><code>data_references_casing</code></a>
+separately if you want <code>mati</code>/<code>mo</code> cased too.</p>
+<h2 id="indentation"><a class="header" href="#indentation">Indentation</a></h2>
+<p><a href="#top_level_indent"><code>top_level_indent</code></a> controls
+depth-0 statements; <a href="#indent_width"><code>indent_width</code></a>
+controls spacing per nesting level inside a block, relative to the block’s own
+opening-statement column. See <a href="#3-see-what-formatting-would-change">Getting Started</a>
+for a full before/after example.</p>
+<h2 id="operator-spacing"><a class="header" href="#operator-spacing">Operator spacing</a></h2>
+<p><code>preserve</code> (the default) leaves spacing exactly as written. <code>fixed</code> normalizes
+every operator to exactly one space on each side and removes interior padding
+inside brackets/parens:</p>
+<pre><code class="language-diff">-IF(ZONES==1)
+-    ZONES=1
+-    CNT=2
+-    ITER=333
++IF(ZONES == 1)
++    ZONES = 1
++    CNT = 2
++    ITER = 333
+ ENDIF
+</code></pre>
+<p><code>auto</code> does everything <code>fixed</code> does, plus vertically aligns the <code>=</code> of
+consecutive <code>Assignment</code> statements at the same nesting depth to the longest
+left-hand side in the run:</p>
+<pre><code class="language-diff">-IF(ZONES==1)
+-    ZONES=1
+-    CNT=2
+-    ITER=333
++IF(ZONES == 1)
++    ZONES = 1
++    CNT   = 2
++    ITER  = 333
+ ENDIF
+</code></pre>
+<p>A run resets at a blank line, a comment-only line, a nesting-depth change, or a
+non-<code>Assignment</code> statement — so alignment never reaches across unrelated
+sections of a script.</p>
+<h2 id="blank-line-normalization"><a class="header" href="#blank-line-normalization">Blank-line normalization</a></h2>
+<p><code>preserve</code> (the default) leaves every run of consecutive blank lines exactly as
+written, however long. <code>auto</code> contracts a run down to the applicable cap
+(<a href="#top_level_blank_line_cap"><code>top_level_blank_line_cap</code></a>
+between top-level statements/blocks, default <code>2</code>;
+<a href="#nested_blank_line_cap"><code>nested_blank_line_cap</code></a>
+inside any block’s body, default <code>1</code>) — only when a run <em>exceeds</em> the cap, never
+padding a shorter run up:</p>
+<pre><code class="language-diff"> RUN PGM=MATRIX
+-
+ 
+     MATI=a.mat
+ 
+-
+     MATO=b.mat
+-
+-
+ 
+ ENDRUN
+</code></pre>
+<h2 id="-fmt-off---fmt-on-regions"><a class="header" href="#-fmt-off---fmt-on-regions"><code>; FMT: OFF</code> / <code>; FMT: ON</code> regions</a></h2>
+<p>Wrap a range in <code>; FMT: OFF</code> / <code>; FMT: ON</code> to exclude it from formatting
+entirely — useful for a block whose hand-tuned spacing carries meaning to a
+reviewer that automatic formatting would otherwise flatten:</p>
+<pre><code class="language-diff">-RUN PGM=MATRIX
++RUN PGM = MATRIX
+ ; FMT: OFF
+     ZONES=1
+ ; FMT: ON
+-    MATI=a.mat
++    MATI = a.mat
+ ENDRUN
+</code></pre>
+<p>Everything between the markers (<code>ZONES=1</code> above) is untouched, while the lines
+outside them still get <code>operator_spacing = "fixed"</code> applied. An <strong>unclosed</strong>
+<code>; FMT: OFF</code> (no matching <code>; FMT: ON</code> before end of file) protects through the
+rest of the file and is always surfaced — never silently unbounded with no
+indication — as a Hint diagnostic (source <code>drut-fmt</code>, see the
+<a href="#diagnostics">Editor Guide</a>), a CLI stderr notice, or an MCP
+<code>format</code> response field, depending on which surface you’re using.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="configuration-reference"><a class="header" href="#configuration-reference">Configuration Reference</a></h1>
+<p>Every <code>[format]</code> field Drut currently understands, in one place. All of them are
+set the same way, in a <code>drut.toml</code> file at (or above) the file you’re formatting:</p>
+<pre><code class="language-toml">[format]
+casing = "lower"
+indent_width = 2
+</code></pre>
+<p>Drut discovers the nearest <code>drut.toml</code> by walking up from the file being
+processed, stopping at the first <code>drut.toml</code> found, a <code>.git</code> boundary, or the
+filesystem root — whichever comes first. A project with no <code>drut.toml</code> anywhere
+behaves exactly like a project with an empty one: every field uses its built-in
+default. Every field is optional; omitting a key is identical to writing its
+default value explicitly.</p>
+<p><strong>A malformed value never blocks formatting.</strong> An unrecognized key or an
+out-of-range value only affects that one field — it warns (CLI stderr, an LSP
+Hint diagnostic, or the MCP <code>format</code> tool’s <code>config_warnings</code> field) and falls
+back to that field’s built-in default. Every other valid setting in the same file
+still applies.</p>
+<h2 id="precedence"><a class="header" href="#precedence">Precedence</a></h2>
+<p>Every field below resolves the same four-tier way, checked in this order — the
+first tier that sets a value wins:</p>
+<ol>
+<li><strong>An explicit CLI flag or MCP tool parameter</strong>, passed for one specific
+invocation — always wins when given.</li>
+<li><strong><code>drut.toml</code></strong> — the nearest one found by the discovery walk above.</li>
+<li><strong>An editor client setting</strong> — for VS Code, one of the <code>drut.format.*</code>
+settings under Settings; delivered to <code>drut-lsp</code> via the standard LSP
+<code>workspace/configuration</code> mechanism. A personal editor preference never
+overrides a project’s own committed <code>drut.toml</code> — it only fills in a field
+<code>drut.toml</code> leaves unset.</li>
+<li><strong>The built-in default</strong> — used only if none of the above set the field.</li>
+</ol>
+<p>Each tier only fills in a field the tier(s) before it left unset; a field is
+never assembled from pieces at different tiers.</p>
+<p>Four fields (<code>casing</code>, <code>control_words_casing</code>, <code>pair_keywords_casing</code>,
+<code>data_references_casing</code>) have one extra wrinkle on top of the four tiers above —
+see <a href="#casing-1"><code>casing</code></a>’s entry for the full explanation.</p>
+<h2 id="fields"><a class="header" href="#fields">Fields</a></h2>
+<h3 id="casing-1"><a class="header" href="#casing-1"><code>casing</code></a></h3>
+<p>The legacy, all-in-one keyword-casing setting. Cases every <code>control_words</code> and
+<code>pair_keywords</code> token together — it cannot reach <code>data_references</code> tokens at all
+(use <a href="#data_references_casing"><code>data_references_casing</code></a> for those).</p>
+<p><strong>Values</strong>:</p>
+<ul>
+<li><code>preserve</code> — leave existing casing exactly as written.</li>
+<li><code>upper</code> — uppercase every control word and pair-keyword name.</li>
+<li><code>lower</code> — lowercase every control word and pair-keyword name.</li>
+</ul>
+<p><strong>Default</strong>: <code>preserve</code>.</p>
+<p><strong>Also known as</strong>: CLI flag <code>--casing</code>; MCP <code>format</code> tool parameter <code>casing</code>.</p>
+<p><strong>Example</strong>:</p>
+<pre><code class="language-toml">[format]
+casing = "upper"
+</code></pre>
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above, tier by tier —
+but <em>within</em> each tier, drut checks that tier’s granular field
+(<code>control_words_casing</code>/<code>pair_keywords_casing</code>) first, and only falls back to
+that same tier’s <code>casing</code> value if the granular field is unset there. Concretely,
+for <code>control_words_casing</code>: explicit <code>--control-words-casing</code>, then explicit
+<code>--casing</code>, then <code>drut.toml</code>’s <code>control_words_casing</code>, then <code>drut.toml</code>’s
+<code>casing</code>, then the editor setting’s granular field, then the editor setting’s
+<code>casing</code>, then the built-in default — in that exact order. A <code>casing</code> value set
+at a <em>higher</em>-precedence tier (say, an explicit <code>--casing</code> flag) still wins over
+a granular field set only at a <em>lower</em> tier (say, <code>control_words_casing</code> in
+<code>drut.toml</code>) — tier order is checked before either field’s own fallback within a
+tier. If you only ever set <code>casing</code>, both <code>control_words</code> and <code>pair_keywords</code>
+follow it exactly as before <code>control_words_casing</code>/<code>pair_keywords_casing</code>
+existed.</p>
+<h3 id="control_words_casing"><a class="header" href="#control_words_casing"><code>control_words_casing</code></a></h3>
+<p>Independent override for the <code>control_words</code> category alone (things like <code>IF</code>,
+<code>ENDIF</code>, <code>LOOP</code>, <code>ENDLOOP</code>) — wins over <code>casing</code> for this category specifically,
+per the two-step fallback explained in <a href="#casing-1"><code>casing</code></a>’s entry above.</p>
+<p><strong>Values</strong>: <code>preserve</code> | <code>upper</code> | <code>lower</code>.</p>
+<p><strong>Default</strong>: <code>preserve</code> (falls back to <code>casing</code> first if <code>casing</code> is set and this
+field isn’t — see <a href="#casing-1"><code>casing</code></a>).</p>
+<p><strong>Also known as</strong>: CLI flag <code>--control-words-casing</code>; MCP <code>format</code> tool parameter
+<code>control_words_casing</code>.</p>
+<p><strong>Example</strong>:</p>
+<pre><code class="language-toml">[format]
+casing = "upper"               # control_words + pair_keywords default to upper...
+control_words_casing = "lower" # ...except control_words specifically, forced lower
+</code></pre>
+<p><strong>Precedence</strong>: see <a href="#casing-1"><code>casing</code></a> — same four-tier chain, with the
+two-step legacy/granular fallback applied at every tier.</p>
+<h3 id="pair_keywords_casing"><a class="header" href="#pair_keywords_casing"><code>pair_keywords_casing</code></a></h3>
+<p>Independent override for the <code>pair_keywords</code> category alone (keyword names inside
+a <code>Control</code> statement’s <code>keyword=value</code> pairs, e.g. <code>PATHLOAD</code>, <code>MATI</code>) — wins
+over <code>casing</code> for this category specifically, same shape as
+<a href="#control_words_casing"><code>control_words_casing</code></a> above.</p>
+<p><strong>Values</strong>: <code>preserve</code> | <code>upper</code> | <code>lower</code>.</p>
+<p><strong>Default</strong>: <code>preserve</code> (falls back to <code>casing</code> first — see <a href="#casing-1"><code>casing</code></a>).</p>
+<p><strong>Also known as</strong>: CLI flag <code>--pair-keywords-casing</code>; MCP <code>format</code> tool parameter
+<code>pair_keywords_casing</code>.</p>
+<p><strong>Example</strong>:</p>
+<pre><code class="language-toml">[format]
+pair_keywords_casing = "lower"
+</code></pre>
+<p><strong>Precedence</strong>: see <a href="#casing-1"><code>casing</code></a> — same four-tier chain, with the
+two-step legacy/granular fallback applied at every tier.</p>
+<h3 id="data_references_casing"><a class="header" href="#data_references_casing"><code>data_references_casing</code></a></h3>
+<p>Casing for the data-reference category: Matrix/Line/Node/Zone/Database
+abbreviations (<code>MI</code>/<code>MO</code>/<code>MW</code>, <code>LI</code>/<code>LW</code>, <code>NI</code>/<code>NW</code>, <code>ZI</code>/<code>ZONES</code>/<code>Z</code>,
+<code>DBI</code>/<code>DBA</code>), <code>RO</code>, the link-endpoint fields <code>A</code>/<code>B</code>, and the reserved loop-index
+identifiers <code>I</code>/<code>J</code>. <strong>Not reachable by <code>casing</code> at all</strong> — this is the only way
+to case this category from configuration.</p>
+<p><strong>Values</strong>: <code>preserve</code> | <code>upper</code> | <code>lower</code>.</p>
+<p><strong>Default</strong>: <code>preserve</code>.</p>
+<p><strong>Also known as</strong>: CLI flag <code>--data-references-casing</code>; MCP <code>format</code> tool
+parameter <code>data_references_casing</code>.</p>
+<p><strong>Example</strong>:</p>
+<pre><code class="language-toml">[format]
+data_references_casing = "lower"
+</code></pre>
+<p><strong>Precedence</strong>: follows the plain <a href="#precedence">four-tier chain</a> — no
+legacy-field fallback, since <code>casing</code> never reaches this category.</p>
+<h3 id="top_level_indent"><a class="header" href="#top_level_indent"><code>top_level_indent</code></a></h3>
+<p>Whether top-level (depth-0, not inside any block) statement indentation is left
+exactly as written, or normalized to column 0.</p>
+<p><strong>Values</strong>:</p>
+<ul>
+<li><code>preserve</code> — leave top-level indentation exactly as written.</li>
+<li><code>normalize</code> — force every top-level line to column 0.</li>
+</ul>
+<p><strong>Default</strong>: <code>preserve</code>.</p>
+<p><strong>Also known as</strong>: CLI flag <code>--top-level-indent</code>; MCP <code>format</code> tool parameter
+<code>top_level_indent</code>.</p>
+<p><strong>Example</strong>:</p>
+<pre><code class="language-toml">[format]
+top_level_indent = "normalize"
+</code></pre>
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above; no
+legacy-field fallback.</p>
+<h3 id="indent_width"><a class="header" href="#indent_width"><code>indent_width</code></a></h3>
+<p>Spaces per nesting level of block indentation, relative to the enclosing block’s
+own opening-statement column.</p>
+<p><strong>Values</strong>: any integer from <code>1</code> to <code>16</code>.</p>
+<p><strong>Default</strong>: <code>4</code>.</p>
+<p><strong>Also known as</strong>: CLI flag <code>--indent-width</code>; MCP <code>format</code> tool parameter
+<code>indent_width</code>.</p>
+<p><strong>Example</strong>:</p>
+<pre><code class="language-toml">[format]
+indent_width = 2
+</code></pre>
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above; no
+legacy-field fallback. An out-of-range value (<code>0</code>, <code>500</code>, …) at any tier is
+treated as unset for that tier — resolution falls through to the next tier
+exactly as if the field had been omitted there.</p>
+<h3 id="operator_spacing"><a class="header" href="#operator_spacing"><code>operator_spacing</code></a></h3>
+<p>Whitespace normalization around <code>=</code>, comparison operators (<code>==</code>, <code>&lt;&gt;</code>, <code>&gt;=</code>,
+<code>&lt;=</code>, <code>&lt;</code>, <code>&gt;</code>), binary arithmetic (<code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>), comma spacing between
+multiple <code>keyword=value</code> pairs, and interior padding inside <code>[...]</code>/<code>(...)</code>.</p>
+<p><strong>Values</strong>:</p>
+<ul>
+<li><code>preserve</code> — leave existing spacing exactly as written.</li>
+<li><code>fixed</code> — normalize every occurrence to exactly one space on each side (and
+zero interior padding inside brackets/parens), independent of neighboring
+lines.</li>
+<li><code>auto</code> — everything <code>fixed</code> does, plus vertically aligns the <code>=</code> of
+consecutive <code>Assignment</code> statements at the same nesting depth to the column of
+the longest left-hand side in the run. A run resets at a blank line, a
+comment-only line, a nesting-depth change, or a non-<code>Assignment</code> statement.</li>
+</ul>
+<p><strong>Default</strong>: <code>preserve</code>.</p>
+<p><strong>Also known as</strong>: CLI flag <code>--operator-spacing</code>; MCP <code>format</code> tool parameter
+<code>operator_spacing</code>.</p>
+<p><strong>Example</strong>:</p>
+<pre><code class="language-toml">[format]
+operator_spacing = "auto"
+</code></pre>
+<p>See the <a href="#operator-spacing">Formatter Guide</a> for full
+before/after examples of <code>fixed</code> vs. <code>auto</code>.</p>
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above; no
+legacy-field fallback.</p>
+<h3 id="blank_lines"><a class="header" href="#blank_lines"><code>blank_lines</code></a></h3>
+<p>Whether runs of consecutive blank lines (including whitespace-only lines) are
+left as written or contracted down to a configured cap.</p>
+<p><strong>Values</strong>:</p>
+<ul>
+<li><code>preserve</code> — leave every blank-line run exactly as written, however long.</li>
+<li><code>auto</code> — contract a run down to the applicable cap (<a href="#top_level_blank_line_cap"><code>top_level_blank_line_cap</code></a>
+or <a href="#nested_blank_line_cap"><code>nested_blank_line_cap</code></a>) only when the run
+exceeds that cap — never pads a shorter run up.</li>
+</ul>
+<p><strong>Default</strong>: <code>preserve</code>.</p>
+<p><strong>Also known as</strong>: CLI flag <code>--blank-lines</code>; MCP <code>format</code> tool parameter
+<code>blank_lines</code>.</p>
+<p><strong>Example</strong>:</p>
+<pre><code class="language-toml">[format]
+blank_lines = "auto"
+</code></pre>
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above; no
+legacy-field fallback.</p>
+<h3 id="top_level_blank_line_cap"><a class="header" href="#top_level_blank_line_cap"><code>top_level_blank_line_cap</code></a></h3>
+<p>The maximum number of consecutive blank lines <code>blank_lines = "auto"</code> allows
+between top-level statements/blocks before contracting the run. Only meaningful
+when <a href="#blank_lines"><code>blank_lines</code></a> is <code>"auto"</code>.</p>
+<p><strong>Values</strong>: any integer from <code>1</code> to <code>50</code>.</p>
+<p><strong>Default</strong>: <code>2</code>.</p>
+<p><strong>Also known as</strong>: CLI flag <code>--top-level-blank-line-cap</code>; MCP <code>format</code> tool
+parameter <code>top_level_blank_line_cap</code>.</p>
+<p><strong>Example</strong>:</p>
+<pre><code class="language-toml">[format]
+blank_lines = "auto"
+top_level_blank_line_cap = 1
+</code></pre>
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above; no
+legacy-field fallback. An out-of-range value at any tier is treated as unset for
+that tier, same as <a href="#indent_width"><code>indent_width</code></a>.</p>
+<h3 id="nested_blank_line_cap"><a class="header" href="#nested_blank_line_cap"><code>nested_blank_line_cap</code></a></h3>
+<p>The maximum number of consecutive blank lines <code>blank_lines = "auto"</code> allows
+inside any block’s own body, uniformly regardless of nesting depth, before
+contracting the run. Only meaningful when <a href="#blank_lines"><code>blank_lines</code></a> is
+<code>"auto"</code>.</p>
+<p><strong>Values</strong>: any integer from <code>1</code> to <code>50</code>.</p>
+<p><strong>Default</strong>: <code>1</code>.</p>
+<p><strong>Also known as</strong>: CLI flag <code>--nested-blank-line-cap</code>; MCP <code>format</code> tool
+parameter <code>nested_blank_line_cap</code>.</p>
+<p><strong>Example</strong>:</p>
+<pre><code class="language-toml">[format]
+blank_lines = "auto"
+nested_blank_line_cap = 2
+</code></pre>
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above; no
+legacy-field fallback. Same out-of-range handling as
+<a href="#top_level_blank_line_cap"><code>top_level_blank_line_cap</code></a>.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+
+        <script>
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+
+
+    </div>
+    </body>
+</html>

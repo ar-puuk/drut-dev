@@ -158,82 +158,19 @@ npm test           # grammar tokenization spot-checks (vscode-textmate, no VS Co
 npx @vscode/vsce package   # produces a .vsix — see Publishing below
 ```
 
-## Editor behavior: format-on-save and format-on-paste
+## Editor behavior and configuration (user-facing — moved)
 
-`005-format-on-save-paste` adds two automatic-reformatting behaviors on top
-of the extension's existing "Format Document" command:
-
-- **Format-on-save** is auto-enabled the first time the extension activates
-  in a workspace (workspace-scoped, one-time, and never silently
-  re-enabled if you turn it back off — see
-  [`specs/005-format-on-save-paste/`](specs/005-format-on-save-paste/) for
-  the full mechanism). No action needed to use it; saving a `.s`/`.block`
-  file reformats it automatically, the same result "Format Document" would
-  already produce.
-- **Format-on-paste** stays off by default — turn it on yourself by adding
-  the following to your workspace's `.vscode/settings.json`:
-
-  ```json
-  {
-    "[drut]": {
-      "editor.formatOnPaste": true
-    }
-  }
-  ```
-
-  Once enabled, pasting Cube Voyager script text into a `.s`/`.block` file
-  reindents it to match its new surrounding structure immediately after
-  the paste.
-
-## Configuration
-
-`012-toml-configuration` lets a project set shared defaults for drut's
-formatting behavior once, in a `drut.toml` file, instead of every user
-having to pass the same flags every time — and, unlike CLI flags, this is
-the only way an editor (LSP) user reaches non-default behavior at all.
-
-**Schema** — a `[format]` table, currently the only table:
-
-```toml
-[format]
-casing = "lower"                 # "preserve" | "upper" | "lower"; omit = "preserve"
-top_level_indent = "normalize"   # "preserve" | "normalize"; omit = "preserve"
-```
-
-Omitting a key means "use the built-in default for that setting" (`preserve`
-for both settings) — writing `preserve` explicitly is equivalent to omitting
-the key, but is accepted as a recognized value rather than a no-op.
-
-**Discovery**: for any file being formatted, drut searches upward from that
-file's own directory for the nearest `drut.toml`, the same way on every
-surface (CLI, editor, MCP). The search stops at the first `drut.toml`
-found, at a `.git` boundary (so a config file from an unrelated parent
-project is never picked up by accident), or at the filesystem root —
-whichever comes first. A project with no `drut.toml` anywhere behaves
-identically to every version of drut before this feature existed.
-
-**Precedence**, per setting, independently: an explicit value passed for
-one call (a CLI flag, or an MCP tool parameter) always wins; otherwise the
-resolved `drut.toml`'s value applies, if it sets that key; otherwise the
-built-in default applies.
-
-**Isolation**: pass `--isolated` (CLI) or `isolated: true` (the MCP
-`format` tool) to skip `drut.toml` discovery entirely for one run, using
-built-in defaults plus any other explicit flags/parameters — useful for CI
-reproducibility or a one-off sanity check.
-
-**A malformed `drut.toml` never blocks formatting.** A problem with one
-setting (an unrecognized key, or an invalid value) only affects that one
-setting — every other valid setting in the same file still applies, and
-formatting completes normally using the built-in default for whatever
-couldn't be resolved. The problem is always surfaced, never silent: a
-notice on stderr (CLI), a `HINT`-severity diagnostic with a distinct
-`drut-config` source (editor/LSP), or a `config_warnings` field in the
-response (MCP's `format` tool) — never a change to the CLI's exit code, and
-never a reason a file fails to format.
-
-See [`specs/012-toml-configuration/`](specs/012-toml-configuration/) for
-the full design rationale.
+Format-on-save/format-on-paste, editor client settings, and the full
+`drut.toml` `[format]` field reference now live in the published user guide,
+not here: see [Editor Guide](https://ar-puuk.github.io/drut-dev/editor-guide.html)
+and [Configuration Reference](https://ar-puuk.github.io/drut-dev/configuration-reference.html)
+(`022-docs-site`). This section used to carry that content directly and, over
+several formatting features, fell behind — it documented only 2 of the
+eventual 10 real `[format]` fields. Don't let this section's replacement
+happen again: **any change that adds/removes a `[format]` field, a CLI flag,
+an MCP tool, or LSP-visible behavior updates the corresponding `docs-site/`
+page as part of that same change** (spec.md FR-011,
+`specs/022-docs-site/`) — not a follow-up, not optional.
 
 ## Repository layout
 
@@ -348,3 +285,9 @@ a feature's fixture-corpus tests must pass cleanly before the next phase begins
 (constitution Principle V). See `.specify/` for the slash-command workflow
 (`/speckit-specify`, `/speckit-clarify`, `/speckit-plan`, `/speckit-tasks`,
 `/speckit-checklist`, `/speckit-analyze`, `/speckit-implement`).
+
+A feature that adds, removes, or changes a `[format]` config field, a CLI flag,
+an MCP tool, or LSP-visible behavior updates the corresponding
+[user-guide page](https://ar-puuk.github.io/drut-dev/) (`docs-site/src/`) as
+part of that same change — see the "Editor behavior and configuration" section
+above for why this is a hard requirement, not a nice-to-have.

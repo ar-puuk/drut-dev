@@ -1,0 +1,59 @@
+name: Docs
+
+# 022-docs-site: a single build-check job -- mdbook build, the
+# configuration-reference field-coverage check, and a freshness check that
+# confirms the committed docs/ folder matches what a fresh build produces.
+# Deliberately NO deploy job, NO pages: write/id-token: write permission, and
+# NO secrets -- publishing is Actions-free (see specs/022-docs-site/
+# research.md SS2/SS2a). GitHub Pages is configured (repository Settings ->
+# Pages -> "Deploy from a branch" -> main -> /docs) to serve the committed
+# docs/ folder directly; this workflow only ever verifies, never deploys.
+on:
+  push:
+    branches:
+      - main
+      - '[0-9][0-9][0-9]-*'
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: docs-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    name: Build, coverage, and freshness check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mdBook
+        uses: peaceiris/actions-mdbook@v2
+        with:
+          mdbook-version: '0.5.4'
+
+      - name: Build docs-site (scripts/build-docs.ps1)
+        shell: pwsh
+        run: ./scripts/build-docs.ps1
+
+      - name: Check configuration-reference field coverage
+        shell: pwsh
+        run: ./scripts/check-docs-coverage.ps1
+
+      - name: Verify committed docs/ isn't stale
+        shell: pwsh
+        # build-docs.ps1 above already overwrote docs/ with a fresh build --
+        # if that produced any diff against what was committed, docs/ was
+        # stale (a maintainer edited docs-site/src/*.md without rebuilding
+        # before committing). This is the mechanism that stands in for a
+        # deploy step's own "did this actually take effect" signal, without
+        # this workflow ever deploying anything itself.
+        run: |
+          $diff = git status --porcelain -- docs
+          if ($diff) {
+            Write-Host "docs/ is out of sync with docs-site/src -- run .\scripts\build-docs.ps1 and commit the result:"
+            Write-Host $diff
+            exit 1
+          }
+          Write-Host "OK: committed docs/ matches a fresh build."

@@ -53,8 +53,14 @@ cargo build --release -p drut-cli
 
 ## Documentation
 
+**[User guide](https://ar-puuk.github.io/drut-dev/)** — install, getting
+started, the CLI/editor/MCP references, formatter behavior, and a complete
+field-by-field `drut.toml` configuration reference. Start here for using Drut.
+
+Contributing to Drut itself:
+
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — architecture, per-crate status,
-  configuration design, build/test commands, versioning, and credits.
+  build/test commands, versioning, and credits.
 - [`CHANGELOG.md`](CHANGELOG.md) — what's shipped, in user-facing terms.
 - [`ROADMAP.md`](ROADMAP.md) — what's left before first publish.
 
