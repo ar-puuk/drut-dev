@@ -16,8 +16,17 @@ Under that heading, in this order:
 1. **One-sentence summary** of what the field controls.
 2. **Values** — every accepted value, each with a one-clause plain-language
    meaning (not just the bare token — e.g. not just "`auto`" but "`auto` — contracts
-   runs of blank lines down to the configured cap").
-3. **Default** — the value used when the field is unset at every tier.
+   runs of blank lines down to the configured cap"). **The default value MUST be
+   marked inline, in this same list** (`` `preserve` **← default** `` for an
+   enum-shaped bullet list; `` any integer from `1` to `16` — **default `4`** ``
+   for a numeric-range one-liner) — not left as something the reader only learns
+   by cross-referencing the separate Default line below. Added 2026-08-17 after
+   direct feedback that the default wasn't "immediately clear" from the original
+   shape (Values list + a separate, easy-to-skim-past Default line only).
+3. **Default** — the value used when the field is unset at every tier. Kept as
+   its own line even with the inline marking above, for quick ctrl-F searchability
+   and as the single canonical answer to "what's the default" independent of
+   which Values-list format a given field uses.
 4. **Also known as** — the field's CLI flag (e.g. `--blank-lines`) and MCP tool
    parameter name (e.g. `blank_lines`), when either differs in spelling from the
    `drut.toml` key or a reader might reasonably search for it under either name

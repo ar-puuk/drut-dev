@@ -53,7 +53,7 @@ The legacy, all-in-one keyword-casing setting. Cases every `control_words` and
 (use [`data_references_casing`](#data_references_casing) for those).
 
 **Values**:
-- `preserve` — leave existing casing exactly as written.
+- `preserve` **← default** — leave existing casing exactly as written.
 - `upper` — uppercase every control word and pair-keyword name.
 - `lower` — lowercase every control word and pair-keyword name.
 
@@ -89,7 +89,7 @@ Independent override for the `control_words` category alone (things like `IF`,
 `ENDIF`, `LOOP`, `ENDLOOP`) — wins over `casing` for this category specifically,
 per the two-step fallback explained in [`casing`](#casing)'s entry above.
 
-**Values**: `preserve` | `upper` | `lower`.
+**Values**: `preserve` **← default**, `upper`, `lower`.
 
 **Default**: `preserve` (falls back to `casing` first if `casing` is set and this
 field isn't — see [`casing`](#casing)).
@@ -115,7 +115,7 @@ a `Control` statement's `keyword=value` pairs, e.g. `PATHLOAD`, `MATI`) — wins
 over `casing` for this category specifically, same shape as
 [`control_words_casing`](#control_words_casing) above.
 
-**Values**: `preserve` | `upper` | `lower`.
+**Values**: `preserve` **← default**, `upper`, `lower`.
 
 **Default**: `preserve` (falls back to `casing` first — see [`casing`](#casing)).
 
@@ -140,7 +140,7 @@ abbreviations (`MI`/`MO`/`MW`, `LI`/`LW`, `NI`/`NW`, `ZI`/`ZONES`/`Z`,
 identifiers `I`/`J`. **Not reachable by `casing` at all** — this is the only way
 to case this category from configuration.
 
-**Values**: `preserve` | `upper` | `lower`.
+**Values**: `preserve` **← default**, `upper`, `lower`.
 
 **Default**: `preserve`.
 
@@ -163,7 +163,7 @@ Whether top-level (depth-0, not inside any block) statement indentation is left
 exactly as written, or normalized to column 0.
 
 **Values**:
-- `preserve` — leave top-level indentation exactly as written.
+- `preserve` **← default** — leave top-level indentation exactly as written.
 - `normalize` — force every top-level line to column 0.
 
 **Default**: `preserve`.
@@ -186,7 +186,7 @@ legacy-field fallback.
 Spaces per nesting level of block indentation, relative to the enclosing block's
 own opening-statement column.
 
-**Values**: any integer from `1` to `16`.
+**Values**: any integer from `1` to `16` — **default `4`**.
 
 **Default**: `4`.
 
@@ -212,7 +212,7 @@ Whitespace normalization around `=`, comparison operators (`==`, `<>`, `>=`,
 multiple `keyword=value` pairs, and interior padding inside `[...]`/`(...)`.
 
 **Values**:
-- `preserve` — leave existing spacing exactly as written.
+- `preserve` **← default** — leave existing spacing exactly as written.
 - `fixed` — normalize every occurrence to exactly one space on each side (and
   zero interior padding inside brackets/parens), independent of neighboring
   lines.
@@ -245,7 +245,8 @@ Whether runs of consecutive blank lines (including whitespace-only lines) are
 left as written or contracted down to a configured cap.
 
 **Values**:
-- `preserve` — leave every blank-line run exactly as written, however long.
+- `preserve` **← default** — leave every blank-line run exactly as written,
+  however long.
 - `auto` — contract a run down to the applicable cap ([`top_level_blank_line_cap`](#top_level_blank_line_cap)
   or [`nested_blank_line_cap`](#nested_blank_line_cap)) only when the run
   exceeds that cap — never pads a shorter run up.
@@ -271,7 +272,7 @@ The maximum number of consecutive blank lines `blank_lines = "auto"` allows
 between top-level statements/blocks before contracting the run. Only meaningful
 when [`blank_lines`](#blank_lines) is `"auto"`.
 
-**Values**: any integer from `1` to `50`.
+**Values**: any integer from `1` to `50` — **default `2`**.
 
 **Default**: `2`.
 
@@ -297,7 +298,7 @@ inside any block's own body, uniformly regardless of nesting depth, before
 contracting the run. Only meaningful when [`blank_lines`](#blank_lines) is
 `"auto"`.
 
-**Values**: any integer from `1` to `50`.
+**Values**: any integer from `1` to `50` — **default `1`**.
 
 **Default**: `1`.
 

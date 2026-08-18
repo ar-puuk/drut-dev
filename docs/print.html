@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-04f19ed7.js";
+            window.path_to_searchindex_js = "searchindex-b1e38494.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c6afe1e7.js"></script>
@@ -714,7 +714,7 @@ see <a href="#casing-1"><code>casing</code></a>’s entry for the full explanati
 (use <a href="#data_references_casing"><code>data_references_casing</code></a> for those).</p>
 <p><strong>Values</strong>:</p>
 <ul>
-<li><code>preserve</code> — leave existing casing exactly as written.</li>
+<li><code>preserve</code> <strong>← default</strong> — leave existing casing exactly as written.</li>
 <li><code>upper</code> — uppercase every control word and pair-keyword name.</li>
 <li><code>lower</code> — lowercase every control word and pair-keyword name.</li>
 </ul>
@@ -742,7 +742,7 @@ existed.</p>
 <p>Independent override for the <code>control_words</code> category alone (things like <code>IF</code>,
 <code>ENDIF</code>, <code>LOOP</code>, <code>ENDLOOP</code>) — wins over <code>casing</code> for this category specifically,
 per the two-step fallback explained in <a href="#casing-1"><code>casing</code></a>’s entry above.</p>
-<p><strong>Values</strong>: <code>preserve</code> | <code>upper</code> | <code>lower</code>.</p>
+<p><strong>Values</strong>: <code>preserve</code> <strong>← default</strong>, <code>upper</code>, <code>lower</code>.</p>
 <p><strong>Default</strong>: <code>preserve</code> (falls back to <code>casing</code> first if <code>casing</code> is set and this
 field isn’t — see <a href="#casing-1"><code>casing</code></a>).</p>
 <p><strong>Also known as</strong>: CLI flag <code>--control-words-casing</code>; MCP <code>format</code> tool parameter
@@ -759,7 +759,7 @@ two-step legacy/granular fallback applied at every tier.</p>
 a <code>Control</code> statement’s <code>keyword=value</code> pairs, e.g. <code>PATHLOAD</code>, <code>MATI</code>) — wins
 over <code>casing</code> for this category specifically, same shape as
 <a href="#control_words_casing"><code>control_words_casing</code></a> above.</p>
-<p><strong>Values</strong>: <code>preserve</code> | <code>upper</code> | <code>lower</code>.</p>
+<p><strong>Values</strong>: <code>preserve</code> <strong>← default</strong>, <code>upper</code>, <code>lower</code>.</p>
 <p><strong>Default</strong>: <code>preserve</code> (falls back to <code>casing</code> first — see <a href="#casing-1"><code>casing</code></a>).</p>
 <p><strong>Also known as</strong>: CLI flag <code>--pair-keywords-casing</code>; MCP <code>format</code> tool parameter
 <code>pair_keywords_casing</code>.</p>
@@ -775,7 +775,7 @@ abbreviations (<code>MI</code>/<code>MO</code>/<code>MW</code>, <code>LI</code>/
 <code>DBI</code>/<code>DBA</code>), <code>RO</code>, the link-endpoint fields <code>A</code>/<code>B</code>, and the reserved loop-index
 identifiers <code>I</code>/<code>J</code>. <strong>Not reachable by <code>casing</code> at all</strong> — this is the only way
 to case this category from configuration.</p>
-<p><strong>Values</strong>: <code>preserve</code> | <code>upper</code> | <code>lower</code>.</p>
+<p><strong>Values</strong>: <code>preserve</code> <strong>← default</strong>, <code>upper</code>, <code>lower</code>.</p>
 <p><strong>Default</strong>: <code>preserve</code>.</p>
 <p><strong>Also known as</strong>: CLI flag <code>--data-references-casing</code>; MCP <code>format</code> tool
 parameter <code>data_references_casing</code>.</p>
@@ -790,7 +790,7 @@ legacy-field fallback, since <code>casing</code> never reaches this category.</p
 exactly as written, or normalized to column 0.</p>
 <p><strong>Values</strong>:</p>
 <ul>
-<li><code>preserve</code> — leave top-level indentation exactly as written.</li>
+<li><code>preserve</code> <strong>← default</strong> — leave top-level indentation exactly as written.</li>
 <li><code>normalize</code> — force every top-level line to column 0.</li>
 </ul>
 <p><strong>Default</strong>: <code>preserve</code>.</p>
@@ -805,7 +805,7 @@ legacy-field fallback.</p>
 <h3 id="indent_width"><a class="header" href="#indent_width"><code>indent_width</code></a></h3>
 <p>Spaces per nesting level of block indentation, relative to the enclosing block’s
 own opening-statement column.</p>
-<p><strong>Values</strong>: any integer from <code>1</code> to <code>16</code>.</p>
+<p><strong>Values</strong>: any integer from <code>1</code> to <code>16</code> — <strong>default <code>4</code></strong>.</p>
 <p><strong>Default</strong>: <code>4</code>.</p>
 <p><strong>Also known as</strong>: CLI flag <code>--indent-width</code>; MCP <code>format</code> tool parameter
 <code>indent_width</code>.</p>
@@ -823,7 +823,7 @@ exactly as if the field had been omitted there.</p>
 multiple <code>keyword=value</code> pairs, and interior padding inside <code>[...]</code>/<code>(...)</code>.</p>
 <p><strong>Values</strong>:</p>
 <ul>
-<li><code>preserve</code> — leave existing spacing exactly as written.</li>
+<li><code>preserve</code> <strong>← default</strong> — leave existing spacing exactly as written.</li>
 <li><code>fixed</code> — normalize every occurrence to exactly one space on each side (and
 zero interior padding inside brackets/parens), independent of neighboring
 lines.</li>
@@ -848,7 +848,8 @@ legacy-field fallback.</p>
 left as written or contracted down to a configured cap.</p>
 <p><strong>Values</strong>:</p>
 <ul>
-<li><code>preserve</code> — leave every blank-line run exactly as written, however long.</li>
+<li><code>preserve</code> <strong>← default</strong> — leave every blank-line run exactly as written,
+however long.</li>
 <li><code>auto</code> — contract a run down to the applicable cap (<a href="#top_level_blank_line_cap"><code>top_level_blank_line_cap</code></a>
 or <a href="#nested_blank_line_cap"><code>nested_blank_line_cap</code></a>) only when the run
 exceeds that cap — never pads a shorter run up.</li>
@@ -866,7 +867,7 @@ legacy-field fallback.</p>
 <p>The maximum number of consecutive blank lines <code>blank_lines = "auto"</code> allows
 between top-level statements/blocks before contracting the run. Only meaningful
 when <a href="#blank_lines"><code>blank_lines</code></a> is <code>"auto"</code>.</p>
-<p><strong>Values</strong>: any integer from <code>1</code> to <code>50</code>.</p>
+<p><strong>Values</strong>: any integer from <code>1</code> to <code>50</code> — <strong>default <code>2</code></strong>.</p>
 <p><strong>Default</strong>: <code>2</code>.</p>
 <p><strong>Also known as</strong>: CLI flag <code>--top-level-blank-line-cap</code>; MCP <code>format</code> tool
 parameter <code>top_level_blank_line_cap</code>.</p>
@@ -883,7 +884,7 @@ that tier, same as <a href="#indent_width"><code>indent_width</code></a>.</p>
 inside any block’s own body, uniformly regardless of nesting depth, before
 contracting the run. Only meaningful when <a href="#blank_lines"><code>blank_lines</code></a> is
 <code>"auto"</code>.</p>
-<p><strong>Values</strong>: any integer from <code>1</code> to <code>50</code>.</p>
+<p><strong>Values</strong>: any integer from <code>1</code> to <code>50</code> — <strong>default <code>1</code></strong>.</p>
 <p><strong>Default</strong>: <code>1</code>.</p>
 <p><strong>Also known as</strong>: CLI flag <code>--nested-blank-line-cap</code>; MCP <code>format</code> tool
 parameter <code>nested_blank_line_cap</code>.</p>
