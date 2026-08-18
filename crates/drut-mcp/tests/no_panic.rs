@@ -46,6 +46,9 @@ fn every_tool_survives_every_edge_case_document_without_panicking() {
             indent_width: None,
             top_level_indent: None,
             operator_spacing: None,
+            blank_lines: None,
+            top_level_blank_line_cap: None,
+            nested_blank_line_cap: None,
             isolated: None,
         });
         assert!(format_result.is_ok(), "case {name:?}: format must not error on malformed-but-valid text");

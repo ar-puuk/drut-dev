@@ -5,9 +5,9 @@ use std::path::{Path, PathBuf};
 use drut_config::{resolve_format_options, ConfigWarning, ExplicitFormatOverride};
 use similar::TextDiff;
 use voyager_core::format::{format_bytes, CasingConvention, EncodingFidelity, OperatorSpacing, TopLevelIndentMode};
-use voyager_core::Position;
+use voyager_core::{BlankLineMode, Position};
 
-use crate::cli::{CasingArg, OperatorSpacingArg, TopLevelIndentArg};
+use crate::cli::{BlankLinesArg, CasingArg, OperatorSpacingArg, TopLevelIndentArg};
 use crate::exit::ExitOutcome;
 use crate::io_util::{write_stdout, write_stdout_line};
 use crate::traverse::{traverse, ReadFailure};
@@ -37,6 +37,15 @@ impl From<OperatorSpacingArg> for OperatorSpacing {
             OperatorSpacingArg::Preserve => OperatorSpacing::Preserve,
             OperatorSpacingArg::Fixed => OperatorSpacing::Fixed,
             OperatorSpacingArg::Auto => OperatorSpacing::Auto,
+        }
+    }
+}
+
+impl From<BlankLinesArg> for BlankLineMode {
+    fn from(value: BlankLinesArg) -> Self {
+        match value {
+            BlankLinesArg::Preserve => BlankLineMode::Preserve,
+            BlankLinesArg::Auto => BlankLineMode::Auto,
         }
     }
 }
@@ -94,6 +103,9 @@ pub fn run(
     indent_width: Option<u8>,
     top_level_indent: Option<TopLevelIndentArg>,
     operator_spacing: Option<OperatorSpacingArg>,
+    blank_lines: Option<BlankLinesArg>,
+    top_level_blank_line_cap: Option<u8>,
+    nested_blank_line_cap: Option<u8>,
     isolated: bool,
 ) -> ExitOutcome {
     let mode = if write {
@@ -113,6 +125,9 @@ pub fn run(
         top_level_indent: top_level_indent.map(TopLevelIndentMode::from),
         indent_width,
         operator_spacing: operator_spacing.map(OperatorSpacing::from),
+        blank_lines: blank_lines.map(BlankLineMode::from),
+        top_level_blank_line_cap,
+        nested_blank_line_cap,
     };
 
     let traversal = traverse(path);

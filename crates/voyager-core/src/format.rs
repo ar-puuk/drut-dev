@@ -120,6 +120,25 @@ pub enum OperatorSpacing {
     Auto,
 }
 
+/// Whether/how `format` contracts excessive runs of consecutive blank lines
+/// (spec.md FR-001, `019-blank-line-normalization`). Two-valued, matching
+/// `TopLevelIndentMode`'s own shape exactly — there is only one real
+/// non-`Preserve` behavior here (contract a run down to the applicable cap),
+/// so no third tier.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BlankLineMode {
+    /// Leave every blank-line run exactly as written, however long — the
+    /// default, and the only behavior when this feature is unconfigured
+    /// (FR-009).
+    #[default]
+    Preserve,
+    /// Contract a run of consecutive blank lines down to the applicable cap
+    /// (`top_level_blank_line_cap` between top-level statements/blocks,
+    /// `nested_blank_line_cap` anywhere inside any block's own body) only
+    /// when the run's length exceeds that cap (FR-003/FR-004).
+    Auto,
+}
+
 /// Caller-supplied configuration for one `format`/`format_bytes` call.
 ///
 /// **No longer `#[derive(Default)]`** (`017-casing-categories-indent-width`):
@@ -155,6 +174,23 @@ pub struct FormatOptions {
     /// (see `impl Default` below) — a project with nothing configured sees
     /// zero behavior change from before this field existed (FR-009).
     pub operator_spacing: OperatorSpacing,
+    /// Whether/how excessive blank-line runs are contracted (spec.md FR-001,
+    /// `019-blank-line-normalization`). Defaults to `Preserve` (see `impl
+    /// Default` below) — a project with nothing configured sees zero
+    /// behavior change from before this field existed (FR-009).
+    pub blank_lines: BlankLineMode,
+    /// The maximum number of consecutive blank lines `auto` allows between
+    /// top-level statements/blocks before contracting the run (spec.md
+    /// FR-002). Defaults to `2` (see `impl Default` below) — accepts any
+    /// `u8` here; the valid-range bound is a `drut-config`-layer policy
+    /// decision, not a fact this crate enforces, the same `indent_width`
+    /// precedent.
+    pub top_level_blank_line_cap: u8,
+    /// The maximum number of consecutive blank lines `auto` allows inside
+    /// any block's own body, uniformly regardless of nesting depth, before
+    /// contracting the run (spec.md FR-002/FR-008). Defaults to `1` (see
+    /// `impl Default` below).
+    pub nested_blank_line_cap: u8,
 }
 
 impl Default for FormatOptions {
@@ -164,6 +200,9 @@ impl Default for FormatOptions {
             top_level_indent: TopLevelIndentMode::default(),
             indent_width: 4,
             operator_spacing: OperatorSpacing::default(),
+            blank_lines: BlankLineMode::default(),
+            top_level_blank_line_cap: 2,
+            nested_blank_line_cap: 1,
         }
     }
 }
@@ -379,6 +418,21 @@ fn render(source: &str, nodes: &[Node], diagnostics: &[Diagnostic], options: For
         spacing_edits.retain(|(line, _, _, _)| !protected.contains(line));
     }
 
+    // Blank-line-run normalization (019-blank-line-normalization) —
+    // short-circuited on `Preserve` (the default), same performance-only
+    // gate shape every other axis already uses; `Preserve` does exactly the
+    // same work as before this feature existed (FR-009/SC-003).
+    let mut lines_to_delete: BTreeSet<u32> = BTreeSet::new();
+    if options.blank_lines != BlankLineMode::Preserve {
+        lines_to_delete = crate::blank_line::lines_to_delete(
+            nodes,
+            &char_lines,
+            &protected,
+            options.top_level_blank_line_cap,
+            options.nested_blank_line_cap,
+        );
+    }
+
     let mut edits_by_line: BTreeMap<u32, Vec<(usize, usize, String)>> = BTreeMap::new();
     for (line, start, end, text) in casing_edits {
         edits_by_line.entry(line).or_default().push((start, end, text));
@@ -391,6 +445,14 @@ fn render(source: &str, nodes: &[Node], diagnostics: &[Diagnostic], options: For
     let mut out = String::with_capacity(source.len());
     for (idx, (content, terminator)) in raw_lines.iter().enumerate() {
         let line_num = (idx + 1) as u32;
+        if lines_to_delete.contains(&line_num) {
+            // This line contributes nothing to `out` at all — a true
+            // deletion, not a blanked-but-still-emitted line (research.md
+            // §1). Every other per-line computation above (indentation
+            // lookup, casing/spacing edits) was already only ever keyed by
+            // line number, so skipping emission here needs no other change.
+            continue;
+        }
         let orig_chars: Vec<char> = content.chars().collect();
 
         let mut chars: Vec<char> = if let Some(spacing) = spacing_by_line.get(&line_num) {
@@ -945,6 +1007,9 @@ mod tests {
             top_level_indent: TopLevelIndentMode::default(),
             indent_width: 4,
             operator_spacing: OperatorSpacing::default(),
+            blank_lines: BlankLineMode::default(),
+            top_level_blank_line_cap: 2,
+            nested_blank_line_cap: 1,
         }
     }
 
@@ -954,7 +1019,124 @@ mod tests {
             top_level_indent: TopLevelIndentMode::Normalize,
             indent_width: 4,
             operator_spacing: OperatorSpacing::default(),
+            blank_lines: BlankLineMode::default(),
+            top_level_blank_line_cap: 2,
+            nested_blank_line_cap: 1,
         }
+    }
+
+    fn blank_lines_auto() -> FormatOptions {
+        FormatOptions {
+            blank_lines: BlankLineMode::Auto,
+            ..FormatOptions::default()
+        }
+    }
+
+    // -- Blank-line-run normalization (019-blank-line-normalization) -----
+
+    #[test]
+    fn deleted_line_is_genuinely_absent_not_just_blanked() {
+        // T009: the render-pipeline's one genuinely new capability
+        // (research.md §1) -- confirms the output's *total line count*
+        // actually decreases, catching a half-implementation that clears a
+        // line's content but still emits an empty output line instead of
+        // truly removing it.
+        let src = "X = 1\n\n\n\n\n\nY = 2\n";
+        let result = format(src, blank_lines_auto());
+        let out = result.text;
+        let input_line_count = src.lines().count();
+        let output_line_count = out.lines().count();
+        assert_eq!(
+            input_line_count - output_line_count,
+            3,
+            "3 excess blank lines (run of 5, cap 2) must genuinely disappear from the output's line count, not just go blank"
+        );
+        assert_eq!(out, "X = 1\n\n\nY = 2\n");
+    }
+
+    #[test]
+    fn surviving_line_edits_are_unaffected_by_deletion_elsewhere_in_the_same_file() {
+        // T009: indentation/casing/spacing edits for a *surviving* line are
+        // still applied correctly even when other lines in the same file
+        // are deleted -- deletion is a final filter over otherwise-
+        // unmodified per-line output, not a renumbering (research.md §1).
+        let src = "if (x=1)\n\n\n\n\n\nrun pgm=matrix\ny = 2\nendrun\nendif\n";
+        let mut options = blank_lines_auto();
+        options.casing = CasingSettings {
+            control_words: CasingConvention::Upper,
+            ..CasingSettings::default()
+        };
+        let out = format(src, options).text;
+        assert_eq!(
+            out,
+            "IF (x=1)\n\n    RUN pgm=matrix\n        y = 2\n    ENDRUN\nENDIF\n",
+            "the surviving lines' own indentation and control-word casing must still be correctly applied: {out}"
+        );
+    }
+
+    #[test]
+    fn blank_lines_auto_is_idempotent_for_an_over_cap_top_level_run() {
+        // 019-blank-line-normalization tasks.md T019 (applying 018's own
+        // post-/speckit-analyze lesson up front): a second format pass over
+        // an already-contracted run must be a stable no-op.
+        let src = "X = 1\n\n\n\n\n\nY = 2\n";
+        let once = format(src, blank_lines_auto()).text;
+        let twice = format(&once, blank_lines_auto()).text;
+        assert_eq!(once, twice);
+    }
+
+    #[test]
+    fn blank_lines_auto_respects_fmt_off_on_for_a_top_level_run() {
+        // 019-blank-line-normalization tasks.md T019: a protected region's
+        // over-cap top-level run is left exactly as written, while an
+        // unprotected over-cap top-level run elsewhere in the same file
+        // contracts normally.
+        let src = "X = 1\n; FMT: OFF\n\n\n\n\n\nY = 2\n; FMT: ON\nZ = 3\n\n\n\n\n\nW = 4\n";
+        let out = format(src, blank_lines_auto()).text;
+        assert_eq!(
+            out,
+            "X = 1\n; FMT: OFF\n\n\n\n\n\nY = 2\n; FMT: ON\nZ = 3\n\n\nW = 4\n",
+            "the protected run must survive exactly as written while the unprotected run contracts to the default cap (2): {out}"
+        );
+    }
+
+    #[test]
+    fn blank_lines_auto_is_idempotent_for_a_multi_level_nested_over_cap_run() {
+        // 019-blank-line-normalization tasks.md T021: a doubly-nested
+        // over-cap run must also settle to a stable fixed point on a
+        // second format pass, not just the singly-nested case T019 already
+        // covers.
+        let src = "RUN PGM=MATRIX\n    LOOP i=1,5\n        X = 1\n\n\n\n\n        Y = 2\n    ENDLOOP\nENDRUN\n";
+        let once = format(src, blank_lines_auto()).text;
+        let twice = format(&once, blank_lines_auto()).text;
+        assert_eq!(once, twice);
+    }
+
+    #[test]
+    fn blank_lines_auto_respects_fmt_off_on_for_a_nested_run_specifically() {
+        // 019-blank-line-normalization tasks.md T021: a protected region
+        // containing an over-cap *nested* run is left exactly as written,
+        // while an unprotected nested run elsewhere in the same file
+        // contracts to the nested cap normally.
+        let src = "RUN PGM=MATRIX\n    LOOP i=1,5\n; FMT: OFF\n        X = 1\n\n\n\n\n        Y = 2\n; FMT: ON\n    ENDLOOP\nENDRUN\n\nRUN PGM=NETWORK\n    A = 1\n\n\n\n\n    B = 2\nENDRUN\n";
+        let out = format(src, blank_lines_auto()).text;
+        assert_eq!(
+            out,
+            "RUN PGM=MATRIX\n    LOOP i=1,5\n; FMT: OFF\n        X = 1\n\n\n\n\n        Y = 2\n; FMT: ON\n    ENDLOOP\nENDRUN\n\nRUN PGM=NETWORK\n    A = 1\n\n    B = 2\nENDRUN\n",
+            "the protected nested run must survive exactly as written while the unprotected nested run contracts to the default nested cap (1): {out}"
+        );
+    }
+
+    #[test]
+    fn blank_lines_preserve_default_is_byte_identical_across_several_over_cap_runs() {
+        // T009 (FR-009/SC-003 regression case): `Preserve` (the default)
+        // leaves every blank-line run exactly as written, however long --
+        // a project with no `blank_lines` configuration produces
+        // byte-identical output to before this feature existed.
+        let src = "X = 1\n\n\n\n\n\nY = 2\n\n\n\nIF (A=1)\n\n\n\n\nENDIF\n";
+        let result = format(src, FormatOptions::default());
+        assert!(!result.changed, "Preserve (the default) must be a true no-op on excessive blank-line runs");
+        assert_eq!(result.text, src);
     }
 
     // -- Indentation -----------------------------------------------------
@@ -1275,6 +1457,7 @@ mod tests {
             top_level_indent: TopLevelIndentMode::default(),
             indent_width: 4,
             operator_spacing: OperatorSpacing::default(),
+            ..FormatOptions::default()
         };
         let out = format(src, options).text;
         assert_eq!(out, "if (x=1)\n    run pgm=matrix\n    endrun\nendif\n");
@@ -1315,6 +1498,7 @@ mod tests {
             top_level_indent: TopLevelIndentMode::default(),
             indent_width: 4,
             operator_spacing: OperatorSpacing::default(),
+            ..FormatOptions::default()
         };
         let out = format(src, pair_keywords_only).text;
         assert_eq!(out, "run PGM=matrix zones=5\nendrun\n", "pair_keywords alone must not touch zones: {out}");
@@ -1328,6 +1512,7 @@ mod tests {
             top_level_indent: TopLevelIndentMode::default(),
             indent_width: 4,
             operator_spacing: OperatorSpacing::default(),
+            ..FormatOptions::default()
         };
         let out = format(src, data_references_only).text;
         assert_eq!(out, "run pgm=matrix ZONES=5\nendrun\n", "data_references alone must reach zones: {out}");
@@ -1375,6 +1560,7 @@ mod tests {
                 top_level_indent: TopLevelIndentMode::default(),
                 indent_width: 4,
                 operator_spacing: OperatorSpacing::default(),
+                ..FormatOptions::default()
             },
         )
         .text;
@@ -1399,6 +1585,7 @@ mod tests {
             top_level_indent: TopLevelIndentMode::default(),
             indent_width: 4,
             operator_spacing: OperatorSpacing::default(),
+            ..FormatOptions::default()
         }
     }
 

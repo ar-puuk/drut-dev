@@ -20,7 +20,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use voyager_core::format::{format_bytes, CasingConvention, CasingSettings, EncodingFidelity, FormatOptions};
-use voyager_core::{parse, BlockKind, Node, OperatorSpacing, Statement, StatementKind, TopLevelIndentMode};
+use voyager_core::{parse, BlankLineMode, BlockKind, Node, OperatorSpacing, Statement, StatementKind, TopLevelIndentMode};
 
 const VALID_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/valid");
 const GOLDEN_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/golden");
@@ -54,6 +54,7 @@ fn data_references_upper_indent_2_options() -> FormatOptions {
         top_level_indent: TopLevelIndentMode::default(),
         indent_width: 2,
         operator_spacing: OperatorSpacing::default(),
+        ..FormatOptions::default()
     }
 }
 
@@ -71,6 +72,7 @@ fn operator_spacing_fixed_options() -> FormatOptions {
         top_level_indent: TopLevelIndentMode::default(),
         indent_width: 4,
         operator_spacing: OperatorSpacing::Fixed,
+        ..FormatOptions::default()
     }
 }
 
@@ -80,6 +82,24 @@ fn operator_spacing_auto_options() -> FormatOptions {
         top_level_indent: TopLevelIndentMode::default(),
         indent_width: 4,
         operator_spacing: OperatorSpacing::Auto,
+        ..FormatOptions::default()
+    }
+}
+
+// -- 019-blank-line-normalization, T025: one more variant, same
+// golden-directory pattern already established -- applied only to the 9
+// already-reviewed real_corpus fixtures.
+const REAL_CORPUS_GOLDEN_BLANK_LINES_DIR: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/golden_blank_lines/real_corpus");
+
+fn blank_lines_auto_options() -> FormatOptions {
+    FormatOptions {
+        casing: CasingSettings::default(),
+        top_level_indent: TopLevelIndentMode::default(),
+        indent_width: 4,
+        operator_spacing: OperatorSpacing::default(),
+        blank_lines: BlankLineMode::Auto,
+        ..FormatOptions::default()
     }
 }
 
@@ -89,6 +109,7 @@ fn normalize_options() -> FormatOptions {
         top_level_indent: TopLevelIndentMode::Normalize,
         indent_width: 4,
         operator_spacing: OperatorSpacing::default(),
+        ..FormatOptions::default()
     }
 }
 
@@ -406,6 +427,35 @@ fn real_corpus_fixtures_are_idempotent_under_operator_spacing_auto() {
 #[test]
 fn real_corpus_fixtures_preserve_structure_and_diagnostics_under_operator_spacing_auto() {
     check_structure_and_diagnostics_preserved(real_corpus_fixtures(), operator_spacing_auto_options());
+}
+
+// -- 019-blank-line-normalization, T025 --
+
+fn golden_blank_lines_path_for_real_corpus(fixture: &Path) -> PathBuf {
+    let rel = fixture
+        .strip_prefix(REAL_CORPUS_DIR)
+        .expect("real_corpus_fixtures() only returns paths under REAL_CORPUS_DIR");
+    Path::new(REAL_CORPUS_GOLDEN_BLANK_LINES_DIR).join(rel)
+}
+
+#[test]
+fn real_corpus_fixtures_match_golden_output_under_blank_lines_auto() {
+    check_golden(
+        real_corpus_fixtures(),
+        Path::new(REAL_CORPUS_GOLDEN_BLANK_LINES_DIR),
+        golden_blank_lines_path_for_real_corpus,
+        blank_lines_auto_options(),
+    );
+}
+
+#[test]
+fn real_corpus_fixtures_are_idempotent_under_blank_lines_auto() {
+    check_idempotent(real_corpus_fixtures(), blank_lines_auto_options());
+}
+
+#[test]
+fn real_corpus_fixtures_preserve_structure_and_diagnostics_under_blank_lines_auto() {
+    check_structure_and_diagnostics_preserved(real_corpus_fixtures(), blank_lines_auto_options());
 }
 
 /// A structural "shape" — statement kinds/words/pair-keys and block

@@ -65,6 +65,9 @@ fn every_tool_succeeds_against_a_read_only_fixture_and_leaves_it_unchanged() {
         indent_width: None,
         top_level_indent: None,
         operator_spacing: None,
+        blank_lines: None,
+        top_level_blank_line_cap: None,
+        nested_blank_line_cap: None,
         isolated: None,
     };
     let format_result = format(&format_input);

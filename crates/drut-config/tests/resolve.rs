@@ -5,7 +5,7 @@
 use std::path::{Path, PathBuf};
 
 use drut_config::{resolve_format_options, ExplicitFormatOverride};
-use voyager_core::{CasingConvention, OperatorSpacing, TopLevelIndentMode};
+use voyager_core::{BlankLineMode, CasingConvention, OperatorSpacing, TopLevelIndentMode};
 
 fn test_file(name: &str, config: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("drut_config_resolve_test_{}_{name}", std::process::id()));
@@ -301,6 +301,85 @@ fn operator_spacing_parses_from_config_and_resolves() {
     let (options, warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default());
     assert_eq!(options.operator_spacing, OperatorSpacing::Auto);
     assert!(warnings.is_empty());
+
+    cleanup(&target);
+}
+
+// -- 019-blank-line-normalization (tasks.md T015) --
+
+#[test]
+fn blank_lines_explicit_overrides_config_file() {
+    let target = test_file("blank_lines_explicit_override", "[format]\nblank_lines = \"preserve\"\n");
+
+    let (options, _warnings) = resolve_format_options(
+        Some(&target),
+        false,
+        ExplicitFormatOverride { blank_lines: Some(BlankLineMode::Auto), ..Default::default() },
+    );
+    assert_eq!(options.blank_lines, BlankLineMode::Auto);
+
+    cleanup(&target);
+}
+
+#[test]
+fn blank_lines_and_both_caps_unset_anywhere_resolve_to_built_in_defaults() {
+    let target = test_file("blank_lines_unset", "[format]\ncasing = \"upper\"\n");
+
+    let (options, warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default());
+    assert_eq!(options.blank_lines, BlankLineMode::Preserve);
+    assert_eq!(options.top_level_blank_line_cap, 2);
+    assert_eq!(options.nested_blank_line_cap, 1);
+    assert!(warnings.is_empty());
+
+    cleanup(&target);
+}
+
+#[test]
+fn top_level_blank_line_cap_explicit_overrides_config_file() {
+    let target = test_file("top_level_blank_line_cap_explicit_override", "[format]\ntop_level_blank_line_cap = 5\n");
+
+    let (options, _warnings) = resolve_format_options(
+        Some(&target),
+        false,
+        ExplicitFormatOverride { top_level_blank_line_cap: Some(3), ..Default::default() },
+    );
+    assert_eq!(options.top_level_blank_line_cap, 3);
+
+    cleanup(&target);
+}
+
+#[test]
+fn nested_blank_line_cap_explicit_overrides_config_file() {
+    let target = test_file("nested_blank_line_cap_explicit_override", "[format]\nnested_blank_line_cap = 5\n");
+
+    let (options, _warnings) = resolve_format_options(
+        Some(&target),
+        false,
+        ExplicitFormatOverride { nested_blank_line_cap: Some(3), ..Default::default() },
+    );
+    assert_eq!(options.nested_blank_line_cap, 3);
+
+    cleanup(&target);
+}
+
+#[test]
+fn top_level_blank_line_cap_out_of_range_in_config_falls_back_to_default_with_a_warning() {
+    let target = test_file("top_level_blank_line_cap_zero", "[format]\ntop_level_blank_line_cap = 0\n");
+
+    let (options, warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default());
+    assert_eq!(options.top_level_blank_line_cap, 2, "must fall back to the built-in default, never fail");
+    assert_eq!(warnings.len(), 1);
+
+    cleanup(&target);
+}
+
+#[test]
+fn nested_blank_line_cap_unreasonably_large_falls_back_to_default_with_a_warning() {
+    let target = test_file("nested_blank_line_cap_large", "[format]\nnested_blank_line_cap = 200\n");
+
+    let (options, warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default());
+    assert_eq!(options.nested_blank_line_cap, 1, "must fall back to the built-in default, never fail");
+    assert_eq!(warnings.len(), 1);
 
     cleanup(&target);
 }

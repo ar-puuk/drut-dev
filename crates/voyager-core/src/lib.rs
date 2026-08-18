@@ -7,6 +7,7 @@
 //! this. See `specs/001-voyager-script-parser/contracts/public-api.md` for
 //! the binding contract behind [`tokenize`] and [`parse`].
 
+pub mod blank_line;
 pub mod block;
 pub mod block_resolution;
 pub mod data_reference;
@@ -27,8 +28,8 @@ pub use block_resolution::{all_blocks, block_at, BlockFold, BlockInfo, BlockKind
 pub use data_reference::{data_reference_entries, data_reference_occurrences, DataReferenceEntry, DataReferenceOccurrence};
 pub use diagnostic::{Diagnostic, DiagnosticKind};
 pub use format::{
-    format, format_bytes, unclosed_fmt_off_markers, CasingConvention, CasingSettings, EncodingFidelity, FormatOptions,
-    FormatResult, OperatorSpacing, TopLevelIndentMode,
+    format, format_bytes, unclosed_fmt_off_markers, BlankLineMode, CasingConvention, CasingSettings, EncodingFidelity,
+    FormatOptions, FormatResult, OperatorSpacing, TopLevelIndentMode,
 };
 pub use keywords::{completion_candidates, did_you_mean, CompletionContext, KeywordEntry, KeywordRole};
 pub use span::{Position, Span};

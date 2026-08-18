@@ -92,6 +92,29 @@ pub enum Command {
         /// built-in default (preserve)."
         #[arg(long, value_enum)]
         operator_spacing: Option<OperatorSpacingArg>,
+        /// Whether/how excessive blank-line runs are contracted
+        /// (019-blank-line-normalization) — `preserve` (default) leaves
+        /// every run exactly as written, however long; `auto` contracts a
+        /// run down to the applicable cap (see the two flags below) only
+        /// when it exceeds that cap. Same `Option`-typed, "requires an
+        /// explicit value, no bare flag" shape every other format mode flag
+        /// already uses.
+        #[arg(long, value_enum)]
+        blank_lines: Option<BlankLinesArg>,
+        /// The maximum number of consecutive blank lines `auto` allows
+        /// between top-level statements/blocks before contracting the run
+        /// (019-blank-line-normalization FR-002). `Option`-typed like
+        /// `--indent-width` — omitting the flag means "consult
+        /// `drut.toml`, then the built-in default (2)."
+        #[arg(long, value_parser = clap::value_parser!(u8).range(1..=50))]
+        top_level_blank_line_cap: Option<u8>,
+        /// The maximum number of consecutive blank lines `auto` allows
+        /// inside any block's own body, uniformly regardless of nesting
+        /// depth, before contracting the run (019-blank-line-normalization
+        /// FR-002/FR-008). Same shape as `--top-level-blank-line-cap`,
+        /// independently — built-in default `1`.
+        #[arg(long, value_parser = clap::value_parser!(u8).range(1..=50))]
+        nested_blank_line_cap: Option<u8>,
         /// Skip `drut.toml` discovery entirely for this run, using built-in
         /// defaults plus any other explicit flags (012-toml-configuration
         /// US3, mirroring Ruff's `--isolated`).
@@ -134,6 +157,12 @@ pub enum TopLevelIndentArg {
 pub enum OperatorSpacingArg {
     Preserve,
     Fixed,
+    Auto,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum BlankLinesArg {
+    Preserve,
     Auto,
 }
 

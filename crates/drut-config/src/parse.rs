@@ -80,6 +80,13 @@ fn parse_format_table(path: &Path, table: &toml::Table, warnings: &mut Vec<Confi
             "top_level_indent" => format.top_level_indent = parse_top_level_indent(path, value, warnings),
             "indent_width" => format.indent_width = parse_indent_width(path, value, warnings),
             "operator_spacing" => format.operator_spacing = parse_operator_spacing(path, value, warnings),
+            "blank_lines" => format.blank_lines = parse_blank_lines(path, value, warnings),
+            "top_level_blank_line_cap" => {
+                format.top_level_blank_line_cap = parse_blank_line_cap(path, "top_level_blank_line_cap", value, warnings)
+            }
+            "nested_blank_line_cap" => {
+                format.nested_blank_line_cap = parse_blank_line_cap(path, "nested_blank_line_cap", value, warnings)
+            }
             other => warnings.push(ConfigWarning::UnrecognizedKey {
                 path: path.to_path_buf(),
                 table: "format".to_string(),
@@ -195,6 +202,58 @@ fn parse_operator_spacing(
                 "operator_spacing",
                 format!("must be a string (\"preserve\", \"fixed\", or \"auto\"), got {value:?}"),
             ));
+            None
+        }
+    }
+}
+
+/// `019-blank-line-normalization`. Same exact-lowercase-string shape
+/// `operator_spacing`/`top_level_indent` already use — case-sensitive, only
+/// `"preserve"`/`"auto"` recognized (there is exactly one non-preserve
+/// behavior here, so no third named value).
+fn parse_blank_lines(
+    path: &Path,
+    value: &toml::Value,
+    warnings: &mut Vec<ConfigWarning>,
+) -> Option<voyager_core::BlankLineMode> {
+    match value.as_str() {
+        Some("preserve") => Some(voyager_core::BlankLineMode::Preserve),
+        Some("auto") => Some(voyager_core::BlankLineMode::Auto),
+        Some(other) => {
+            warnings.push(invalid_value(
+                path,
+                "blank_lines",
+                format!("must be \"preserve\" or \"auto\", got {other:?}"),
+            ));
+            None
+        }
+        None => {
+            warnings.push(invalid_value(
+                path,
+                "blank_lines",
+                format!("must be a string (\"preserve\" or \"auto\"), got {value:?}"),
+            ));
+            None
+        }
+    }
+}
+
+/// Shared by `top_level_blank_line_cap`/`nested_blank_line_cap`
+/// (019-blank-line-normalization) — accepts any TOML integer here; the
+/// valid-range bound is enforced later, at `resolve_format_options`'s
+/// resolve layer (data-model.md §3), not during parsing, the same
+/// `indent_width` precedent.
+fn parse_blank_line_cap(path: &Path, key: &str, value: &toml::Value, warnings: &mut Vec<ConfigWarning>) -> Option<u8> {
+    match value.as_integer() {
+        Some(n) => match u8::try_from(n) {
+            Ok(cap) => Some(cap),
+            Err(_) => {
+                warnings.push(invalid_value(path, key, format!("must be a positive integer, got {n}")));
+                None
+            }
+        },
+        None => {
+            warnings.push(invalid_value(path, key, format!("must be a positive integer, got {value:?}")));
             None
         }
     }

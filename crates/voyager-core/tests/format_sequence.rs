@@ -29,6 +29,7 @@ fn normalize() -> FormatOptions {
         top_level_indent: TopLevelIndentMode::Normalize,
         indent_width: 4,
         operator_spacing: OperatorSpacing::default(),
+        ..FormatOptions::default()
     }
 }
 

@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use drut_config::{parse::parse, ConfigWarning};
-use voyager_core::{CasingConvention, OperatorSpacing, TopLevelIndentMode};
+use voyager_core::{BlankLineMode, CasingConvention, OperatorSpacing, TopLevelIndentMode};
 
 fn write_config(name: &str, content: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("drut_config_parse_test_{}_{name}", std::process::id()));
@@ -256,6 +256,64 @@ fn operator_spacing_malformed_value_warns_and_falls_back_to_none() {
     assert_eq!(config.format.operator_spacing, None);
     assert_eq!(warnings.len(), 1);
     assert!(matches!(&warnings[0], ConfigWarning::InvalidValue { key, .. } if key == "operator_spacing"));
+
+    cleanup(&path);
+}
+
+// -- 019-blank-line-normalization: blank_lines + both caps (tasks.md T014) --
+
+#[test]
+fn blank_lines_parses_both_accepted_values_with_zero_warnings() {
+    for (value, expected) in [("preserve", BlankLineMode::Preserve), ("auto", BlankLineMode::Auto)] {
+        let path = write_config(&format!("blank_lines_{value}"), &format!("[format]\nblank_lines = \"{value}\"\n"));
+
+        let (config, warnings) = parse(&path);
+        assert_eq!(config.format.blank_lines, Some(expected), "value: {value}");
+        assert!(warnings.is_empty(), "expected zero warnings for {value:?}, got {warnings:?}");
+
+        cleanup(&path);
+    }
+}
+
+#[test]
+fn blank_lines_malformed_value_warns_and_falls_back_to_none() {
+    let path = write_config("blank_lines_malformed", "[format]\nblank_lines = \"sometimes\"\n");
+
+    let (config, warnings) = parse(&path);
+    assert_eq!(config.format.blank_lines, None);
+    assert_eq!(warnings.len(), 1);
+    assert!(matches!(&warnings[0], ConfigWarning::InvalidValue { key, .. } if key == "blank_lines"));
+
+    cleanup(&path);
+}
+
+#[test]
+fn each_blank_line_cap_parses_a_plain_integer_cleanly() {
+    let path = write_config(
+        "blank_line_caps_valid",
+        "[format]\ntop_level_blank_line_cap = 3\nnested_blank_line_cap = 2\n",
+    );
+
+    let (config, warnings) = parse(&path);
+    assert_eq!(config.format.top_level_blank_line_cap, Some(3));
+    assert_eq!(config.format.nested_blank_line_cap, Some(2));
+    assert!(warnings.is_empty(), "expected zero warnings, got {warnings:?}");
+
+    cleanup(&path);
+}
+
+#[test]
+fn a_malformed_blank_line_cap_value_warns_and_falls_back_only_for_that_key() {
+    let path = write_config(
+        "blank_line_caps_malformed",
+        "[format]\ntop_level_blank_line_cap = \"two\"\nnested_blank_line_cap = 1\n",
+    );
+
+    let (config, warnings) = parse(&path);
+    assert_eq!(config.format.top_level_blank_line_cap, None);
+    assert_eq!(config.format.nested_blank_line_cap, Some(1));
+    assert_eq!(warnings.len(), 1);
+    assert!(matches!(&warnings[0], ConfigWarning::InvalidValue { key, .. } if key == "top_level_blank_line_cap"));
 
     cleanup(&path);
 }

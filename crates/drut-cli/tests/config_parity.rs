@@ -81,6 +81,9 @@ fn cli_lsp_and_mcp_resolve_the_same_drut_toml_identically() {
         indent_width: None,
         top_level_indent: None,
         operator_spacing: None,
+        blank_lines: None,
+        top_level_blank_line_cap: None,
+        nested_blank_line_cap: None,
         isolated: None,
     })
     .unwrap();
@@ -154,6 +157,9 @@ fn cli_lsp_and_mcp_resolve_the_new_granular_settings_identically() {
         indent_width: None,
         top_level_indent: None,
         operator_spacing: None,
+        blank_lines: None,
+        top_level_blank_line_cap: None,
+        nested_blank_line_cap: None,
         isolated: None,
     })
     .unwrap();

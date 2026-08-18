@@ -50,6 +50,25 @@ pub struct FormatInput {
     /// normalizes it; `"auto"` does everything `"fixed"` does plus aligning
     /// consecutive `Assignment` statements' `=`.
     pub operator_spacing: Option<String>,
+    /// `"preserve"` / `"auto"` / absent — same absent-means-"consult
+    /// drut.toml, then default (preserve)" precedence as `casing`/
+    /// `operator_spacing` above (019-blank-line-normalization). `"preserve"`
+    /// leaves every blank-line run exactly as written, however long;
+    /// `"auto"` contracts a run down to the applicable cap (see the two
+    /// parameters below) only when it exceeds that cap.
+    pub blank_lines: Option<String>,
+    /// The maximum number of consecutive blank lines `auto` allows between
+    /// top-level statements/blocks before contracting the run
+    /// (019-blank-line-normalization FR-002), 1–50 if given. Same
+    /// absent-means-"consult drut.toml, then default (2)" precedence as
+    /// every other setting here.
+    pub top_level_blank_line_cap: Option<u8>,
+    /// The maximum number of consecutive blank lines `auto` allows inside
+    /// any block's own body, uniformly regardless of nesting depth, before
+    /// contracting the run (019-blank-line-normalization FR-002/FR-008),
+    /// 1–50 if given. Same precedence as `top_level_blank_line_cap` above,
+    /// independently — built-in default `1`.
+    pub nested_blank_line_cap: Option<u8>,
     /// Skip `drut.toml` discovery entirely for this call, using built-in
     /// defaults plus `casing`/`top_level_indent` above if given
     /// (012-toml-configuration US3, mirroring the CLI's `--isolated`).
@@ -134,6 +153,24 @@ fn explicit_override(input: &FormatInput) -> Result<drut_config::ExplicitFormatO
             ))
         }
     };
+    let blank_lines = match input.blank_lines.as_deref() {
+        None => None,
+        Some("preserve") => Some(voyager_core::BlankLineMode::Preserve),
+        Some("auto") => Some(voyager_core::BlankLineMode::Auto),
+        Some(other) => {
+            return Err(format!("`blank_lines` must be \"preserve\" or \"auto\" if given, got {other:?}"))
+        }
+    };
+    if let Some(cap) = input.top_level_blank_line_cap {
+        if !(1..=50).contains(&cap) {
+            return Err(format!("`top_level_blank_line_cap` must be between 1 and 50 if given, got {cap}"));
+        }
+    }
+    if let Some(cap) = input.nested_blank_line_cap {
+        if !(1..=50).contains(&cap) {
+            return Err(format!("`nested_blank_line_cap` must be between 1 and 50 if given, got {cap}"));
+        }
+    }
     Ok(drut_config::ExplicitFormatOverride {
         casing,
         control_words_casing,
@@ -142,6 +179,9 @@ fn explicit_override(input: &FormatInput) -> Result<drut_config::ExplicitFormatO
         top_level_indent,
         indent_width: input.indent_width,
         operator_spacing,
+        blank_lines,
+        top_level_blank_line_cap: input.top_level_blank_line_cap,
+        nested_blank_line_cap: input.nested_blank_line_cap,
     })
 }
 
@@ -193,6 +233,9 @@ mod tests {
             indent_width: None,
             top_level_indent: None,
             operator_spacing: None,
+            blank_lines: None,
+            top_level_blank_line_cap: None,
+            nested_blank_line_cap: None,
             isolated: None,
         }
     }
@@ -210,6 +253,9 @@ mod tests {
             indent_width: None,
             top_level_indent: top_level_indent.map(str::to_string),
             operator_spacing: None,
+            blank_lines: None,
+            top_level_blank_line_cap: None,
+            nested_blank_line_cap: None,
             isolated,
         }
     }
@@ -233,6 +279,9 @@ mod tests {
             indent_width,
             top_level_indent: None,
             operator_spacing: None,
+            blank_lines: None,
+            top_level_blank_line_cap: None,
+            nested_blank_line_cap: None,
             isolated: None,
         }
     }
@@ -517,5 +566,53 @@ mod tests {
         input.operator_spacing = Some("tight".to_string());
         let err = format(&input).unwrap_err();
         assert!(err.contains("operator_spacing"), "expected an error naming the field, got: {err}");
+    }
+
+    // -- 019-blank-line-normalization (tasks.md T017) --
+
+    #[test]
+    fn blank_lines_param_overrides_a_drut_toml_resolved_preserve() {
+        let dir = temp_project("blank_lines");
+        write_config(&dir, "[format]\nblank_lines = \"preserve\"\n");
+        let file = dir.join("x.s");
+        std::fs::write(&file, "X = 1\n\n\n\n\n\nY = 2\n").unwrap();
+
+        let mut overridden = path_input(file.to_str().unwrap(), None, None, None);
+        overridden.blank_lines = Some("auto".to_string());
+        let result = format(&overridden).unwrap();
+        assert_eq!(result.text, "X = 1\n\n\nY = 2\n", "the run of 5 must contract to the default top-level cap (2)");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn blank_line_cap_params_override_the_built_in_defaults() {
+        let mut input = text_input("X = 1\n\n\n\n\n\nY = 2\n", None);
+        input.blank_lines = Some("auto".to_string());
+        input.top_level_blank_line_cap = Some(1);
+        let result = format(&input).unwrap();
+        assert_eq!(result.text, "X = 1\n\nY = 2\n");
+    }
+
+    #[test]
+    fn blank_lines_invalid_value_is_a_clean_error() {
+        // FR-011/SC-004: same closed-set shape as casing/operator_spacing --
+        // an invalid value is a clean tool-call error, not a silent
+        // fallback (that softer behavior is drut.toml-only).
+        let mut input = text_input("X = 1\n", None);
+        input.blank_lines = Some("sometimes".to_string());
+        let err = format(&input).unwrap_err();
+        assert!(err.contains("blank_lines"), "expected an error naming the field, got: {err}");
+    }
+
+    #[test]
+    fn blank_line_cap_out_of_range_is_a_clean_error_not_a_silent_clamp() {
+        let mut input = text_input("X = 1\n", None);
+        input.top_level_blank_line_cap = Some(0);
+        assert!(format(&input).is_err(), "an explicit out-of-range top_level_blank_line_cap must be a clean error");
+
+        let mut input = text_input("X = 1\n", None);
+        input.nested_blank_line_cap = Some(51);
+        assert!(format(&input).is_err(), "an explicit out-of-range nested_blank_line_cap must be a clean error");
     }
 }

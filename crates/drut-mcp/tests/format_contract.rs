@@ -18,6 +18,9 @@ fn text_input(text: &str) -> FormatInput {
         indent_width: None,
         top_level_indent: None,
         operator_spacing: None,
+        blank_lines: None,
+        top_level_blank_line_cap: None,
+        nested_blank_line_cap: None,
         isolated: None,
     }
 }

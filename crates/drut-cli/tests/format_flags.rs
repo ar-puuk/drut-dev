@@ -606,3 +606,64 @@ fn operator_spacing_invalid_value_is_a_usage_error_not_a_silent_fallback() {
     assert_ne!(out.status.code(), Some(0));
     assert_eq!(fs::read_to_string(&file).unwrap(), MESSY);
 }
+
+// -- 019-blank-line-normalization (tasks.md T016) --
+
+#[test]
+fn blank_lines_flag_overrides_a_drut_toml_resolved_preserve_for_one_run() {
+    let dir = TempDir::new("blank-lines-flag");
+    fs::write(dir.path().join("drut.toml"), "[format]\nblank_lines = \"preserve\"\n").unwrap();
+    let file = dir.path().join("x.s");
+    fs::write(&file, "X = 1\n\n\n\n\n\nY = 2\n").unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--blank-lines=auto"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "X = 1\n\n\nY = 2\n",
+        "the run of 5 must contract to the default top-level cap (2)"
+    );
+}
+
+#[test]
+fn top_level_blank_line_cap_flag_overrides_the_default() {
+    let dir = TempDir::new("top-level-blank-line-cap-flag");
+    let file = dir.path().join("x.s");
+    fs::write(&file, "X = 1\n\n\n\n\n\nY = 2\n").unwrap();
+
+    let out = drut(&[
+        "format",
+        file.to_str().unwrap(),
+        "--blank-lines=auto",
+        "--top-level-blank-line-cap=1",
+    ]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "X = 1\n\nY = 2\n");
+}
+
+#[test]
+fn blank_line_cap_out_of_range_is_a_usage_error_not_a_silent_clamp() {
+    // Mirrors --indent-width's own regression case (data-model.md §3): the
+    // CLI validates its own range at the argument-parsing layer.
+    let dir = TempDir::new("blank-line-cap-out-of-range");
+    let file = dir.path().join("x.s");
+    fs::write(&file, MESSY).unwrap();
+
+    let out = drut(&[
+        "format",
+        file.to_str().unwrap(),
+        "--blank-lines=auto",
+        "--top-level-blank-line-cap=0",
+    ]);
+    assert_ne!(out.status.code(), Some(0));
+    assert_eq!(fs::read_to_string(&file).unwrap(), MESSY);
+
+    let out = drut(&[
+        "format",
+        file.to_str().unwrap(),
+        "--blank-lines=auto",
+        "--nested-blank-line-cap=51",
+    ]);
+    assert_ne!(out.status.code(), Some(0));
+    assert_eq!(fs::read_to_string(&file).unwrap(), MESSY);
+}

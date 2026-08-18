@@ -158,6 +158,7 @@ fn casing_indentation_and_operator_spacing_all_apply_independently_together() {
         top_level_indent: TopLevelIndentMode::default(),
         indent_width: 4,
         operator_spacing: OperatorSpacing::Fixed,
+        ..FormatOptions::default()
     };
     let out = format(src, options).text;
     assert_eq!(

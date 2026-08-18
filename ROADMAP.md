@@ -270,9 +270,11 @@ already been researched or partially unblocked; see the note per item.
       stays untouched, so an unconfigured project sees zero behavior
       change, matching every other axis shipped so far.
 
-13. **Blank-line-run normalization** — *queued, understanding confirmed,
-    not yet spec'd* (added 2026-08-17, alongside `018-operator-spacing`'s
-    own completion). Well-precedented shape (Python's `black`/JS's
+13. **Blank-line-run normalization** — ✅ *done, implemented 2026-08-17 as
+    `019-blank-line-normalization`* (added 2026-08-17, alongside
+    `018-operator-spacing`'s own completion; see
+    `specs/019-blank-line-normalization/` for the full spec/plan/tasks).
+    Well-precedented shape (Python's `black`/JS's
     `prettier` both cap consecutive blank lines, fewer nested than at
     module level) — not a novel idea needing its own research pass the way
     casing/operator-spacing did. Scope settled through direct conversation:

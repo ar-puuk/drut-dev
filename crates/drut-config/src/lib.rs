@@ -39,6 +39,17 @@ pub struct FormatConfig {
     /// compatible with (unlike `casing`) — precedence is just `explicit >
     /// this field > built-in default` (data-model.md §4).
     pub operator_spacing: Option<voyager_core::OperatorSpacing>,
+    /// `019-blank-line-normalization`. Single new setting, no legacy field —
+    /// precedence is `explicit > this field > built-in default (preserve)`,
+    /// same shape as `operator_spacing` above.
+    pub blank_lines: Option<voyager_core::BlankLineMode>,
+    /// Valid range is enforced by `resolve_format_options`, not here — this
+    /// field carries whatever integer `drut.toml` actually had, valid or
+    /// not (data-model.md §3), mirroring `indent_width`'s own precedent.
+    pub top_level_blank_line_cap: Option<u8>,
+    /// Same range-validated-with-fallback treatment as
+    /// `top_level_blank_line_cap` above, independently.
+    pub nested_blank_line_cap: Option<u8>,
 }
 
 /// A non-fatal problem found while parsing a `drut.toml` (spec.md FR-011).
@@ -88,6 +99,9 @@ pub struct ExplicitFormatOverride {
     pub top_level_indent: Option<voyager_core::TopLevelIndentMode>,
     pub indent_width: Option<u8>,
     pub operator_spacing: Option<voyager_core::OperatorSpacing>,
+    pub blank_lines: Option<voyager_core::BlankLineMode>,
+    pub top_level_blank_line_cap: Option<u8>,
+    pub nested_blank_line_cap: Option<u8>,
 }
 
 /// Built-in default indentation width (`FormatOptions::default().indent_width`,
@@ -99,6 +113,20 @@ const DEFAULT_INDENT_WIDTH: u8 = 4;
 /// with a non-blocking warning, the same fallback pattern every other
 /// malformed `[format]` value in this crate already uses.
 const INDENT_WIDTH_RANGE: std::ops::RangeInclusive<u8> = 1..=16;
+
+/// Built-in default caps (`FormatOptions::default()`'s own
+/// `top_level_blank_line_cap`/`nested_blank_line_cap`, spec.md FR-002) —
+/// the fallback used whenever no layer supplies a value, or the supplied
+/// value is out of the valid range.
+const DEFAULT_TOP_LEVEL_BLANK_LINE_CAP: u8 = 2;
+const DEFAULT_NESTED_BLANK_LINE_CAP: u8 = 1;
+/// The valid range for each blank-line cap (spec.md Assumptions: "a sane
+/// upper bound, not unlimited" is a planning-phase detail, not fixed by the
+/// spec) — both caps are "positive-integer" per spec.md's own framing, so
+/// `0` is out of range same as any other malformed value; `50` is a
+/// generous sane ceiling no real project's own style would plausibly
+/// exceed, mirroring `INDENT_WIDTH_RANGE`'s own precedent shape.
+const BLANK_LINE_CAP_RANGE: std::ops::RangeInclusive<u8> = 1..=50;
 
 /// The one entry point every adapter calls (contracts/toml-config-api.md).
 /// Per field, independently: explicit override wins, else the resolved
@@ -169,12 +197,35 @@ fn resolve_casing_and_indent(
         .operator_spacing
         .or(config.format.operator_spacing)
         .unwrap_or_default();
+    let blank_lines = explicit
+        .blank_lines
+        .or(config.format.blank_lines)
+        .unwrap_or_default();
+    let top_level_blank_line_cap = resolve_blank_line_cap(
+        explicit.top_level_blank_line_cap,
+        config.format.top_level_blank_line_cap,
+        "top_level_blank_line_cap",
+        DEFAULT_TOP_LEVEL_BLANK_LINE_CAP,
+        config_path,
+        warnings,
+    );
+    let nested_blank_line_cap = resolve_blank_line_cap(
+        explicit.nested_blank_line_cap,
+        config.format.nested_blank_line_cap,
+        "nested_blank_line_cap",
+        DEFAULT_NESTED_BLANK_LINE_CAP,
+        config_path,
+        warnings,
+    );
 
     voyager_core::FormatOptions {
         casing: voyager_core::CasingSettings { control_words, pair_keywords, data_references },
         top_level_indent,
         indent_width,
         operator_spacing,
+        blank_lines,
+        top_level_blank_line_cap,
+        nested_blank_line_cap,
     }
 }
 
@@ -216,6 +267,44 @@ fn resolve_indent_width(
         }
     }
     DEFAULT_INDENT_WIDTH
+}
+
+/// Shared by `top_level_blank_line_cap` and `nested_blank_line_cap`
+/// (019-blank-line-normalization) — identical range-validated-with-fallback
+/// shape as `resolve_indent_width` above, parameterized by `key`/`default`
+/// since there are two independent caps rather than one.
+#[allow(clippy::too_many_arguments)]
+fn resolve_blank_line_cap(
+    explicit: Option<u8>,
+    config: Option<u8>,
+    key: &str,
+    default: u8,
+    config_path: Option<&Path>,
+    warnings: &mut Vec<ConfigWarning>,
+) -> u8 {
+    if let Some(value) = explicit {
+        if BLANK_LINE_CAP_RANGE.contains(&value) {
+            return value;
+        }
+    }
+    if let Some(value) = config {
+        if BLANK_LINE_CAP_RANGE.contains(&value) {
+            return value;
+        }
+        if let Some(path) = config_path {
+            warnings.push(ConfigWarning::InvalidValue {
+                path: path.to_path_buf(),
+                table: "format".to_string(),
+                key: key.to_string(),
+                message: format!(
+                    "{value} is outside the valid range {}-{}; using the default ({default})",
+                    BLANK_LINE_CAP_RANGE.start(),
+                    BLANK_LINE_CAP_RANGE.end()
+                ),
+            });
+        }
+    }
+    default
 }
 
 fn default_options(

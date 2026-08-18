@@ -47,6 +47,18 @@ CONTRIBUTING.md's "Versioning" section).
   the CLI (`--operator-spacing`), and the MCP `format` tool
   (`operator_spacing`); `preserve` remains the default, so a project with
   nothing configured sees zero behavior change.
+- A new `blank_lines` `[format]` setting (`preserve`/`auto`, default
+  `preserve`) caps runs of consecutive blank lines. `auto` contracts (never
+  pads) a run down to `top_level_blank_line_cap` (default `2`) between
+  top-level statements/blocks, or `nested_blank_line_cap` (default `1`)
+  anywhere inside any block's own body, regardless of nesting depth — a
+  whitespace-only line counts as blank. `; FMT: OFF`/`; FMT: ON` regions
+  are never touched. Exposed identically via `drut.toml`, the CLI
+  (`--blank-lines`, `--top-level-blank-line-cap`,
+  `--nested-blank-line-cap`), and the MCP `format` tool (`blank_lines`,
+  `top_level_blank_line_cap`, `nested_blank_line_cap`); `preserve` remains
+  the default, so a project with nothing configured sees zero behavior
+  change.
 
 ### Fixed
 
