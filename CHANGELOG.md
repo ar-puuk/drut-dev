@@ -11,6 +11,8 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-17
+
 ### Added
 
 - Casing is now three independently-configurable settings instead of one:
