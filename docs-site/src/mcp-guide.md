@@ -22,10 +22,10 @@ about to propose) is structurally valid before suggesting it.
 ## `format`
 
 Reformats a script's whitespace/indentation (and, opt-in via the same
-parameters `drut format`/`drut.toml` accept — `casing`, `operator_spacing`,
-`blank_lines`, and the rest) and returns the result plus whether anything
-changed. Idempotent: formatting an already-formatted script reports
-`changed=false`.
+parameters `drut format`/`drut.toml` accept — `control_words_casing`,
+`operator_spacing`, `blank_lines`, and the rest) and returns the result plus
+whether anything changed. Idempotent: formatting an already-formatted script
+reports `changed=false`.
 
 **Use it when**: an assistant is about to write or hand back Cube Voyager script
 text and wants it consistently formatted first.

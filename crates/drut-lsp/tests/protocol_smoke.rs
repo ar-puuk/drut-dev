@@ -504,7 +504,7 @@ fn did_open_publishes_a_drut_config_hint_for_a_malformed_drut_toml_additive_to_s
     let dir = std::env::temp_dir().join(format!("drut_lsp_protocol_smoke_test_{}_malformed_config", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("drut.toml"), "[format]\ncasing = \"sideways\"\n").unwrap();
+    std::fs::write(dir.join("drut.toml"), "[format]\ncontrol_words_casing = \"sideways\"\n").unwrap();
     let file = dir.join("a.s");
     let uri = file_uri_str(&file);
 
@@ -518,7 +518,7 @@ fn did_open_publishes_a_drut_config_hint_for_a_malformed_drut_toml_additive_to_s
     assert_eq!(diagnostics[0]["source"], json!("drut-config"));
     assert_eq!(diagnostics[0]["severity"], json!(4), "HINT is severity 4 in the LSP spec");
     let message = diagnostics[0]["message"].as_str().unwrap();
-    assert!(message.contains("casing"), "expected the message to name the specific bad key, got: {message}");
+    assert!(message.contains("control_words_casing"), "expected the message to name the specific bad key, got: {message}");
 
     shutdown(&client);
     let _ = std::fs::remove_dir_all(&dir);
@@ -635,7 +635,7 @@ fn unsupported_client_config_edit_stays_stale_until_the_script_itself_is_touched
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let config_path = dir.join("drut.toml");
-    std::fs::write(&config_path, "[format]\ncasing = \"upper\"\n").unwrap();
+    std::fs::write(&config_path, "[format]\ncontrol_words_casing = \"upper\"\n").unwrap();
     let script = dir.join("a.s");
     let uri = file_uri_str(&script);
 
@@ -650,7 +650,7 @@ fn unsupported_client_config_edit_stays_stale_until_the_script_itself_is_touched
     // happened) -- confirm the channel stays completely silent (not even a
     // stray publishDiagnostics), unlike `assert_no_request_arrives_within`'s
     // more lenient "drain notifications, only forbid requests" check.
-    std::fs::write(&config_path, "[format]\ncasing = \"sideways\"\n").unwrap();
+    std::fs::write(&config_path, "[format]\ncontrol_words_casing = \"sideways\"\n").unwrap();
     let silence = client.receiver.recv_timeout(std::time::Duration::from_millis(300));
     assert!(silence.is_err(), "expected complete silence with no watcher registered, got: {silence:?}");
 
@@ -711,7 +711,7 @@ fn editing_drut_toml_live_updates_the_open_documents_diagnostic_to_the_new_bad_v
     // didOpen is ever sent for it.
     let dir = temp_config_project("live_edit_primary_repro");
     let config_path = dir.join("drut.toml");
-    std::fs::write(&config_path, "[format]\ncasing = \"middle\"\n").unwrap();
+    std::fs::write(&config_path, "[format]\ncontrol_words_casing = \"middle\"\n").unwrap();
     let script = dir.join("a.s");
     let script_uri = file_uri_str(&script);
 
@@ -727,7 +727,7 @@ fn editing_drut_toml_live_updates_the_open_documents_diagnostic_to_the_new_bad_v
     // Edit drut.toml on disk to a *different* invalid value, then simulate
     // the client forwarding the watched-file-change notification -- no
     // action of any kind is taken on the script file itself.
-    std::fs::write(&config_path, "[format]\ncasing = \"midle\"\n").unwrap();
+    std::fs::write(&config_path, "[format]\ncontrol_words_casing = \"midle\"\n").unwrap();
     send_notification(&client, "workspace/didChangeWatchedFiles", watched_file_event(&config_path, 2));
 
     let note = recv_notification(&client, "textDocument/publishDiagnostics");
@@ -748,7 +748,7 @@ fn editing_drut_toml_refreshes_every_open_document_it_affects_not_only_the_focus
     // T010 / US1 Acceptance Scenario 2.
     let dir = temp_config_project("multiple_documents");
     let config_path = dir.join("drut.toml");
-    std::fs::write(&config_path, "[format]\ncasing = \"upper\"\n").unwrap();
+    std::fs::write(&config_path, "[format]\ncontrol_words_casing = \"upper\"\n").unwrap();
     let script_a = dir.join("a.s");
     let script_b = dir.join("b.s");
     let uri_a = file_uri_str(&script_a);
@@ -761,7 +761,7 @@ fn editing_drut_toml_refreshes_every_open_document_it_affects_not_only_the_focus
     did_open(&client, &uri_a, "IF (a=b)\nENDIF\n");
     did_open(&client, &uri_b, "IF (a=b)\nENDIF\n");
 
-    std::fs::write(&config_path, "[format]\ncasing = \"sideways\"\n").unwrap();
+    std::fs::write(&config_path, "[format]\ncontrol_words_casing = \"sideways\"\n").unwrap();
     send_notification(&client, "workspace/didChangeWatchedFiles", watched_file_event(&config_path, 2));
 
     // Both documents must republish -- order not guaranteed, so collect two
@@ -786,7 +786,7 @@ fn editing_drut_toml_from_valid_to_invalid_adds_a_diagnostic_with_no_action_on_t
     // T011 / US1 Acceptance Scenario 3.
     let dir = temp_config_project("valid_to_invalid");
     let config_path = dir.join("drut.toml");
-    std::fs::write(&config_path, "[format]\ncasing = \"upper\"\n").unwrap();
+    std::fs::write(&config_path, "[format]\ncontrol_words_casing = \"upper\"\n").unwrap();
     let script = dir.join("a.s");
     let uri = file_uri_str(&script);
 
@@ -797,7 +797,7 @@ fn editing_drut_toml_from_valid_to_invalid_adds_a_diagnostic_with_no_action_on_t
     let note = did_open(&client, &uri, "IF (a=b)\nENDIF\n");
     assert!(note.params["diagnostics"].as_array().unwrap().is_empty(), "valid config -- expected zero diagnostics");
 
-    std::fs::write(&config_path, "[format]\ncasing = \"sideways\"\n").unwrap();
+    std::fs::write(&config_path, "[format]\ncontrol_words_casing = \"sideways\"\n").unwrap();
     send_notification(&client, "workspace/didChangeWatchedFiles", watched_file_event(&config_path, 2));
 
     let note = recv_notification(&client, "textDocument/publishDiagnostics");
@@ -812,7 +812,7 @@ fn editing_drut_toml_from_invalid_to_valid_clears_the_diagnostic_with_no_action_
     // T011 / US1 Acceptance Scenario 4.
     let dir = temp_config_project("invalid_to_valid");
     let config_path = dir.join("drut.toml");
-    std::fs::write(&config_path, "[format]\ncasing = \"sideways\"\n").unwrap();
+    std::fs::write(&config_path, "[format]\ncontrol_words_casing = \"sideways\"\n").unwrap();
     let script = dir.join("a.s");
     let uri = file_uri_str(&script);
 
@@ -823,7 +823,7 @@ fn editing_drut_toml_from_invalid_to_valid_clears_the_diagnostic_with_no_action_
     let note = did_open(&client, &uri, "IF (a=b)\nENDIF\n");
     assert_eq!(note.params["diagnostics"].as_array().unwrap().len(), 1, "invalid config -- expected one diagnostic");
 
-    std::fs::write(&config_path, "[format]\ncasing = \"upper\"\n").unwrap();
+    std::fs::write(&config_path, "[format]\ncontrol_words_casing = \"upper\"\n").unwrap();
     send_notification(&client, "workspace/didChangeWatchedFiles", watched_file_event(&config_path, 2));
 
     let note = recv_notification(&client, "textDocument/publishDiagnostics");
@@ -849,7 +849,7 @@ fn a_config_change_that_does_not_affect_a_document_produces_no_visible_diagnosti
     let unrelated_dir = dir.join("unrelated");
     std::fs::create_dir_all(&unrelated_dir).unwrap();
     let unrelated_config = unrelated_dir.join("drut.toml");
-    std::fs::write(&unrelated_config, "[format]\ncasing = \"upper\"\n").unwrap();
+    std::fs::write(&unrelated_config, "[format]\ncontrol_words_casing = \"upper\"\n").unwrap();
 
     let (client, _handle) = spawn_server();
     initialize_with_capabilities(&client, watched_files_capabilities(true));
@@ -858,7 +858,7 @@ fn a_config_change_that_does_not_affect_a_document_produces_no_visible_diagnosti
     let note = did_open(&client, &uri, "IF (a=b)\nENDIF\n");
     assert!(note.params["diagnostics"].as_array().unwrap().is_empty());
 
-    std::fs::write(&unrelated_config, "[format]\ncasing = \"sideways\"\n").unwrap();
+    std::fs::write(&unrelated_config, "[format]\ncontrol_words_casing = \"sideways\"\n").unwrap();
     send_notification(&client, "workspace/didChangeWatchedFiles", watched_file_event(&unrelated_config, 2));
 
     // The re-check happens for this document too (broad scope, FR-007 --

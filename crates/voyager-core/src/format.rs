@@ -63,7 +63,11 @@ pub enum CasingConvention {
 /// Whether `format` leaves existing top-level (depth-0) indentation
 /// untouched or unconditionally forces it to column 0 (spec.md FR-001/
 /// FR-002 in `009-top-level-indent-toggle`). Two-valued, no "off" state —
-/// `format` always does one or the other (research.md §4).
+/// `format` always does one or the other (research.md §4). Named `Auto`
+/// (renamed from `Normalize`, its name through the rest of this crate's
+/// history up to this point, for `preserve`/`auto` naming consistency
+/// with `OperatorSpacing`/`BlankLineMode`, which use the same shape) —
+/// behavior unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TopLevelIndentMode {
     /// Leave existing top-level indentation exactly as written — the
@@ -72,7 +76,7 @@ pub enum TopLevelIndentMode {
     Preserve,
     /// Force every top-level line to column 0, unconditionally —
     /// `008`'s original behavior, unchanged, now opt-in.
-    Normalize,
+    Auto,
 }
 
 /// Three independently-configurable casing categories (spec.md FR-001,
@@ -684,7 +688,7 @@ fn diagnosed_block_openers(diagnostics: &[Diagnostic]) -> BTreeSet<Position> {
 /// Top-level nodes' own first lines are normalized to column 0 — every
 /// top-level statement or block opener, on every format pass, regardless
 /// of its current indentation or formatting history — **only when `mode`
-/// is `Normalize`**. **Reversed 2026-08-11
+/// is `Auto`**. **Reversed 2026-08-11
 /// (008-top-level-indentation-normalization)**: previously left untouched
 /// (the original 161-file corpus survey found no dominant top-level
 /// convention — only 20.4% at column 0, modal value column 8 — see
@@ -695,9 +699,10 @@ fn diagnosed_block_openers(diagnostics: &[Diagnostic]) -> BTreeSet<Position> {
 /// — `Preserve` (never inserting a plan entry for a top-level line, so
 /// `computed_indent` falls back to the line's real on-disk column) is
 /// the default again; `008`'s unconditional behavior survives unchanged
-/// as `Normalize`, opt-in only (research.md §1 in `009`'s own spec
-/// confirms `plan_block`/`plan_children`/`computed_indent` need no
-/// change at all to support both modes).
+/// as `Auto` (named `Normalize` before this rename), opt-in only
+/// (research.md §1 in `009`'s own spec confirms
+/// `plan_block`/`plan_children`/`computed_indent` need no change at all
+/// to support both modes).
 fn plan_indentation(
     nodes: &[Node],
     lines: &[Vec<char>],
@@ -708,7 +713,7 @@ fn plan_indentation(
     plan: &mut IndentPlan,
 ) {
     for node in nodes {
-        if mode == TopLevelIndentMode::Normalize {
+        if mode == TopLevelIndentMode::Auto {
             let line = node.span().start.line;
             if !protected.contains(&line) {
                 plan.insert(line, 0);
@@ -1013,10 +1018,10 @@ mod tests {
         }
     }
 
-    fn normalize() -> FormatOptions {
+    fn auto_top_level_indent() -> FormatOptions {
         FormatOptions {
             casing: CasingSettings::default(),
-            top_level_indent: TopLevelIndentMode::Normalize,
+            top_level_indent: TopLevelIndentMode::Auto,
             indent_width: 4,
             operator_spacing: OperatorSpacing::default(),
             blank_lines: BlankLineMode::default(),
@@ -1240,11 +1245,11 @@ mod tests {
     #[test]
     fn top_level_baseline_is_always_normalized_to_zero() {
         // 008-top-level-indentation-normalization's own behavior, retargeted
-        // 2026-08-12 (009-top-level-indent-toggle) to explicit Normalize
+        // 2026-08-12 (009-top-level-indent-toggle) to explicit Auto
         // mode now that Preserve is the default -- this test exists to
         // keep proving 008's guarantee still holds, opt-in.
         let src = "        RUN PGM=MATRIX\n        X = 1\n        ENDRUN\n";
-        let out = format(src, normalize()).text;
+        let out = format(src, auto_top_level_indent()).text;
         assert_eq!(out, "RUN PGM=MATRIX\n    X = 1\nENDRUN\n");
     }
 
@@ -1268,9 +1273,9 @@ mod tests {
         // Previously had zero code path touching it at all -- plan_indentation
         // only ever iterated Node::Block entries (research.md §1 in 008's
         // own spec). Retargeted 2026-08-12 (009-top-level-indent-toggle) to
-        // explicit Normalize mode now that Preserve is the default.
+        // explicit Auto mode now that Preserve is the default.
         let src = "    X = 1\n";
-        let out = format(src, normalize()).text;
+        let out = format(src, auto_top_level_indent()).text;
         assert_eq!(out, "X = 1\n");
     }
 
@@ -1307,12 +1312,12 @@ mod tests {
     fn diagnosed_block_opener_is_normalized_but_children_stay_untouched() {
         // The explicit 007/008 interaction point (008's own tasks.md T006).
         // Retargeted 2026-08-12 (009-top-level-indent-toggle) to explicit
-        // Normalize mode now that Preserve is the default: a genuinely
+        // Auto mode now that Preserve is the default: a genuinely
         // unmatched PROCESS whose own opener sits at non-zero indentation,
         // with both its legitimate body content (FILEI) and a swallowed
         // trailing RUN block also at non-zero indentation.
         let src = "    PROCESS PHASE=INPUT\n        FILEI = ni.1\n\n    RUN PGM=HWYASSIGN\n        FILEI NETI = 'net.net'\n    ENDRUN\n";
-        let result = format(src, normalize());
+        let result = format(src, auto_top_level_indent());
 
         assert!(result.changed);
         assert_eq!(result.diagnostics.len(), 1);
@@ -1331,7 +1336,7 @@ mod tests {
     fn diagnosed_block_opener_and_children_both_stay_untouched_by_default() {
         // 009-top-level-indent-toggle FR-001: under the Preserve default,
         // nothing forces the opener's own line either (unlike the
-        // Normalize-mode sibling above, where 008's unconditional rule
+        // Auto-mode sibling above, where 008's unconditional rule
         // corrects it independently of 007's children-only skip) -- the
         // whole diagnosed subtree, opener included, is byte-for-byte
         // untouched, same as pre-008.
@@ -1812,18 +1817,18 @@ mod tests {
     fn opener_residue_child_anchors_to_protected_openers_true_on_disk_column_not_a_discarded_planned_value() {
         // research.md §2's load-bearing finding, tasks.md T006: protection
         // must be gated at *collection* time, not filtered at final render
-        // time. Under Normalize mode, a top-level opener would normally be
+        // time. Under Auto mode, a top-level opener would normally be
         // forced to column 0 — but this opener is protected, so it must
         // keep its real on-disk column (6), and the out-of-region child
         // must anchor to THAT column, not to a discarded, would-have-been-0
         // planned value.
         let src = "; FMT: OFF\n      if (x=1)\n; FMT: ON\na = 1\nendif\n";
-        let out = format(src, normalize()).text;
+        let out = format(src, auto_top_level_indent()).text;
         assert_eq!(
             out,
             "; FMT: OFF\n      if (x=1)\n; FMT: ON\n          a = 1\n      endif\n",
             "the protected IF opener must keep its true on-disk column (6), not be \
-             forced to 0 by Normalize mode; the out-of-region child must be indented \
+             forced to 0 by Auto mode; the out-of-region child must be indented \
              4 spaces relative to that TRUE column (10), and the closer must align \
              to that same true column (6) — none of these may anchor to a discarded \
              planned value of 0"
@@ -1834,15 +1839,15 @@ mod tests {
     fn protected_top_level_line_stays_untouched_under_normalize_mode() {
         // 009-top-level-indent-toggle interaction, tasks.md T007: gate
         // point #1 (plan_indentation's top-level insert, only reached
-        // under Normalize) must be guarded by `protected` exactly like the
+        // under Auto) must be guarded by `protected` exactly like the
         // other three gate points.
         let src = "; FMT: OFF\n      a = 1\n; FMT: ON\nb = 2\n";
-        let out = format(src, normalize()).text;
+        let out = format(src, auto_top_level_indent()).text;
         assert_eq!(
             out,
             "; FMT: OFF\n      a = 1\n; FMT: ON\nb = 2\n",
             "the protected top-level statement must keep its real on-disk column (6), \
-             not be forced to column 0 by Normalize mode"
+             not be forced to column 0 by Auto mode"
         );
     }
 
@@ -1858,7 +1863,7 @@ mod tests {
         // the same diagnosed subtree) sits outside the marked region
         // entirely, protected only by 007's own unchanged mechanism.
         let src = "; FMT: OFF\n    PROCESS PHASE=INPUT\n        FILEI = ni.1\n; FMT: ON\n\n    RUN PGM=HWYASSIGN\n        FILEI NETI = 'net.net'\n    ENDRUN\n";
-        let result = format(src, normalize());
+        let result = format(src, auto_top_level_indent());
 
         assert_eq!(
             result.diagnostics.len(),

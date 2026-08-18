@@ -11,7 +11,6 @@ fn text_input(text: &str) -> FormatInput {
             text: Some(text.to_string()),
             path: None,
         },
-        casing: None,
         control_words_casing: None,
         pair_keywords_casing: None,
         data_references_casing: None,

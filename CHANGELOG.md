@@ -11,6 +11,46 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking**: removed the legacy, flat `casing` setting — superseded by the
+  three granular fields (`control_words_casing`, `pair_keywords_casing`,
+  `data_references_casing`) since `017-casing-categories-indent-width`, which
+  together already cover everything `casing` used to (`control_words`+
+  `pair_keywords` together; `data_references` was never reachable through it
+  at all). Removed everywhere it existed: `drut.toml`'s `casing` key, the
+  CLI's `--casing` flag, the MCP `format` tool's `casing` parameter, and the
+  VS Code `drut.format.casing` setting. A `drut.toml`/MCP call still using
+  `casing` now gets a plain "unrecognized key" warning and each category
+  falls back to its own built-in default (`preserve`) instead of the removed
+  field's value — the same non-blocking degrade every other unrecognized key
+  or invalid value already gets, never a hard failure. `--casing` on the CLI
+  is now a usage error (unknown flag) rather than being silently accepted.
+  If you relied on one `casing = "upper"` covering both categories, set
+  `control_words_casing` and `pair_keywords_casing` explicitly instead.
+- **Breaking**: `top_level_indent`'s non-`preserve` value is now `"auto"`,
+  not `"normalize"` — matching the `preserve`/`auto` naming
+  `operator_spacing`/`blank_lines` already use for the same "leave it
+  alone" vs. "actively fix it" shape. Applies identically to `drut.toml`
+  (`top_level_indent = "auto"`), the CLI (`--top-level-indent=auto`), the
+  MCP `format` tool (`top_level_indent: "auto"`), and the VS Code
+  `drut.format.topLevelIndent` setting. A `drut.toml`/CLI/MCP value of
+  `"normalize"` is no longer recognized — it now warns and falls back to
+  the built-in default (`preserve`), the same as any other invalid value,
+  rather than being silently accepted under its old name.
+
+### Fixed
+
+- A single-line, self-closing short-`IF` (e.g. `IF (@MODE@ = 1) PRINT
+  LIST=...`, valid without a matching `ENDIF`) rendered its entire
+  condition — `@token@` references, operators, numbers — in one flat
+  color instead of each element's normal distinct color, unlike the
+  equivalent multi-line block-style `IF`. The editor's semantic
+  highlighting was tagging the whole header (`IF` through the condition's
+  closing paren) as one token to distinguish a short-`IF` from a
+  block-style one; narrowed to just the `IF`/`ELSEIF` keyword itself, so
+  the condition and body now color exactly like the block-style form.
+
 ## [0.2.1] - 2026-08-18
 
 ### Fixed

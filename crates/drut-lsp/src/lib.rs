@@ -341,7 +341,6 @@ fn handle_response(connection: &Connection, response: Response, state: &mut Serv
 fn parse_client_format_defaults(value: &serde_json::Value) -> drut_config::ExplicitFormatOverride {
     let field = |key: &str| value.get(key);
     drut_config::ExplicitFormatOverride {
-        casing: field("casing").and_then(parse_client_casing),
         control_words_casing: field("controlWordsCasing").and_then(parse_client_casing),
         pair_keywords_casing: field("pairKeywordsCasing").and_then(parse_client_casing),
         data_references_casing: field("dataReferencesCasing").and_then(parse_client_casing),
@@ -354,11 +353,11 @@ fn parse_client_format_defaults(value: &serde_json::Value) -> drut_config::Expli
     }
 }
 
-/// Shared by `casing` and the three granular `*Casing` fields — identical
-/// accepted-value shape (`"preserve"`/`"upper"`/`"lower"`) every one of
-/// them already has at the `drut.toml` parsing layer (`drut_config::
-/// parse::parse_casing`); any other string, or any non-string JSON value,
-/// is simply unrecognized here (`None`), not a hard failure.
+/// Shared by the three granular `*Casing` fields — identical accepted-value
+/// shape (`"preserve"`/`"upper"`/`"lower"`) every one of them already has
+/// at the `drut.toml` parsing layer (`drut_config::parse::parse_casing`);
+/// any other string, or any non-string JSON value, is simply unrecognized
+/// here (`None`), not a hard failure.
 fn parse_client_casing(value: &serde_json::Value) -> Option<voyager_core::CasingConvention> {
     match value.as_str()? {
         "preserve" => Some(voyager_core::CasingConvention::Preserve),
@@ -371,7 +370,7 @@ fn parse_client_casing(value: &serde_json::Value) -> Option<voyager_core::Casing
 fn parse_client_top_level_indent(value: &serde_json::Value) -> Option<voyager_core::TopLevelIndentMode> {
     match value.as_str()? {
         "preserve" => Some(voyager_core::TopLevelIndentMode::Preserve),
-        "normalize" => Some(voyager_core::TopLevelIndentMode::Normalize),
+        "auto" => Some(voyager_core::TopLevelIndentMode::Auto),
         _ => None,
     }
 }
@@ -601,11 +600,14 @@ mod tests {
     #[test]
     fn parse_client_format_defaults_parses_every_known_field() {
         let value = json!({
+            // The legacy flat "casing" key is no longer looked up at all --
+            // present here to prove it's harmlessly ignored, not that it
+            // still does anything.
             "casing": "upper",
             "controlWordsCasing": "lower",
             "pairKeywordsCasing": "preserve",
             "dataReferencesCasing": "upper",
-            "topLevelIndent": "normalize",
+            "topLevelIndent": "auto",
             "indentWidth": 2,
             "operatorSpacing": "fixed",
             "blankLines": "auto",
@@ -613,11 +615,10 @@ mod tests {
             "nestedBlankLineCap": 1
         });
         let result = parse_client_format_defaults(&value);
-        assert_eq!(result.casing, Some(voyager_core::CasingConvention::Upper));
         assert_eq!(result.control_words_casing, Some(voyager_core::CasingConvention::Lower));
         assert_eq!(result.pair_keywords_casing, Some(voyager_core::CasingConvention::Preserve));
         assert_eq!(result.data_references_casing, Some(voyager_core::CasingConvention::Upper));
-        assert_eq!(result.top_level_indent, Some(voyager_core::TopLevelIndentMode::Normalize));
+        assert_eq!(result.top_level_indent, Some(voyager_core::TopLevelIndentMode::Auto));
         assert_eq!(result.indent_width, Some(2));
         assert_eq!(result.operator_spacing, Some(voyager_core::OperatorSpacing::Fixed));
         assert_eq!(result.blank_lines, Some(voyager_core::BlankLineMode::Auto));
@@ -631,11 +632,11 @@ mod tests {
     #[test]
     fn parse_client_format_defaults_leaves_only_the_malformed_field_none() {
         let value = json!({
-            "casing": "sideways",
+            "controlWordsCasing": "sideways",
             "indentWidth": 4
         });
         let result = parse_client_format_defaults(&value);
-        assert_eq!(result.casing, None, "an unrecognized string must leave only this field None");
+        assert_eq!(result.control_words_casing, None, "an unrecognized string must leave only this field None");
         assert_eq!(result.indent_width, Some(4), "a sibling valid field must be unaffected");
     }
 
@@ -646,14 +647,14 @@ mod tests {
         // treated identically to an object with every key absent (spec.md
         // Edge Cases).
         let result = parse_client_format_defaults(&json!(null));
-        assert_eq!(result.casing, None);
+        assert_eq!(result.control_words_casing, None);
         assert_eq!(result.indent_width, None);
     }
 
     #[test]
     fn parse_client_format_defaults_of_an_empty_object_resolves_to_every_field_none() {
         let result = parse_client_format_defaults(&json!({}));
-        assert_eq!(result.casing, None);
+        assert_eq!(result.control_words_casing, None);
         assert_eq!(result.indent_width, None);
     }
 }

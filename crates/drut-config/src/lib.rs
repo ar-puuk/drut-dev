@@ -19,14 +19,17 @@ pub struct DrutConfig {
 /// file" — distinct from "set to the default value" (spec.md's own "absent
 /// means built-in default" convention).
 ///
-/// `casing` is the legacy, already-shipped setting — unchanged, still
-/// applies to `control_words` + `pair_keywords` only (the two categories it
-/// already reached before `017-casing-categories-indent-width`). The three
-/// `*_casing` fields below are new, independent, granular overrides — see
-/// `resolve_format_options`'s own doc comment for the full precedence.
+/// The three `*_casing` fields are independent, granular overrides, one per
+/// category — see `resolve_format_options`'s own doc comment for the full
+/// precedence. (A flat `casing` field once existed, covering
+/// `control_words`+`pair_keywords` together with a two-step
+/// legacy-then-granular fallback at every precedence tier — removed once
+/// the granular fields fully superseded it; a `drut.toml` still using
+/// `casing` now gets a plain `UnrecognizedKey` warning and falls back to
+/// each granular field's own default, same as any other removed/unknown
+/// key.)
 #[derive(Debug, Clone, Default)]
 pub struct FormatConfig {
-    pub casing: Option<voyager_core::CasingConvention>,
     pub control_words_casing: Option<voyager_core::CasingConvention>,
     pub pair_keywords_casing: Option<voyager_core::CasingConvention>,
     pub data_references_casing: Option<voyager_core::CasingConvention>,
@@ -35,8 +38,8 @@ pub struct FormatConfig {
     /// this field carries whatever integer `drut.toml` actually had, valid
     /// or not (data-model.md §4).
     pub indent_width: Option<u8>,
-    /// `018-operator-spacing`. Single new setting, no legacy field to stay
-    /// compatible with (unlike `casing`) — precedence is just `explicit >
+    /// `018-operator-spacing`. Single setting, no legacy field to stay
+    /// compatible with — precedence is just `explicit >
     /// this field > built-in default` (data-model.md §4).
     pub operator_spacing: Option<voyager_core::OperatorSpacing>,
     /// `019-blank-line-normalization`. Single new setting, no legacy field —
@@ -92,7 +95,6 @@ impl std::fmt::Display for ConfigWarning {
 /// the resolved config file, then the built-in default" (spec.md FR-006).
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ExplicitFormatOverride {
-    pub casing: Option<voyager_core::CasingConvention>,
     pub control_words_casing: Option<voyager_core::CasingConvention>,
     pub pair_keywords_casing: Option<voyager_core::CasingConvention>,
     pub data_references_casing: Option<voyager_core::CasingConvention>,
@@ -176,12 +178,10 @@ pub fn resolve_format_options(
 /// `client_defaults` (021-editor-settings-config, contracts/
 /// editor-settings-config.md) is consulted only after both `explicit` and
 /// `config` (`drut.toml`) have had a chance to set a field — a lower-
-/// precedence-but-one tier, never before either. `control_words`/
-/// `pair_keywords` are the two fields with a legacy-`casing`-then-granular
-/// fallback *within* each tier already (research.md §1's checklist-review
-/// correction) — `client_defaults` gets the identical two-step treatment
-/// (`.or(client_defaults.control_words_casing).or(client_defaults.casing)`),
-/// not just one more `.or()` like every other field.
+/// precedence-but-one tier, never before either. Every field here (`casing`
+/// removed; see `FormatConfig`'s own doc comment) resolves the same plain
+/// `explicit > config > client_defaults > built-in default` chain, one
+/// `.or()` per tier.
 fn resolve_casing_and_indent(
     explicit: &ExplicitFormatOverride,
     config: &DrutConfig,
@@ -189,24 +189,15 @@ fn resolve_casing_and_indent(
     config_path: Option<&Path>,
     warnings: &mut Vec<ConfigWarning>,
 ) -> voyager_core::FormatOptions {
-    // Legacy `casing` (already-shipped) covers control_words + pair_keywords
-    // only — it structurally never reached data_references, so it's never
-    // part of that category's own fallback chain (data-model.md §3).
     let control_words = explicit
         .control_words_casing
-        .or(explicit.casing)
         .or(config.format.control_words_casing)
-        .or(config.format.casing)
         .or(client_defaults.control_words_casing)
-        .or(client_defaults.casing)
         .unwrap_or_default();
     let pair_keywords = explicit
         .pair_keywords_casing
-        .or(explicit.casing)
         .or(config.format.pair_keywords_casing)
-        .or(config.format.casing)
         .or(client_defaults.pair_keywords_casing)
-        .or(client_defaults.casing)
         .unwrap_or_default();
     let data_references = explicit
         .data_references_casing

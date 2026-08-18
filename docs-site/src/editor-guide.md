@@ -81,13 +81,12 @@ block.
 
 ## Editor client settings
 
-All 10 `[format]` fields (see the [Configuration Reference](configuration-reference.md))
+All 9 `[format]` fields (see the [Configuration Reference](configuration-reference.md))
 are also available as personal VS Code settings, not only via a project's
 committed `drut.toml`:
 
 | Setting | `drut.toml` field |
 |---|---|
-| `drut.format.casing` | `casing` |
 | `drut.format.controlWordsCasing` | `control_words_casing` |
 | `drut.format.pairKeywordsCasing` | `pair_keywords_casing` |
 | `drut.format.dataReferencesCasing` | `data_references_casing` |

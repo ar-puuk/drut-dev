@@ -200,7 +200,7 @@ mod tests {
     #[test]
     fn client_format_defaults_starts_at_default_before_any_pull() {
         let state = ServerState::new();
-        assert_eq!(state.client_format_defaults().casing, None);
+        assert_eq!(state.client_format_defaults().control_words_casing, None);
         assert_eq!(state.client_format_defaults().indent_width, None);
     }
 
@@ -208,12 +208,12 @@ mod tests {
     fn client_format_defaults_round_trips_through_set() {
         let mut state = ServerState::new();
         let defaults = drut_config::ExplicitFormatOverride {
-            casing: Some(voyager_core::CasingConvention::Upper),
+            control_words_casing: Some(voyager_core::CasingConvention::Upper),
             indent_width: Some(2),
             ..Default::default()
         };
         state.set_client_format_defaults(defaults);
-        assert_eq!(state.client_format_defaults().casing, Some(voyager_core::CasingConvention::Upper));
+        assert_eq!(state.client_format_defaults().control_words_casing, Some(voyager_core::CasingConvention::Upper));
         assert_eq!(state.client_format_defaults().indent_width, Some(2));
     }
 
@@ -221,7 +221,7 @@ mod tests {
     fn set_client_format_defaults_replaces_the_previous_cache_wholesale() {
         let mut state = ServerState::new();
         state.set_client_format_defaults(drut_config::ExplicitFormatOverride {
-            casing: Some(voyager_core::CasingConvention::Upper),
+            control_words_casing: Some(voyager_core::CasingConvention::Upper),
             ..Default::default()
         });
         // A second pull with a different (and, notably, sparser) value must
@@ -230,7 +230,7 @@ mod tests {
             indent_width: Some(8),
             ..Default::default()
         });
-        assert_eq!(state.client_format_defaults().casing, None, "the earlier pull's casing value must not linger");
+        assert_eq!(state.client_format_defaults().control_words_casing, None, "the earlier pull's control_words_casing value must not linger");
         assert_eq!(state.client_format_defaults().indent_width, Some(8));
     }
 

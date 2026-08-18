@@ -204,7 +204,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("drut_lsp_range_formatting_test_{}_governed", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("drut.toml"), "[format]\ncasing = \"upper\"\n").unwrap();
+        std::fs::write(dir.join("drut.toml"), "[format]\ncontrol_words_casing = \"upper\"\n").unwrap();
         let file = dir.join("a.s");
         let uri_str = file_uri_str(&file);
 

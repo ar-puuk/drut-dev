@@ -18,7 +18,7 @@
 
 use voyager_core::{format, CasingSettings, FormatOptions, OperatorSpacing, TopLevelIndentMode};
 
-/// 009-top-level-indent-toggle: explicit Normalize mode, for the two tests
+/// 009-top-level-indent-toggle: explicit Auto mode, for the two tests
 /// below whose fixture genuinely needs a non-zero top-level RUN corrected
 /// to column 0 -- the other three tests in this file (007-era, predating
 /// 008) are mode-independent by fixture construction and are left on
@@ -26,7 +26,7 @@ use voyager_core::{format, CasingSettings, FormatOptions, OperatorSpacing, TopLe
 fn normalize() -> FormatOptions {
     FormatOptions {
         casing: CasingSettings::default(),
-        top_level_indent: TopLevelIndentMode::Normalize,
+        top_level_indent: TopLevelIndentMode::Auto,
         indent_width: 4,
         operator_spacing: OperatorSpacing::default(),
         ..FormatOptions::default()
@@ -112,7 +112,7 @@ fn run_if_residue_is_fixed_after_endrun_is_added() {
 #[test]
 fn process_run_residue_with_stale_run_indentation_resolves_in_one_pass() {
     // Retargeted 2026-08-12 (009-top-level-indent-toggle) to explicit
-    // Normalize mode now that Preserve is the default -- this test exists
+    // Auto mode now that Preserve is the default -- this test exists
     // to keep proving 008's own guarantee still holds, opt-in.
     let step2 = "PROCESS PHASE=INPUT\n    FILEI = ni.1\n    LOOP DAY = 1, 5\n        PRINT LIST='Day = ', DAY\n    ENDLOOP\nENDPROCESS\n\n    RUN PGM=HWYASSIGN\n        FILEI NETI = 'net.net'\n    ENDRUN\n";
     let pass2 = format(step2, normalize());
@@ -146,7 +146,7 @@ fn process_run_residue_with_stale_run_indentation_resolves_in_one_pass() {
 #[test]
 fn process_run_residue_full_sequence_with_stale_run_indentation_resolves_in_one_pass() {
     // Retargeted 2026-08-12 (009-top-level-indent-toggle) to explicit
-    // Normalize mode now that Preserve is the default -- see the sibling
+    // Auto mode now that Preserve is the default -- see the sibling
     // test above.
     let step1 = "PROCESS PHASE=INPUT\n    FILEI = ni.1\n    LOOP DAY = 1, 5\n        PRINT LIST='Day = ', DAY\n    ENDLOOP\n\n    RUN PGM=HWYASSIGN\n        FILEI NETI = 'net.net'\n    ENDRUN\n";
 

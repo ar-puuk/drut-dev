@@ -70,14 +70,14 @@ fn client_defaults_wins_for_a_field_drut_toml_does_not_set_even_when_toml_govern
 
     let client_defaults = ExplicitFormatOverride {
         indent_width: Some(8),
-        top_level_indent: Some(TopLevelIndentMode::Normalize),
+        top_level_indent: Some(TopLevelIndentMode::Auto),
         ..Default::default()
     };
     let (options, _warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), client_defaults);
     assert_eq!(options.indent_width, 2, "drut.toml still wins for the field it sets");
     assert_eq!(
         options.top_level_indent,
-        TopLevelIndentMode::Normalize,
+        TopLevelIndentMode::Auto,
         "client_defaults wins for the field drut.toml never mentions"
     );
 
@@ -120,58 +120,49 @@ fn out_of_range_client_defaults_blank_line_cap_falls_back_to_default_with_a_warn
     cleanup(&target);
 }
 
-/// The CHK001/CHK002 regression case (research.md §1's checklist-review
-/// correction): a `client_defaults.casing` (legacy, no granular field set)
-/// value must still resolve *both* `control_words` and `pair_keywords`
-/// correctly — proving the two-step
-/// `.or(client_defaults.control_words_casing).or(client_defaults.casing)`
-/// fallback from T002, not just the single-step shape every other field
-/// gets.
+/// A `client_defaults` value for one granular casing field must resolve
+/// independently of the others — no legacy `casing` field exists to
+/// short-circuit through anymore (it was removed; each `*_casing` field
+/// gets the same plain per-field fallback every other setting already has).
 #[test]
-fn legacy_client_defaults_casing_alone_resolves_both_control_words_and_pair_keywords() {
-    let dir =
-        std::env::temp_dir().join(format!("drut_config_client_defaults_test_{}_legacy_casing", std::process::id()));
+fn client_defaults_granular_casing_field_resolves_independently() {
+    let dir = std::env::temp_dir().join(format!("drut_config_client_defaults_test_{}_granular_casing", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join(".git")).unwrap();
     let target = dir.join("a.s");
     std::fs::write(&target, "IF (a=b)\nENDIF\n").unwrap();
 
-    let client_defaults = ExplicitFormatOverride { casing: Some(CasingConvention::Upper), ..Default::default() };
+    let client_defaults = ExplicitFormatOverride { control_words_casing: Some(CasingConvention::Upper), ..Default::default() };
     let (options, _warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), client_defaults);
-    assert_eq!(
-        options.casing.control_words,
-        CasingConvention::Upper,
-        "legacy client_defaults.casing must reach control_words, same as it already does at the explicit/drut.toml tiers"
-    );
+    assert_eq!(options.casing.control_words, CasingConvention::Upper, "client_defaults must apply with nothing else set");
     assert_eq!(
         options.casing.pair_keywords,
-        CasingConvention::Upper,
-        "legacy client_defaults.casing must reach pair_keywords, same as it already does at the explicit/drut.toml tiers"
-    );
-    assert_eq!(
-        options.casing.data_references,
         CasingConvention::Preserve,
-        "legacy casing never reaches data_references at any tier, including client_defaults"
+        "a client_defaults value for one granular field must not leak into another"
     );
 
     cleanup(&target);
 }
 
-/// A `drut.toml` that sets the granular `control_words_casing` field must
-/// still win over `client_defaults`' own legacy `casing` fallback for that
-/// field — the two-step fallback only kicks in once `drut.toml`'s own
-/// two-step chain (`config.format.control_words_casing.or(config.format.
-/// casing)`) has nothing at all to offer.
+/// A `drut.toml` that sets the granular `control_words_casing` field wins
+/// over `client_defaults`' own value for that same field; a *different*
+/// granular field `drut.toml` never mentions still falls through to
+/// `client_defaults` — each field resolves its own four-tier chain
+/// independently.
 #[test]
-fn drut_toml_granular_field_wins_over_client_defaults_legacy_casing() {
+fn drut_toml_granular_field_wins_over_client_defaults_for_that_field_only() {
     let target = test_file("toml_granular_wins", "[format]\ncontrol_words_casing = \"lower\"\n");
 
-    let client_defaults = ExplicitFormatOverride { casing: Some(CasingConvention::Upper), ..Default::default() };
+    let client_defaults = ExplicitFormatOverride {
+        control_words_casing: Some(CasingConvention::Upper),
+        pair_keywords_casing: Some(CasingConvention::Upper),
+        ..Default::default()
+    };
     let (options, _warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), client_defaults);
     assert_eq!(options.casing.control_words, CasingConvention::Lower, "drut.toml's granular field must win");
-    // pair_keywords isn't set anywhere in drut.toml (neither granular nor
-    // legacy) -- client_defaults' own legacy casing must still reach it.
-    assert_eq!(options.casing.pair_keywords, CasingConvention::Upper, "client_defaults' legacy casing must still reach pair_keywords");
+    // pair_keywords isn't set in drut.toml at all -- client_defaults' own
+    // value for that field must still reach it.
+    assert_eq!(options.casing.pair_keywords, CasingConvention::Upper, "client_defaults must still reach a field drut.toml never sets");
 
     cleanup(&target);
 }

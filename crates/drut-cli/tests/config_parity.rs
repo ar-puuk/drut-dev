@@ -32,10 +32,10 @@ fn file_uri_str(path: &Path) -> String {
 
 #[test]
 fn cli_lsp_and_mcp_resolve_the_same_drut_toml_identically() {
-    let dir = temp_project("legacy_fields");
+    let dir = temp_project("core_fields");
     std::fs::write(
         dir.join("drut.toml"),
-        "[format]\ncasing = \"upper\"\ntop_level_indent = \"normalize\"\n",
+        "[format]\ncontrol_words_casing = \"upper\"\ntop_level_indent = \"auto\"\n",
     )
     .unwrap();
     let file = dir.join("a.s");
@@ -74,7 +74,6 @@ fn cli_lsp_and_mcp_resolve_the_same_drut_toml_identically() {
             text: None,
             path: Some(file.to_str().unwrap().to_string()),
         },
-        casing: None,
         control_words_casing: None,
         pair_keywords_casing: None,
         data_references_casing: None,
@@ -91,9 +90,9 @@ fn cli_lsp_and_mcp_resolve_the_same_drut_toml_identically() {
 
     assert_eq!(cli_text, lsp_text, "CLI and LSP must produce byte-identical output for the same drut.toml");
     assert_eq!(lsp_text, mcp_text, "LSP and MCP must produce byte-identical output for the same drut.toml");
-    // Sanity check: this must actually be the config-driven result (casing
-    // upper + top_level_indent normalize), not a coincidental three-way
-    // match on unrelated/default output.
+    // Sanity check: this must actually be the config-driven result
+    // (control_words_casing upper + top_level_indent auto), not a
+    // coincidental three-way match on unrelated/default output.
     assert_eq!(
         cli_text, "IF (x=1)\n    y = 2\nENDIF\n",
         "expected the drut.toml-driven result: top-level lines forced to column 0, IF/ENDIF uppercased"
@@ -150,7 +149,6 @@ fn cli_lsp_and_mcp_resolve_the_new_granular_settings_identically() {
             text: None,
             path: Some(file.to_str().unwrap().to_string()),
         },
-        casing: None,
         control_words_casing: None,
         pair_keywords_casing: None,
         data_references_casing: None,

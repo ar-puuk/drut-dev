@@ -58,7 +58,6 @@ fn every_tool_succeeds_against_a_read_only_fixture_and_leaves_it_unchanged() {
             text: None,
             path: Some(path_str.clone()),
         },
-        casing: None,
         control_words_casing: None,
         pair_keywords_casing: None,
         data_references_casing: None,

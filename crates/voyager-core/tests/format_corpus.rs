@@ -31,7 +31,7 @@ const ENCODING_FALLBACK_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/
 // 009-top-level-indent-toggle: a second, separate fixture set holding 008's
 // already-committed, already-human-reviewed golden output verbatim (copied
 // before GOLDEN_DIR was regenerated to preserve-mode output) -- proves
-// explicit Normalize mode reproduces 008's shipped behavior exactly, with
+// explicit Auto mode reproduces 008's shipped behavior exactly, with
 // no second human-review pass needed since this content never changed.
 const GOLDEN_NORMALIZE_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/golden_normalize");
 const REAL_CORPUS_GOLDEN_NORMALIZE_DIR: &str =
@@ -106,7 +106,7 @@ fn blank_lines_auto_options() -> FormatOptions {
 fn normalize_options() -> FormatOptions {
     FormatOptions {
         casing: CasingSettings::default(),
-        top_level_indent: TopLevelIndentMode::Normalize,
+        top_level_indent: TopLevelIndentMode::Auto,
         indent_width: 4,
         operator_spacing: OperatorSpacing::default(),
         ..FormatOptions::default()
@@ -302,7 +302,7 @@ fn real_corpus_fixture_count_is_the_known_nine() {
     assert_eq!(real_corpus_fixtures().len(), 9);
 }
 
-// -- 009-top-level-indent-toggle: explicit Normalize mode reproduces 008's
+// -- 009-top-level-indent-toggle: explicit Auto mode reproduces 008's
 // already-committed, already-human-reviewed golden_normalize/ output
 // byte-for-byte (FR-006/SC-002) -- no second human-review pass needed,
 // since golden_normalize/ is a verbatim copy of what 008 already had

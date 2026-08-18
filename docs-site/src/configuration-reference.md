@@ -5,7 +5,7 @@ set the same way, in a `drut.toml` file at (or above) the file you're formatting
 
 ```toml
 [format]
-casing = "lower"
+control_words_casing = "lower"
 indent_width = 2
 ```
 
@@ -15,6 +15,30 @@ filesystem root — whichever comes first. A project with no `drut.toml` anywher
 behaves exactly like a project with an empty one: every field uses its built-in
 default. Every field is optional; omitting a key is identical to writing its
 default value explicitly.
+
+## Starter `drut.toml`
+
+Every field, commented out at its built-in default. Copy this into a `drut.toml`
+at your project root and uncomment (then change) only the fields you want to
+override — a commented-out line changes nothing, so you never need to remember
+the full field list or its defaults from scratch:
+
+```toml
+[format]
+# control_words_casing = "preserve"      # preserve | upper | lower
+# pair_keywords_casing = "preserve"      # preserve | upper | lower
+# data_references_casing = "preserve"    # preserve | upper | lower
+# top_level_indent = "preserve"          # preserve | auto
+# indent_width = 4                       # 1-16
+# operator_spacing = "preserve"          # preserve | fixed | auto
+# blank_lines = "preserve"               # preserve | auto
+# top_level_blank_line_cap = 2           # 1-50, only used when blank_lines = "auto"
+# nested_blank_line_cap = 1              # 1-50, only used when blank_lines = "auto"
+```
+
+See [Fields](#fields) below for what each one actually does, and
+[Precedence](#precedence) for how a set value interacts with CLI flags, MCP
+parameters, and editor settings.
 
 **A malformed value never blocks formatting.** An unrecognized key or an
 out-of-range value only affects that one field — it warns (CLI stderr, an LSP
@@ -38,61 +62,25 @@ first tier that sets a value wins:
 4. **The built-in default** — used only if none of the above set the field.
 
 Each tier only fills in a field the tier(s) before it left unset; a field is
-never assembled from pieces at different tiers.
+never assembled from pieces at different tiers. Every field below resolves
+this same plain four-tier chain — no field has any extra fallback wrinkle.
 
-Four fields (`casing`, `control_words_casing`, `pair_keywords_casing`,
-`data_references_casing`) have one extra wrinkle on top of the four tiers above —
-see [`casing`](#casing)'s entry for the full explanation.
+> A flat `casing` field once existed, covering `control_words`+`pair_keywords`
+> together — removed once the three granular fields below fully superseded
+> it. A `drut.toml`/CLI/MCP/editor-setting still using `casing` no longer does
+> anything; it degrades exactly like any other unrecognized key (a warning,
+> falling back to each field's own built-in default), never a hard failure.
 
 ## Fields
 
-### `casing`
-
-The legacy, all-in-one keyword-casing setting. Cases every `control_words` and
-`pair_keywords` token together — it cannot reach `data_references` tokens at all
-(use [`data_references_casing`](#data_references_casing) for those).
-
-**Values**:
-- `preserve` **← default** — leave existing casing exactly as written.
-- `upper` — uppercase every control word and pair-keyword name.
-- `lower` — lowercase every control word and pair-keyword name.
-
-**Default**: `preserve`.
-
-**Also known as**: CLI flag `--casing`; MCP `format` tool parameter `casing`.
-
-**Example**:
-
-```toml
-[format]
-casing = "upper"
-```
-
-**Precedence**: follows the [four-tier chain](#precedence) above, tier by tier —
-but *within* each tier, drut checks that tier's granular field
-(`control_words_casing`/`pair_keywords_casing`) first, and only falls back to
-that same tier's `casing` value if the granular field is unset there. Concretely,
-for `control_words_casing`: explicit `--control-words-casing`, then explicit
-`--casing`, then `drut.toml`'s `control_words_casing`, then `drut.toml`'s
-`casing`, then the editor setting's granular field, then the editor setting's
-`casing`, then the built-in default — in that exact order. A `casing` value set
-at a *higher*-precedence tier (say, an explicit `--casing` flag) still wins over
-a granular field set only at a *lower* tier (say, `control_words_casing` in
-`drut.toml`) — tier order is checked before either field's own fallback within a
-tier. If you only ever set `casing`, both `control_words` and `pair_keywords`
-follow it exactly as before `control_words_casing`/`pair_keywords_casing`
-existed.
-
 ### `control_words_casing`
 
-Independent override for the `control_words` category alone (things like `IF`,
-`ENDIF`, `LOOP`, `ENDLOOP`) — wins over `casing` for this category specifically,
-per the two-step fallback explained in [`casing`](#casing)'s entry above.
+Casing convention for the `control_words` category (things like `IF`,
+`ENDIF`, `LOOP`, `ENDLOOP`).
 
 **Values**: `preserve` **← default**, `upper`, `lower`.
 
-**Default**: `preserve` (falls back to `casing` first if `casing` is set and this
-field isn't — see [`casing`](#casing)).
+**Default**: `preserve`.
 
 **Also known as**: CLI flag `--control-words-casing`; MCP `format` tool parameter
 `control_words_casing`.
@@ -101,23 +89,20 @@ field isn't — see [`casing`](#casing)).
 
 ```toml
 [format]
-casing = "upper"               # control_words + pair_keywords default to upper...
-control_words_casing = "lower" # ...except control_words specifically, forced lower
+control_words_casing = "upper"
 ```
 
-**Precedence**: see [`casing`](#casing) — same four-tier chain, with the
-two-step legacy/granular fallback applied at every tier.
+**Precedence**: follows the [four-tier chain](#precedence) above.
 
 ### `pair_keywords_casing`
 
-Independent override for the `pair_keywords` category alone (keyword names inside
-a `Control` statement's `keyword=value` pairs, e.g. `PATHLOAD`, `MATI`) — wins
-over `casing` for this category specifically, same shape as
-[`control_words_casing`](#control_words_casing) above.
+Casing convention for the `pair_keywords` category (keyword names inside
+a `Control` statement's `keyword=value` pairs, e.g. `PATHLOAD`, `MATI`), same
+shape as [`control_words_casing`](#control_words_casing) above.
 
 **Values**: `preserve` **← default**, `upper`, `lower`.
 
-**Default**: `preserve` (falls back to `casing` first — see [`casing`](#casing)).
+**Default**: `preserve`.
 
 **Also known as**: CLI flag `--pair-keywords-casing`; MCP `format` tool parameter
 `pair_keywords_casing`.
@@ -129,16 +114,14 @@ over `casing` for this category specifically, same shape as
 pair_keywords_casing = "lower"
 ```
 
-**Precedence**: see [`casing`](#casing) — same four-tier chain, with the
-two-step legacy/granular fallback applied at every tier.
+**Precedence**: follows the [four-tier chain](#precedence) above.
 
 ### `data_references_casing`
 
 Casing for the data-reference category: Matrix/Line/Node/Zone/Database
 abbreviations (`MI`/`MO`/`MW`, `LI`/`LW`, `NI`/`NW`, `ZI`/`ZONES`/`Z`,
 `DBI`/`DBA`), `RO`, the link-endpoint fields `A`/`B`, and the reserved loop-index
-identifiers `I`/`J`. **Not reachable by `casing` at all** — this is the only way
-to case this category from configuration.
+identifiers `I`/`J`.
 
 **Values**: `preserve` **← default**, `upper`, `lower`.
 
@@ -154,8 +137,7 @@ parameter `data_references_casing`.
 data_references_casing = "lower"
 ```
 
-**Precedence**: follows the plain [four-tier chain](#precedence) — no
-legacy-field fallback, since `casing` never reaches this category.
+**Precedence**: follows the [four-tier chain](#precedence) above.
 
 ### `top_level_indent`
 
@@ -164,7 +146,7 @@ exactly as written, or normalized to column 0.
 
 **Values**:
 - `preserve` **← default** — leave top-level indentation exactly as written.
-- `normalize` — force every top-level line to column 0.
+- `auto` — force every top-level line to column 0.
 
 **Default**: `preserve`.
 
@@ -175,11 +157,10 @@ exactly as written, or normalized to column 0.
 
 ```toml
 [format]
-top_level_indent = "normalize"
+top_level_indent = "auto"
 ```
 
-**Precedence**: follows the [four-tier chain](#precedence) above; no
-legacy-field fallback.
+**Precedence**: follows the [four-tier chain](#precedence) above.
 
 ### `indent_width`
 
@@ -200,8 +181,8 @@ own opening-statement column.
 indent_width = 2
 ```
 
-**Precedence**: follows the [four-tier chain](#precedence) above; no
-legacy-field fallback. An out-of-range value (`0`, `500`, ...) at any tier is
+**Precedence**: follows the [four-tier chain](#precedence) above. An
+out-of-range value (`0`, `500`, ...) at any tier is
 treated as unset for that tier — resolution falls through to the next tier
 exactly as if the field had been omitted there.
 
@@ -236,8 +217,7 @@ operator_spacing = "auto"
 See the [Formatter Guide](formatter-guide.md#operator-spacing) for full
 before/after examples of `fixed` vs. `auto`.
 
-**Precedence**: follows the [four-tier chain](#precedence) above; no
-legacy-field fallback.
+**Precedence**: follows the [four-tier chain](#precedence) above.
 
 ### `blank_lines`
 
@@ -263,8 +243,7 @@ left as written or contracted down to a configured cap.
 blank_lines = "auto"
 ```
 
-**Precedence**: follows the [four-tier chain](#precedence) above; no
-legacy-field fallback.
+**Precedence**: follows the [four-tier chain](#precedence) above.
 
 ### `top_level_blank_line_cap`
 
@@ -287,8 +266,8 @@ blank_lines = "auto"
 top_level_blank_line_cap = 1
 ```
 
-**Precedence**: follows the [four-tier chain](#precedence) above; no
-legacy-field fallback. An out-of-range value at any tier is treated as unset for
+**Precedence**: follows the [four-tier chain](#precedence) above. An
+out-of-range value at any tier is treated as unset for
 that tier, same as [`indent_width`](#indent_width).
 
 ### `nested_blank_line_cap`
@@ -313,6 +292,6 @@ blank_lines = "auto"
 nested_blank_line_cap = 2
 ```
 
-**Precedence**: follows the [four-tier chain](#precedence) above; no
-legacy-field fallback. Same out-of-range handling as
+**Precedence**: follows the [four-tier chain](#precedence) above. Same
+out-of-range handling as
 [`top_level_blank_line_cap`](#top_level_blank_line_cap).

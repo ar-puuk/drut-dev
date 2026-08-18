@@ -40,7 +40,6 @@ for accepted values, defaults, and what each actually does:
 
 | Flag | `drut.toml` field |
 |---|---|
-| `--casing` | [`casing`](configuration-reference.md#casing) |
 | `--control-words-casing` | [`control_words_casing`](configuration-reference.md#control_words_casing) |
 | `--pair-keywords-casing` | [`pair_keywords_casing`](configuration-reference.md#pair_keywords_casing) |
 | `--data-references-casing` | [`data_references_casing`](configuration-reference.md#data_references_casing) |

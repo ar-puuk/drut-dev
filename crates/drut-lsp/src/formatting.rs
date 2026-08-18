@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn document_under_a_drut_toml_governed_directory_picks_up_its_settings() {
         let dir = temp_project("governed");
-        std::fs::write(dir.join("drut.toml"), "[format]\ncasing = \"upper\"\n").unwrap();
+        std::fs::write(dir.join("drut.toml"), "[format]\ncontrol_words_casing = \"upper\"\n").unwrap();
         let file = dir.join("a.s");
         let uri = file_uri(&file);
         let uri_str = uri.as_str().to_string();
@@ -216,7 +216,7 @@ mod tests {
     #[test]
     fn untitled_document_falls_back_to_the_workspace_root_s_drut_toml() {
         let dir = temp_project("workspace-root-fallback");
-        std::fs::write(dir.join("drut.toml"), "[format]\ncasing = \"upper\"\n").unwrap();
+        std::fs::write(dir.join("drut.toml"), "[format]\ncontrol_words_casing = \"upper\"\n").unwrap();
 
         let mut state = ServerState::new();
         state.set_workspace_root(Some(dir.clone()));

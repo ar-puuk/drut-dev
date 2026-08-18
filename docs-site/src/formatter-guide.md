@@ -18,27 +18,29 @@ Every field below is documented in full in the
 
 ## Casing
 
-`casing` (and its three granular counterparts,
-[`control_words_casing`](configuration-reference.md#control_words_casing)/
-[`pair_keywords_casing`](configuration-reference.md#pair_keywords_casing)/
-[`data_references_casing`](configuration-reference.md#data_references_casing))
-only ever touches keyword *names* — never a value, and never a category it
-isn't scoped to. This example makes both boundaries visible at once, with
-`casing = "upper"`:
+The three independent casing fields —
+[`control_words_casing`](configuration-reference.md#control_words_casing),
+[`pair_keywords_casing`](configuration-reference.md#pair_keywords_casing), and
+[`data_references_casing`](configuration-reference.md#data_references_casing) —
+only ever touch keyword *names* — never a value, and never a category they
+aren't scoped to. This example makes both boundaries visible at once, with
+`control_words_casing = "upper"`:
 
 ```diff
 -run pgm=matrix
-+RUN PGM=matrix
++RUN pgm=matrix
      mati=base.mat,mo=out.mat
 -endrun
 +ENDRUN
 ```
 
-`run`/`endrun` (control words) and `pgm` (a pair-keyword name) are uppercased —
-but `matrix` (a value, never touched) and `mati`/`mo` (data-reference tokens,
-`casing`'s legacy scope can't reach them) stay exactly as written. Set
-[`data_references_casing`](configuration-reference.md#data_references_casing)
-separately if you want `mati`/`mo` cased too.
+`run`/`endrun` (control words) are uppercased — but `pgm` (a pair-keyword name,
+`pair_keywords_casing`'s own scope, left unset here), `matrix` (a value, never
+touched), and `mati`/`mo` (data-reference tokens,
+[`data_references_casing`](configuration-reference.md#data_references_casing)'s
+own scope, also left unset here) all stay exactly as written. Each of the
+three fields only ever affects its own category — set the one(s) you want
+independently.
 
 ## Indentation
 

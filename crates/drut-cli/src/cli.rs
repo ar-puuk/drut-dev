@@ -39,30 +39,25 @@ pub enum Command {
         /// Print a unified diff per changed file; write nothing (FR-019).
         #[arg(long, conflicts_with_all = ["write", "check"])]
         diff: bool,
-        /// Opt-in keyword-casing convention — must be `preserve`, `upper`,
-        /// or `lower` when given; no bare `--casing` (FR-015, amended by
-        /// 014-casing-preserve-mode FR-006). Unchanged by
-        /// 017-casing-categories-indent-width: still applies to
-        /// `control_words` + `pair_keywords` only, exactly as before —
-        /// the three flags below are new, independent, granular overrides.
-        #[arg(long, value_enum)]
-        casing: Option<CasingArg>,
-        /// Independent override for the control-words category
-        /// (017-casing-categories-indent-width FR-001) — wins over
-        /// `--casing` for this category specifically when both are given.
+        /// Opt-in keyword-casing convention for the control-words category
+        /// (things like `IF`, `ENDIF`, `LOOP`, `ENDLOOP`) — must be
+        /// `preserve`, `upper`, or `lower` when given; no bare
+        /// `--control-words-casing` (FR-015, amended by
+        /// 014-casing-preserve-mode FR-006; 017-casing-categories-indent-width
+        /// FR-001). A flat `--casing` covering this category and
+        /// `--pair-keywords-casing` together once existed — removed once
+        /// this granular flag and the one below fully superseded it.
         #[arg(long, value_enum)]
         control_words_casing: Option<CasingArg>,
         /// Independent override for the pair-keywords category
-        /// (017-casing-categories-indent-width FR-001) — wins over
-        /// `--casing` for this category specifically when both are given.
+        /// (017-casing-categories-indent-width FR-001) — keyword names
+        /// inside a `Control` statement's `keyword=value` pairs.
         #[arg(long, value_enum)]
         pair_keywords_casing: Option<CasingArg>,
         /// Independent override for the data-references category — Matrix/
         /// Line/Node/Zone/Database abbreviations, the output-record and
         /// link-endpoint tokens, and the two reserved loop-index
-        /// identifiers (017-casing-categories-indent-width FR-004). Not
-        /// reachable by `--casing` at all — this is the only way to case
-        /// this category from the command line.
+        /// identifiers (017-casing-categories-indent-width FR-004).
         #[arg(long, value_enum)]
         data_references_casing: Option<CasingArg>,
         /// Spaces per nesting level of block indentation
@@ -72,9 +67,11 @@ pub enum Command {
         #[arg(long, value_parser = clap::value_parser!(u8).range(1..=16))]
         indent_width: Option<u8>,
         /// Top-level (depth-0) indentation policy — `preserve` (default,
-        /// FR-001) leaves it exactly as written; `normalize` forces every
+        /// FR-001) leaves it exactly as written; `auto` forces every
         /// top-level line to column 0 (FR-002/FR-003,
-        /// 009-top-level-indent-toggle). As of 012-toml-configuration,
+        /// 009-top-level-indent-toggle; named `normalize` before this value
+        /// was renamed for `preserve`/`auto` naming consistency with
+        /// `--operator-spacing`/`--blank-lines`). As of 012-toml-configuration,
         /// `Option`-typed like `--casing` — omitting the flag means "consult
         /// `drut.toml`, then the built-in default," which requires
         /// distinguishing "not passed" from "explicitly `preserve`"
@@ -150,7 +147,7 @@ pub enum CasingArg {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum TopLevelIndentArg {
     Preserve,
-    Normalize,
+    Auto,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]

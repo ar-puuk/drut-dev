@@ -76,7 +76,7 @@ drut format sample.s --write --isolated
 Reformats `sample.s` in place. `--write`, `--check` (report which files would
 change, write nothing), and `--diff` (shown above) are mutually exclusive — see
 the [CLI Reference](cli-reference.md#format) for the full flag list, including
-`--casing`, `--operator-spacing`, and every other formatting axis.
+`--control-words-casing`, `--operator-spacing`, and every other formatting axis.
 
 ## Next steps
 

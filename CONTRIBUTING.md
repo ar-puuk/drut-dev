@@ -39,11 +39,17 @@ remaining pre-publish sequence.
   census re-run against the fix — see the module doc for the fix's effect on
   the dictionary (one entry, `COST`/`PRINT`, dropped as the bug's own
   artifact; everything else unchanged). Since then, the formatter has grown: a
-  `--top-level-indent` mode (`preserve`, the default, or `normalize` — force
-  every top-level statement to column 0) and a three-valued `casing` convention
-  (`preserve`, the default, `upper`, or `lower`) — see
-  [`specs/009-top-level-indent-toggle/`](specs/009-top-level-indent-toggle/) and
-  [`specs/014-casing-preserve-mode/`](specs/014-casing-preserve-mode/); a
+  `--top-level-indent` mode (`preserve`, the default, or `auto` — force
+  every top-level statement to column 0) and three independent, three-valued
+  casing fields (`control_words_casing`/`pair_keywords_casing`/
+  `data_references_casing`; each `preserve`, the default, `upper`, or
+  `lower`) — see
+  [`specs/009-top-level-indent-toggle/`](specs/009-top-level-indent-toggle/),
+  [`specs/014-casing-preserve-mode/`](specs/014-casing-preserve-mode/), and
+  [`specs/017-casing-categories-indent-width/`](specs/017-casing-categories-indent-width/)
+  (a prior flat `casing` field, covering `control_words`+`pair_keywords`
+  together, was later removed once these granular fields fully superseded
+  it — see `CHANGELOG.md`); a
   `; FMT: OFF`/`; FMT: ON` inline marker pair to exclude a range from
   formatting entirely, with an unclosed marker surfaced (never silently
   extended forever without notice) — see
@@ -70,8 +76,10 @@ remaining pre-publish sequence.
   [`specs/003-lsp-vscode-extension/`](specs/003-lsp-vscode-extension/), and
   [`specs/004-mcp-server/`](specs/004-mcp-server/). `check` is fully wired
   (plain-text or SARIF 2.1.0 output); `format` supports default/`--write`/
-  `--check`/`--diff` disposition modes, opt-in `--casing=preserve|upper|lower`,
-  `--top-level-indent=preserve|normalize`, and `--isolated` (skip `drut.toml`
+  `--check`/`--diff` disposition modes, opt-in
+  `--control-words-casing=preserve|upper|lower` (and its
+  `--pair-keywords-casing`/`--data-references-casing` siblings),
+  `--top-level-indent=preserve|auto`, and `--isolated` (skip `drut.toml`
   discovery for one run); `server` speaks the Language Server Protocol over
   stdio; `mcp` speaks the Model Context Protocol over stdio.
 - **`drut-lsp`** (`crates/drut-lsp`) — a thin LSP adapter over `voyager-core`:
@@ -113,7 +121,7 @@ remaining pre-publish sequence.
   actively-maintained Rust MCP SDK is async-only) are scoped entirely to this
   one crate; `voyager-core`, `drut-cli`'s other subcommands, and `drut-lsp`
   remain fully synchronous. `format`'s parameters now mirror the CLI's flags
-  (`casing`, `top_level_indent`, `isolated`), plus response fields for unclosed
+  (`control_words_casing`, `top_level_indent`, `isolated`), plus response fields for unclosed
   `; FMT: OFF` markers and `drut.toml` warnings. See
   [`specs/004-mcp-server/`](specs/004-mcp-server/) for the full spec/plan/
   data-model/contracts/tasks.

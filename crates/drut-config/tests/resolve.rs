@@ -23,19 +23,23 @@ fn cleanup(target: &Path) {
 
 #[test]
 fn explicit_value_wins_over_a_present_valid_config_file_per_field() {
-    let target = test_file("explicit_wins", "[format]\ncasing = \"lower\"\ntop_level_indent = \"preserve\"\n");
+    let target = test_file(
+        "explicit_wins",
+        "[format]\ncontrol_words_casing = \"lower\"\npair_keywords_casing = \"lower\"\ntop_level_indent = \"preserve\"\n",
+    );
 
     let (options, warnings) = resolve_format_options(
         Some(&target),
         false,
         ExplicitFormatOverride {
-            casing: Some(CasingConvention::Upper),
+            control_words_casing: Some(CasingConvention::Upper),
+            pair_keywords_casing: Some(CasingConvention::Upper),
             ..Default::default()
         },
         ExplicitFormatOverride::default(),
     );
-    assert_eq!(options.casing.control_words, CasingConvention::Upper, "explicit casing must win");
-    assert_eq!(options.casing.pair_keywords, CasingConvention::Upper, "explicit casing must win");
+    assert_eq!(options.casing.control_words, CasingConvention::Upper, "explicit override must win");
+    assert_eq!(options.casing.pair_keywords, CasingConvention::Upper, "explicit override must win");
     assert_eq!(
         options.top_level_indent,
         TopLevelIndentMode::Preserve,
@@ -48,12 +52,15 @@ fn explicit_value_wins_over_a_present_valid_config_file_per_field() {
 
 #[test]
 fn config_file_value_wins_over_the_built_in_default_when_no_explicit_value_given() {
-    let target = test_file("file_wins_over_default", "[format]\ncasing = \"lower\"\ntop_level_indent = \"normalize\"\n");
+    let target = test_file(
+        "file_wins_over_default",
+        "[format]\ncontrol_words_casing = \"lower\"\npair_keywords_casing = \"lower\"\ntop_level_indent = \"auto\"\n",
+    );
 
     let (options, _warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), ExplicitFormatOverride::default());
     assert_eq!(options.casing.control_words, CasingConvention::Lower);
     assert_eq!(options.casing.pair_keywords, CasingConvention::Lower);
-    assert_eq!(options.top_level_indent, TopLevelIndentMode::Normalize);
+    assert_eq!(options.top_level_indent, TopLevelIndentMode::Auto);
 
     cleanup(&target);
 }
@@ -64,7 +71,7 @@ fn no_file_path_skips_discovery_and_resolves_straight_to_explicit_then_default()
         None,
         false,
         ExplicitFormatOverride {
-            casing: Some(CasingConvention::Upper),
+            control_words_casing: Some(CasingConvention::Upper),
             ..Default::default()
         },
         ExplicitFormatOverride::default(),
@@ -76,7 +83,7 @@ fn no_file_path_skips_discovery_and_resolves_straight_to_explicit_then_default()
 
 #[test]
 fn isolated_skips_discovery_even_with_a_valid_nearby_config_present() {
-    let target = test_file("isolated", "[format]\ncasing = \"lower\"\ntop_level_indent = \"normalize\"\n");
+    let target = test_file("isolated", "[format]\ncontrol_words_casing = \"lower\"\ntop_level_indent = \"auto\"\n");
 
     let (options, warnings) = resolve_format_options(Some(&target), true, ExplicitFormatOverride::default(), ExplicitFormatOverride::default());
     assert_eq!(
@@ -92,20 +99,20 @@ fn isolated_skips_discovery_even_with_a_valid_nearby_config_present() {
 
 #[test]
 fn isolated_still_honors_an_explicit_override() {
-    let target = test_file("isolated_with_explicit", "[format]\ncasing = \"lower\"\n");
+    let target = test_file("isolated_with_explicit", "[format]\ncontrol_words_casing = \"lower\"\n");
 
     let (options, _warnings) = resolve_format_options(
         Some(&target),
         true,
         ExplicitFormatOverride {
-            casing: Some(CasingConvention::Upper),
-            top_level_indent: Some(TopLevelIndentMode::Normalize),
+            control_words_casing: Some(CasingConvention::Upper),
+            top_level_indent: Some(TopLevelIndentMode::Auto),
             ..Default::default()
         },
         ExplicitFormatOverride::default(),
     );
     assert_eq!(options.casing.control_words, CasingConvention::Upper);
-    assert_eq!(options.top_level_indent, TopLevelIndentMode::Normalize);
+    assert_eq!(options.top_level_indent, TopLevelIndentMode::Auto);
 
     cleanup(&target);
 }
@@ -116,11 +123,11 @@ fn a_present_config_file_that_does_not_mention_casing_resolves_to_preserve() {
     // without ever mentioning casing at all -- the unset field must still
     // resolve to CasingConvention::Preserve, not panic or leave a stale
     // value.
-    let target = test_file("casing_unset_in_file", "[format]\ntop_level_indent = \"normalize\"\n");
+    let target = test_file("casing_unset_in_file", "[format]\ntop_level_indent = \"auto\"\n");
 
     let (options, warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), ExplicitFormatOverride::default());
     assert_eq!(options.casing.control_words, CasingConvention::Preserve);
-    assert_eq!(options.top_level_indent, TopLevelIndentMode::Normalize);
+    assert_eq!(options.top_level_indent, TopLevelIndentMode::Auto);
     assert!(warnings.is_empty());
 
     cleanup(&target);
@@ -145,32 +152,17 @@ fn a_missing_config_file_resolves_to_explicit_then_default_with_no_warnings() {
 // -- 017-casing-categories-indent-width: per-category precedence (tasks.md T015) --
 
 #[test]
-fn legacy_casing_alone_covers_control_words_and_pair_keywords_but_never_data_references() {
-    let target = test_file("legacy_only", "[format]\ncasing = \"upper\"\n");
+fn a_removed_legacy_casing_key_in_the_file_governs_nothing() {
+    // The flat `casing` field (which used to cover control_words +
+    // pair_keywords together, never data_references) was removed --
+    // present in a drut.toml, it's now just an unrecognized key, so every
+    // category resolves to its own built-in default instead.
+    let target = test_file("legacy_casing_removed", "[format]\ncasing = \"upper\"\n");
 
     let (options, _warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), ExplicitFormatOverride::default());
-    assert_eq!(options.casing.control_words, CasingConvention::Upper);
-    assert_eq!(options.casing.pair_keywords, CasingConvention::Upper);
-    assert_eq!(
-        options.casing.data_references,
-        CasingConvention::Preserve,
-        "legacy casing never reached data_references before this feature and still doesn't"
-    );
-
-    cleanup(&target);
-}
-
-#[test]
-fn granular_data_references_field_governs_data_references_while_legacy_governs_the_other_two() {
-    let target = test_file(
-        "legacy_plus_granular",
-        "[format]\ncasing = \"upper\"\ndata_references_casing = \"lower\"\n",
-    );
-
-    let (options, _warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), ExplicitFormatOverride::default());
-    assert_eq!(options.casing.control_words, CasingConvention::Upper, "still governed by legacy casing");
-    assert_eq!(options.casing.pair_keywords, CasingConvention::Upper, "still governed by legacy casing");
-    assert_eq!(options.casing.data_references, CasingConvention::Lower, "granular field, not legacy, governs this one");
+    assert_eq!(options.casing.control_words, CasingConvention::Preserve);
+    assert_eq!(options.casing.pair_keywords, CasingConvention::Preserve);
+    assert_eq!(options.casing.data_references, CasingConvention::Preserve);
 
     cleanup(&target);
 }
@@ -194,7 +186,7 @@ fn all_three_granular_fields_set_independently_resolve_independently() {
 fn explicit_granular_override_wins_over_both_config_layers_for_its_own_category_only() {
     let target = test_file(
         "explicit_granular_wins",
-        "[format]\ncasing = \"upper\"\ndata_references_casing = \"upper\"\n",
+        "[format]\ncontrol_words_casing = \"upper\"\ndata_references_casing = \"upper\"\n",
     );
 
     let (options, _warnings) = resolve_format_options(
@@ -264,7 +256,7 @@ fn explicit_indent_width_overrides_config_file() {
 
 #[test]
 fn indent_width_unset_resolves_to_four() {
-    let target = test_file("indent_width_unset", "[format]\ncasing = \"upper\"\n");
+    let target = test_file("indent_width_unset", "[format]\ncontrol_words_casing = \"upper\"\n");
 
     let (options, _warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), ExplicitFormatOverride::default());
     assert_eq!(options.indent_width, 4);
@@ -291,7 +283,7 @@ fn operator_spacing_explicit_overrides_config_file() {
 
 #[test]
 fn operator_spacing_unset_anywhere_resolves_to_preserve() {
-    let target = test_file("operator_spacing_unset", "[format]\ncasing = \"upper\"\n");
+    let target = test_file("operator_spacing_unset", "[format]\ncontrol_words_casing = \"upper\"\n");
 
     let (options, warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), ExplicitFormatOverride::default());
     assert_eq!(options.operator_spacing, OperatorSpacing::Preserve);
@@ -330,7 +322,7 @@ fn blank_lines_explicit_overrides_config_file() {
 
 #[test]
 fn blank_lines_and_both_caps_unset_anywhere_resolve_to_built_in_defaults() {
-    let target = test_file("blank_lines_unset", "[format]\ncasing = \"upper\"\n");
+    let target = test_file("blank_lines_unset", "[format]\ncontrol_words_casing = \"upper\"\n");
 
     let (options, warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), ExplicitFormatOverride::default());
     assert_eq!(options.blank_lines, BlankLineMode::Preserve);

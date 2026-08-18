@@ -597,6 +597,25 @@ after this log.)
    Narrowed the token to just the header (`IF` through the condition's
    closing paren); the body statement now renders under the static
    grammar's own coloring again. LSP-only fix, no `voyager-core` change.
+7. **Short-`IF` condition swallowed into one flat color** — *done* (fixed
+   2026-08-18). Follow-up to item 6: narrowing the `shortIf` token to "the
+   header through the condition's closing paren" fixed the *body* but left
+   a second, distinct bug in that same header span — the condition's own
+   tokens (`@token@` references, operators, numbers) rendered as one flat
+   `shortIf` color instead of their normal distinct static-grammar colors,
+   since the one semantic token now covered them too (real-world report:
+   `IF (@MODE@ = 1) PRINT ...` showed `@MODE@ = 1` uniformly in the `IF`
+   color, where the block-style `IF (@MODE@ = 1)\n...\nENDIF` form colors
+   `@MODE@`/`=`/`1` distinctly). This also meant the `shortIf` token
+   overlapped the separately-emitted `@token@` variable-ref token whenever
+   one appeared in the condition — invalid per the LSP semantic-tokens spec
+   (tokens on a line must be non-overlapping), and undefined-behavior
+   territory for any client. Narrowed the `shortIf` token further, to just
+   the `IF`/`ELSEIF` keyword itself (ending at the condition's opening
+   `(`); the condition and body now both render entirely under the static
+   grammar's own coloring, matching the block-style form, with no
+   overlapping tokens. LSP-only fix (`crates/drut-lsp/src/
+   semantic_tokens.rs`), no `voyager-core` change.
 
 ## Open questions (not part of the pre-publish sequence)
 

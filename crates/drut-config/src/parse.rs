@@ -67,7 +67,9 @@ fn parse_format_table(path: &Path, table: &toml::Table, warnings: &mut Vec<Confi
 
     for (key, value) in table {
         match key.as_str() {
-            "casing" => format.casing = parse_casing(path, "casing", value, warnings),
+            // The legacy flat `casing` key was removed (superseded by the
+            // three granular fields below) -- it now falls through to the
+            // `other` catch-all arm below like any other unrecognized key.
             "control_words_casing" => {
                 format.control_words_casing = parse_casing(path, "control_words_casing", value, warnings)
             }
@@ -107,13 +109,12 @@ fn invalid_value(path: &Path, key: &str, message: String) -> ConfigWarning {
     }
 }
 
-/// Shared by the legacy `casing` field and the three new granular
-/// `*_casing` fields (`017-casing-categories-indent-width`) — identical
-/// accepted-value shape (`"preserve"`/`"upper"`/`"lower"`) at every one of
-/// them; `"auto"` (or any other string) is deliberately just another
-/// unrecognized value here, not a special case — this feature ships no
-/// built-in preset (FR-003), so there is nothing for a fourth named value
-/// to mean.
+/// Shared by the three granular `*_casing` fields
+/// (`017-casing-categories-indent-width`) — identical accepted-value shape
+/// (`"preserve"`/`"upper"`/`"lower"`) at every one of them; `"auto"` (or any
+/// other string) is deliberately just another unrecognized value here, not
+/// a special case — this feature ships no built-in preset (FR-003), so
+/// there is nothing for a fourth named value to mean.
 fn parse_casing(
     path: &Path,
     key: &str,
@@ -175,10 +176,10 @@ fn parse_indent_width(path: &Path, value: &toml::Value, warnings: &mut Vec<Confi
 /// `018-operator-spacing`. Same exact-lowercase-string shape `casing`/
 /// `top_level_indent` already use (both are, on inspection, case-sensitive
 /// today — an exact match against "preserve"/"upper"/"lower" and
-/// "preserve"/"normalize" respectively, not the case-insensitive behavior
-/// this feature's own design docs assumed of them; matched here for
-/// consistency with the real existing behavior rather than introducing a
-/// one-off case-insensitive exception).
+/// "preserve"/"auto" respectively, not the case-insensitive behavior this
+/// feature's own design docs assumed of them; matched here for consistency
+/// with the real existing behavior rather than introducing a one-off
+/// case-insensitive exception).
 fn parse_operator_spacing(
     path: &Path,
     value: &toml::Value,
@@ -266,12 +267,18 @@ fn parse_top_level_indent(
 ) -> Option<voyager_core::TopLevelIndentMode> {
     match value.as_str() {
         Some("preserve") => Some(voyager_core::TopLevelIndentMode::Preserve),
-        Some("normalize") => Some(voyager_core::TopLevelIndentMode::Normalize),
+        // Renamed from "normalize" for `preserve`/`auto` naming consistency
+        // with `operator_spacing`/`blank_lines` above -- old drut.toml files
+        // written with "normalize" no longer parse; they fall through to
+        // the `other` arm below like any other invalid value (warns, falls
+        // back to the built-in default) rather than being silently accepted
+        // under two names.
+        Some("auto") => Some(voyager_core::TopLevelIndentMode::Auto),
         Some(other) => {
             warnings.push(invalid_value(
                 path,
                 "top_level_indent",
-                format!("must be \"preserve\" or \"normalize\", got {other:?}"),
+                format!("must be \"preserve\" or \"auto\", got {other:?}"),
             ));
             None
         }
@@ -279,7 +286,7 @@ fn parse_top_level_indent(
             warnings.push(invalid_value(
                 path,
                 "top_level_indent",
-                format!("must be a string (\"preserve\" or \"normalize\"), got {value:?}"),
+                format!("must be a string (\"preserve\" or \"auto\"), got {value:?}"),
             ));
             None
         }

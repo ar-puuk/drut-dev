@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-b1e38494.js";
+            window.path_to_searchindex_js = "searchindex-a73fb0dd.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c6afe1e7.js"></script>
@@ -318,7 +318,7 @@ reordered, no keyword was invented or removed.</p>
 <p>Reformats <code>sample.s</code> in place. <code>--write</code>, <code>--check</code> (report which files would
 change, write nothing), and <code>--diff</code> (shown above) are mutually exclusive — see
 the <a href="#format">CLI Reference</a> for the full flag list, including
-<code>--casing</code>, <code>--operator-spacing</code>, and every other formatting axis.</p>
+<code>--control-words-casing</code>, <code>--operator-spacing</code>, and every other formatting axis.</p>
 <h2 id="next-steps"><a class="header" href="#next-steps">Next steps</a></h2>
 <ul>
 <li>Set up your editor for live diagnostics/formatting: <a href="#editor-lsp-guide">Editor Guide</a>.</li>
@@ -372,7 +372,6 @@ for accepted values, defaults, and what each actually does:</p>
 <tr><th>Flag</th><th><code>drut.toml</code> field</th></tr>
 </thead>
 <tbody>
-<tr><td><code>--casing</code></td><td><a href="#casing-1"><code>casing</code></a></td></tr>
 <tr><td><code>--control-words-casing</code></td><td><a href="#control_words_casing"><code>control_words_casing</code></a></td></tr>
 <tr><td><code>--pair-keywords-casing</code></td><td><a href="#pair_keywords_casing"><code>pair_keywords_casing</code></a></td></tr>
 <tr><td><code>--data-references-casing</code></td><td><a href="#data_references_casing"><code>data_references_casing</code></a></td></tr>
@@ -488,7 +487,7 @@ script text into a <code>.s</code>/<code>.block</code> file reindents it to matc
 structure immediately — correctly handling a paste that opens or closes a
 block.</p>
 <h2 id="editor-client-settings"><a class="header" href="#editor-client-settings">Editor client settings</a></h2>
-<p>All 10 <code>[format]</code> fields (see the <a href="#configuration-reference">Configuration Reference</a>)
+<p>All 9 <code>[format]</code> fields (see the <a href="#configuration-reference">Configuration Reference</a>)
 are also available as personal VS Code settings, not only via a project’s
 committed <code>drut.toml</code>:</p>
 <div class="table-wrapper">
@@ -497,7 +496,6 @@ committed <code>drut.toml</code>:</p>
 <tr><th>Setting</th><th><code>drut.toml</code> field</th></tr>
 </thead>
 <tbody>
-<tr><td><code>drut.format.casing</code></td><td><code>casing</code></td></tr>
 <tr><td><code>drut.format.controlWordsCasing</code></td><td><code>control_words_casing</code></td></tr>
 <tr><td><code>drut.format.pairKeywordsCasing</code></td><td><code>pair_keywords_casing</code></td></tr>
 <tr><td><code>drut.format.dataReferencesCasing</code></td><td><code>data_references_casing</code></td></tr>
@@ -536,10 +534,10 @@ structural set — the Hint-level streams (unclosed <code>; FMT: OFF</code>, mal
 about to propose) is structurally valid before suggesting it.</p>
 <h2 id="format-1"><a class="header" href="#format-1"><code>format</code></a></h2>
 <p>Reformats a script’s whitespace/indentation (and, opt-in via the same
-parameters <code>drut format</code>/<code>drut.toml</code> accept — <code>casing</code>, <code>operator_spacing</code>,
-<code>blank_lines</code>, and the rest) and returns the result plus whether anything
-changed. Idempotent: formatting an already-formatted script reports
-<code>changed=false</code>.</p>
+parameters <code>drut format</code>/<code>drut.toml</code> accept — <code>control_words_casing</code>,
+<code>operator_spacing</code>, <code>blank_lines</code>, and the rest) and returns the result plus
+whether anything changed. Idempotent: formatting an already-formatted script
+reports <code>changed=false</code>.</p>
 <p><strong>Use it when</strong>: an assistant is about to write or hand back Cube Voyager script
 text and wants it consistently formatted first.</p>
 <h2 id="query_structure"><a class="header" href="#query_structure"><code>query_structure</code></a></h2>
@@ -575,24 +573,26 @@ are left with their original indentation rather than guessed at.</p>
 <a href="#configuration-reference">Configuration Reference</a> — this page focuses on
 <em>what changes</em>, with real examples.</p>
 <h2 id="casing"><a class="header" href="#casing">Casing</a></h2>
-<p><code>casing</code> (and its three granular counterparts,
-<a href="#control_words_casing"><code>control_words_casing</code></a>/
-<a href="#pair_keywords_casing"><code>pair_keywords_casing</code></a>/
-<a href="#data_references_casing"><code>data_references_casing</code></a>)
-only ever touches keyword <em>names</em> — never a value, and never a category it
-isn’t scoped to. This example makes both boundaries visible at once, with
-<code>casing = "upper"</code>:</p>
+<p>The three independent casing fields —
+<a href="#control_words_casing"><code>control_words_casing</code></a>,
+<a href="#pair_keywords_casing"><code>pair_keywords_casing</code></a>, and
+<a href="#data_references_casing"><code>data_references_casing</code></a> —
+only ever touch keyword <em>names</em> — never a value, and never a category they
+aren’t scoped to. This example makes both boundaries visible at once, with
+<code>control_words_casing = "upper"</code>:</p>
 <pre><code class="language-diff">-run pgm=matrix
-+RUN PGM=matrix
++RUN pgm=matrix
      mati=base.mat,mo=out.mat
 -endrun
 +ENDRUN
 </code></pre>
-<p><code>run</code>/<code>endrun</code> (control words) and <code>pgm</code> (a pair-keyword name) are uppercased —
-but <code>matrix</code> (a value, never touched) and <code>mati</code>/<code>mo</code> (data-reference tokens,
-<code>casing</code>’s legacy scope can’t reach them) stay exactly as written. Set
-<a href="#data_references_casing"><code>data_references_casing</code></a>
-separately if you want <code>mati</code>/<code>mo</code> cased too.</p>
+<p><code>run</code>/<code>endrun</code> (control words) are uppercased — but <code>pgm</code> (a pair-keyword name,
+<code>pair_keywords_casing</code>’s own scope, left unset here), <code>matrix</code> (a value, never
+touched), and <code>mati</code>/<code>mo</code> (data-reference tokens,
+<a href="#data_references_casing"><code>data_references_casing</code></a>’s
+own scope, also left unset here) all stay exactly as written. Each of the
+three fields only ever affects its own category — set the one(s) you want
+independently.</p>
 <h2 id="indentation"><a class="header" href="#indentation">Indentation</a></h2>
 <p><a href="#top_level_indent"><code>top_level_indent</code></a> controls
 depth-0 statements; <a href="#indent_width"><code>indent_width</code></a>
@@ -674,7 +674,7 @@ indication — as a Hint diagnostic (source <code>drut-fmt</code>, see the
 <p>Every <code>[format]</code> field Drut currently understands, in one place. All of them are
 set the same way, in a <code>drut.toml</code> file at (or above) the file you’re formatting:</p>
 <pre><code class="language-toml">[format]
-casing = "lower"
+control_words_casing = "lower"
 indent_width = 2
 </code></pre>
 <p>Drut discovers the nearest <code>drut.toml</code> by walking up from the file being
@@ -683,6 +683,25 @@ filesystem root — whichever comes first. A project with no <code>drut.toml</co
 behaves exactly like a project with an empty one: every field uses its built-in
 default. Every field is optional; omitting a key is identical to writing its
 default value explicitly.</p>
+<h2 id="starter-druttoml"><a class="header" href="#starter-druttoml">Starter <code>drut.toml</code></a></h2>
+<p>Every field, commented out at its built-in default. Copy this into a <code>drut.toml</code>
+at your project root and uncomment (then change) only the fields you want to
+override — a commented-out line changes nothing, so you never need to remember
+the full field list or its defaults from scratch:</p>
+<pre><code class="language-toml">[format]
+# control_words_casing = "preserve"      # preserve | upper | lower
+# pair_keywords_casing = "preserve"      # preserve | upper | lower
+# data_references_casing = "preserve"    # preserve | upper | lower
+# top_level_indent = "preserve"          # preserve | auto
+# indent_width = 4                       # 1-16
+# operator_spacing = "preserve"          # preserve | fixed | auto
+# blank_lines = "preserve"               # preserve | auto
+# top_level_blank_line_cap = 2           # 1-50, only used when blank_lines = "auto"
+# nested_blank_line_cap = 1              # 1-50, only used when blank_lines = "auto"
+</code></pre>
+<p>See <a href="#fields">Fields</a> below for what each one actually does, and
+<a href="#precedence">Precedence</a> for how a set value interacts with CLI flags, MCP
+parameters, and editor settings.</p>
 <p><strong>A malformed value never blocks formatting.</strong> An unrecognized key or an
 out-of-range value only affects that one field — it warns (CLI stderr, an LSP
 Hint diagnostic, or the MCP <code>format</code> tool’s <code>config_warnings</code> field) and falls
@@ -703,78 +722,46 @@ overrides a project’s own committed <code>drut.toml</code> — it only fills i
 <li><strong>The built-in default</strong> — used only if none of the above set the field.</li>
 </ol>
 <p>Each tier only fills in a field the tier(s) before it left unset; a field is
-never assembled from pieces at different tiers.</p>
-<p>Four fields (<code>casing</code>, <code>control_words_casing</code>, <code>pair_keywords_casing</code>,
-<code>data_references_casing</code>) have one extra wrinkle on top of the four tiers above —
-see <a href="#casing-1"><code>casing</code></a>’s entry for the full explanation.</p>
+never assembled from pieces at different tiers. Every field below resolves
+this same plain four-tier chain — no field has any extra fallback wrinkle.</p>
+<blockquote>
+<p>A flat <code>casing</code> field once existed, covering <code>control_words</code>+<code>pair_keywords</code>
+together — removed once the three granular fields below fully superseded
+it. A <code>drut.toml</code>/CLI/MCP/editor-setting still using <code>casing</code> no longer does
+anything; it degrades exactly like any other unrecognized key (a warning,
+falling back to each field’s own built-in default), never a hard failure.</p>
+</blockquote>
 <h2 id="fields"><a class="header" href="#fields">Fields</a></h2>
-<h3 id="casing-1"><a class="header" href="#casing-1"><code>casing</code></a></h3>
-<p>The legacy, all-in-one keyword-casing setting. Cases every <code>control_words</code> and
-<code>pair_keywords</code> token together — it cannot reach <code>data_references</code> tokens at all
-(use <a href="#data_references_casing"><code>data_references_casing</code></a> for those).</p>
-<p><strong>Values</strong>:</p>
-<ul>
-<li><code>preserve</code> <strong>← default</strong> — leave existing casing exactly as written.</li>
-<li><code>upper</code> — uppercase every control word and pair-keyword name.</li>
-<li><code>lower</code> — lowercase every control word and pair-keyword name.</li>
-</ul>
-<p><strong>Default</strong>: <code>preserve</code>.</p>
-<p><strong>Also known as</strong>: CLI flag <code>--casing</code>; MCP <code>format</code> tool parameter <code>casing</code>.</p>
-<p><strong>Example</strong>:</p>
-<pre><code class="language-toml">[format]
-casing = "upper"
-</code></pre>
-<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above, tier by tier —
-but <em>within</em> each tier, drut checks that tier’s granular field
-(<code>control_words_casing</code>/<code>pair_keywords_casing</code>) first, and only falls back to
-that same tier’s <code>casing</code> value if the granular field is unset there. Concretely,
-for <code>control_words_casing</code>: explicit <code>--control-words-casing</code>, then explicit
-<code>--casing</code>, then <code>drut.toml</code>’s <code>control_words_casing</code>, then <code>drut.toml</code>’s
-<code>casing</code>, then the editor setting’s granular field, then the editor setting’s
-<code>casing</code>, then the built-in default — in that exact order. A <code>casing</code> value set
-at a <em>higher</em>-precedence tier (say, an explicit <code>--casing</code> flag) still wins over
-a granular field set only at a <em>lower</em> tier (say, <code>control_words_casing</code> in
-<code>drut.toml</code>) — tier order is checked before either field’s own fallback within a
-tier. If you only ever set <code>casing</code>, both <code>control_words</code> and <code>pair_keywords</code>
-follow it exactly as before <code>control_words_casing</code>/<code>pair_keywords_casing</code>
-existed.</p>
 <h3 id="control_words_casing"><a class="header" href="#control_words_casing"><code>control_words_casing</code></a></h3>
-<p>Independent override for the <code>control_words</code> category alone (things like <code>IF</code>,
-<code>ENDIF</code>, <code>LOOP</code>, <code>ENDLOOP</code>) — wins over <code>casing</code> for this category specifically,
-per the two-step fallback explained in <a href="#casing-1"><code>casing</code></a>’s entry above.</p>
+<p>Casing convention for the <code>control_words</code> category (things like <code>IF</code>,
+<code>ENDIF</code>, <code>LOOP</code>, <code>ENDLOOP</code>).</p>
 <p><strong>Values</strong>: <code>preserve</code> <strong>← default</strong>, <code>upper</code>, <code>lower</code>.</p>
-<p><strong>Default</strong>: <code>preserve</code> (falls back to <code>casing</code> first if <code>casing</code> is set and this
-field isn’t — see <a href="#casing-1"><code>casing</code></a>).</p>
+<p><strong>Default</strong>: <code>preserve</code>.</p>
 <p><strong>Also known as</strong>: CLI flag <code>--control-words-casing</code>; MCP <code>format</code> tool parameter
 <code>control_words_casing</code>.</p>
 <p><strong>Example</strong>:</p>
 <pre><code class="language-toml">[format]
-casing = "upper"               # control_words + pair_keywords default to upper...
-control_words_casing = "lower" # ...except control_words specifically, forced lower
+control_words_casing = "upper"
 </code></pre>
-<p><strong>Precedence</strong>: see <a href="#casing-1"><code>casing</code></a> — same four-tier chain, with the
-two-step legacy/granular fallback applied at every tier.</p>
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above.</p>
 <h3 id="pair_keywords_casing"><a class="header" href="#pair_keywords_casing"><code>pair_keywords_casing</code></a></h3>
-<p>Independent override for the <code>pair_keywords</code> category alone (keyword names inside
-a <code>Control</code> statement’s <code>keyword=value</code> pairs, e.g. <code>PATHLOAD</code>, <code>MATI</code>) — wins
-over <code>casing</code> for this category specifically, same shape as
-<a href="#control_words_casing"><code>control_words_casing</code></a> above.</p>
+<p>Casing convention for the <code>pair_keywords</code> category (keyword names inside
+a <code>Control</code> statement’s <code>keyword=value</code> pairs, e.g. <code>PATHLOAD</code>, <code>MATI</code>), same
+shape as <a href="#control_words_casing"><code>control_words_casing</code></a> above.</p>
 <p><strong>Values</strong>: <code>preserve</code> <strong>← default</strong>, <code>upper</code>, <code>lower</code>.</p>
-<p><strong>Default</strong>: <code>preserve</code> (falls back to <code>casing</code> first — see <a href="#casing-1"><code>casing</code></a>).</p>
+<p><strong>Default</strong>: <code>preserve</code>.</p>
 <p><strong>Also known as</strong>: CLI flag <code>--pair-keywords-casing</code>; MCP <code>format</code> tool parameter
 <code>pair_keywords_casing</code>.</p>
 <p><strong>Example</strong>:</p>
 <pre><code class="language-toml">[format]
 pair_keywords_casing = "lower"
 </code></pre>
-<p><strong>Precedence</strong>: see <a href="#casing-1"><code>casing</code></a> — same four-tier chain, with the
-two-step legacy/granular fallback applied at every tier.</p>
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above.</p>
 <h3 id="data_references_casing"><a class="header" href="#data_references_casing"><code>data_references_casing</code></a></h3>
 <p>Casing for the data-reference category: Matrix/Line/Node/Zone/Database
 abbreviations (<code>MI</code>/<code>MO</code>/<code>MW</code>, <code>LI</code>/<code>LW</code>, <code>NI</code>/<code>NW</code>, <code>ZI</code>/<code>ZONES</code>/<code>Z</code>,
 <code>DBI</code>/<code>DBA</code>), <code>RO</code>, the link-endpoint fields <code>A</code>/<code>B</code>, and the reserved loop-index
-identifiers <code>I</code>/<code>J</code>. <strong>Not reachable by <code>casing</code> at all</strong> — this is the only way
-to case this category from configuration.</p>
+identifiers <code>I</code>/<code>J</code>.</p>
 <p><strong>Values</strong>: <code>preserve</code> <strong>← default</strong>, <code>upper</code>, <code>lower</code>.</p>
 <p><strong>Default</strong>: <code>preserve</code>.</p>
 <p><strong>Also known as</strong>: CLI flag <code>--data-references-casing</code>; MCP <code>format</code> tool
@@ -783,25 +770,23 @@ parameter <code>data_references_casing</code>.</p>
 <pre><code class="language-toml">[format]
 data_references_casing = "lower"
 </code></pre>
-<p><strong>Precedence</strong>: follows the plain <a href="#precedence">four-tier chain</a> — no
-legacy-field fallback, since <code>casing</code> never reaches this category.</p>
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above.</p>
 <h3 id="top_level_indent"><a class="header" href="#top_level_indent"><code>top_level_indent</code></a></h3>
 <p>Whether top-level (depth-0, not inside any block) statement indentation is left
 exactly as written, or normalized to column 0.</p>
 <p><strong>Values</strong>:</p>
 <ul>
 <li><code>preserve</code> <strong>← default</strong> — leave top-level indentation exactly as written.</li>
-<li><code>normalize</code> — force every top-level line to column 0.</li>
+<li><code>auto</code> — force every top-level line to column 0.</li>
 </ul>
 <p><strong>Default</strong>: <code>preserve</code>.</p>
 <p><strong>Also known as</strong>: CLI flag <code>--top-level-indent</code>; MCP <code>format</code> tool parameter
 <code>top_level_indent</code>.</p>
 <p><strong>Example</strong>:</p>
 <pre><code class="language-toml">[format]
-top_level_indent = "normalize"
+top_level_indent = "auto"
 </code></pre>
-<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above; no
-legacy-field fallback.</p>
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above.</p>
 <h3 id="indent_width"><a class="header" href="#indent_width"><code>indent_width</code></a></h3>
 <p>Spaces per nesting level of block indentation, relative to the enclosing block’s
 own opening-statement column.</p>
@@ -813,8 +798,8 @@ own opening-statement column.</p>
 <pre><code class="language-toml">[format]
 indent_width = 2
 </code></pre>
-<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above; no
-legacy-field fallback. An out-of-range value (<code>0</code>, <code>500</code>, …) at any tier is
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above. An
+out-of-range value (<code>0</code>, <code>500</code>, …) at any tier is
 treated as unset for that tier — resolution falls through to the next tier
 exactly as if the field had been omitted there.</p>
 <h3 id="operator_spacing"><a class="header" href="#operator_spacing"><code>operator_spacing</code></a></h3>
@@ -841,8 +826,7 @@ operator_spacing = "auto"
 </code></pre>
 <p>See the <a href="#operator-spacing">Formatter Guide</a> for full
 before/after examples of <code>fixed</code> vs. <code>auto</code>.</p>
-<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above; no
-legacy-field fallback.</p>
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above.</p>
 <h3 id="blank_lines"><a class="header" href="#blank_lines"><code>blank_lines</code></a></h3>
 <p>Whether runs of consecutive blank lines (including whitespace-only lines) are
 left as written or contracted down to a configured cap.</p>
@@ -861,8 +845,7 @@ exceeds that cap — never pads a shorter run up.</li>
 <pre><code class="language-toml">[format]
 blank_lines = "auto"
 </code></pre>
-<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above; no
-legacy-field fallback.</p>
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above.</p>
 <h3 id="top_level_blank_line_cap"><a class="header" href="#top_level_blank_line_cap"><code>top_level_blank_line_cap</code></a></h3>
 <p>The maximum number of consecutive blank lines <code>blank_lines = "auto"</code> allows
 between top-level statements/blocks before contracting the run. Only meaningful
@@ -876,8 +859,8 @@ parameter <code>top_level_blank_line_cap</code>.</p>
 blank_lines = "auto"
 top_level_blank_line_cap = 1
 </code></pre>
-<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above; no
-legacy-field fallback. An out-of-range value at any tier is treated as unset for
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above. An
+out-of-range value at any tier is treated as unset for
 that tier, same as <a href="#indent_width"><code>indent_width</code></a>.</p>
 <h3 id="nested_blank_line_cap"><a class="header" href="#nested_blank_line_cap"><code>nested_blank_line_cap</code></a></h3>
 <p>The maximum number of consecutive blank lines <code>blank_lines = "auto"</code> allows
@@ -893,8 +876,8 @@ parameter <code>nested_blank_line_cap</code>.</p>
 blank_lines = "auto"
 nested_blank_line_cap = 2
 </code></pre>
-<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above; no
-legacy-field fallback. Same out-of-range handling as
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above. Same
+out-of-range handling as
 <a href="#top_level_blank_line_cap"><code>top_level_blank_line_cap</code></a>.</p>
 
                     </main>
