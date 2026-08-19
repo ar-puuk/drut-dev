@@ -1,5 +1,8 @@
 # Drut for Cube Voyager
 
+> **This package is under active development.** If you find any bugs, please
+> [report an issue on GitHub](https://github.com/ar-puuk/drut-dev/issues).
+
 Syntax highlighting, structural diagnostics, formatting, and full Language
 Server support for **Cube Voyager control-statement scripts** (`.s` /
 `.block` files) — the script language transportation planners use to write

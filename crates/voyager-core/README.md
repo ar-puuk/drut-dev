@@ -1,5 +1,8 @@
 # voyager-core
 
+> **This package is under active development.** If you find any bugs, please
+> [report an issue on GitHub](https://github.com/ar-puuk/drut-dev/issues).
+
 Tokenizer and structural parser for Cube Voyager control-statement scripts
 (`.s` / `.block` files), targeting Cube Voyager 6.5 as the grammar baseline.
 

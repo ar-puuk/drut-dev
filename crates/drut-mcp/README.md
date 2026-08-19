@@ -1,5 +1,8 @@
 # drut-mcp
 
+> **This package is under active development.** If you find any bugs, please
+> [report an issue on GitHub](https://github.com/ar-puuk/drut-dev/issues).
+
 Model Context Protocol server for Cube Voyager control-statement scripts,
 part of [Drut](https://github.com/ar-puuk/drut-dev). Gives an LLM agent
 read-only, structural tools over [`voyager-core`](https://crates.io/crates/voyager-core)

@@ -1,5 +1,8 @@
 # Drut
 
+> **This package is under active development.** If you find any bugs, please
+> [report an issue on GitHub](https://github.com/ar-puuk/drut-dev/issues).
+
 Drut is a linter, formatter, and editor tooling suite for **Cube Voyager
 control-statement scripts** (`.s` / `.block` files) — the script language
 transportation planners use to write travel-demand model logic. Editing

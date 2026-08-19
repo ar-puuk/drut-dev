@@ -1,5 +1,8 @@
 # drut-lsp
 
+> **This package is under active development.** If you find any bugs, please
+> [report an issue on GitHub](https://github.com/ar-puuk/drut-dev/issues).
+
 Language Server Protocol implementation for Cube Voyager control-statement
 scripts, part of [Drut](https://github.com/ar-puuk/drut-dev). Diagnostics,
 hover, completion, folding ranges, semantic tokens, and formatting over

@@ -1,5 +1,8 @@
 # drut-config
 
+> **This package is under active development.** If you find any bugs, please
+> [report an issue on GitHub](https://github.com/ar-puuk/drut-dev/issues).
+
 `drut.toml` project configuration for [Drut](https://github.com/ar-puuk/drut-dev):
 discovery (walking up from a file being processed to find the nearest
 `drut.toml`), parsing, and resolution against explicit CLI flags or MCP
