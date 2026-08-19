@@ -79,9 +79,40 @@ script text into a `.s`/`.block` file reindents it to match its new surrounding
 structure immediately — correctly handling a paste that opens or closes a
 block.
 
+## Syntax highlighting
+
+Static TextMate-grammar highlighting (works immediately, before the language
+server even attaches) recognizes these categories:
+
+| Category | Covers | Scope |
+|---|---|---|
+| Control words | `IF`, `LOOP`, `RUN`, `ENDIF`, ... | `keyword.control.drut` |
+| Statement words | `PRINT`, `FILEI`, `FILEO`, `ARRAY`, ... | `support.function.statement.drut` |
+| Function calls | A recognized Cube Voyager built-in function name immediately followed by `(` — `REPLACESTR(...)`, `ROUND(...)`, and 136 others (see the [Formatter Guide](formatter-guide.md#function-call-casing) for the full list) | `support.function.builtin.drut` |
+| Pair-keyword names | A `keyword=value` pair's keyword, e.g. `PATHLOAD`'s `PATH` | `variable.parameter.drut` |
+| Values | A pair's bareword value, e.g. `PGM=MATRIX`'s `MATRIX` | `constant.other.drut` |
+| `@name@` substitution | Variable references | `variable.other.readwrite.drut`, plus a semantic-token `variable` override (below) |
+| Numbers | Numeric literals | `constant.numeric.drut` |
+| Operators | `=`, `+`, `-`, `<>`, ... | `keyword.operator.drut` |
+| Comments | `; ...` and `/* ... */` | `comment.line.semicolon.drut` / `comment.block.drut` |
+| Strings | Quoted string literals | `string.quoted.single.drut` / `string.quoted.double.drut` |
+
+Function calls and statement words render in the same color by default (both
+use the generic "built-in procedure" convention most themes already style),
+but are independently recognized and independently colorable — see Highlight
+color customization below.
+
+`@name@` references also always get a real color, not just whatever a theme
+happens to assign — the extension auto-seeds a `#4EC9B0` semantic-token
+override the first time it activates in a workspace, since some themes render
+that TextMate scope with no color at all. This seed is workspace-scoped and
+one-time only: deleting it from `.vscode/settings.json` by hand keeps it
+deleted, forever, for that workspace (the extension never fights that choice
+back) — unless you configure `drut.highlight.namedVariables` (below).
+
 ## Editor client settings
 
-All 9 `[format]` fields (see the [Configuration Reference](configuration-reference.md))
+All 10 `[format]` fields (see the [Configuration Reference](configuration-reference.md))
 are also available as personal VS Code settings, not only via a project's
 committed `drut.toml`:
 
@@ -90,6 +121,7 @@ committed `drut.toml`:
 | `drut.format.casingControlWords` | `casing_control_words` |
 | `drut.format.casingPairKeywords` | `casing_pair_keywords` |
 | `drut.format.casingDataReferences` | `casing_data_references` |
+| `drut.format.casingFunctionCalls` | `casing_function_calls` |
 | `drut.format.indentTopLevel` | `indent_top_level` |
 | `drut.format.indentWidth` | `indent_width` |
 | `drut.format.operatorSpacing` | `operator_spacing` |
@@ -105,3 +137,46 @@ configuration. See the Configuration Reference's
 [Precedence](configuration-reference.md#precedence) section for the full
 four-tier chain. A changed setting takes effect on the very next format request
 against an already-open document — no reopen or editor restart needed.
+
+## Highlight color customization
+
+Unlike the `[format]` fields above, `drut.highlight.*` settings are **VS Code
+personal settings only** — there is no `drut.toml` equivalent, no CLI flag, no
+MCP parameter. Color is a personal/accessibility preference (theme,
+colorblindness, monitor), not a shared file-content convention the way casing
+or indentation is, so there's nothing to put in a committed project file.
+
+Nine settings, one per category from the Syntax highlighting table above
+(`@name@` excepted — see below), each an optional CSS color
+(e.g. `#RRGGBB`):
+
+| Setting | Colors |
+|---|---|
+| `drut.highlight.controlWords` | Control words |
+| `drut.highlight.statementWords` | Statement words |
+| `drut.highlight.functionCalls` | Function calls |
+| `drut.highlight.pairKeywords` | Pair-keyword names |
+| `drut.highlight.values` | Values |
+| `drut.highlight.numbers` | Numbers |
+| `drut.highlight.operators` | Operators |
+| `drut.highlight.comments` | Comments |
+| `drut.highlight.strings` | Strings |
+
+Leaving any of these unset keeps your color theme's own choice for that
+category — setting one takes effect immediately (no window reload), and
+clearing it afterward reverts to the theme's color, not a stuck last value.
+None of these ever touch a rule they didn't add themselves — another
+extension's customizations, or your own hand-written ones, always survive
+untouched.
+
+**`drut.highlight.namedVariables`** (`@name@` substitution) works the same way
+from a user's perspective, but is written into the current *workspace's*
+settings (`.vscode/settings.json`), not your personal/global settings — VS
+Code resolves this particular setting per-scope rather than merging across
+scopes, and the auto-seeded default described above already lives at
+workspace scope, so a global-scope write would be silently invisible.
+Leaving it unset preserves the auto-seed behavior exactly (including "a
+manual deletion sticks forever"); setting it takes over live; clearing it
+afterward reverts to the `#4EC9B0` default specifically, not to no color at
+all (a fully theme-driven state would reintroduce the invisibility problem
+this default exists to prevent).
