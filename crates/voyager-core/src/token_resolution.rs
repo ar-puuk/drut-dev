@@ -148,6 +148,29 @@ pub fn variable_ref_at(nodes: &[Node], pos: Position) -> Option<VariableRefAt> {
     None
 }
 
+/// Depth-first walk collecting every non-empty `Block::opener_tokens` slice in
+/// `nodes` — structurally identical to `collect_if_condition_token_slices`,
+/// but for the opener statement's own token stream instead of an `IfBranch`'s
+/// condition. `If` blocks contribute nothing here: their `opener_tokens` is
+/// always empty by construction (`block.rs`), since their condition is
+/// already covered by `collect_if_condition_token_slices` -- no
+/// double-counting risk to guard against explicitly.
+fn collect_opener_token_slices<'a>(nodes: &'a [Node], out: &mut Vec<&'a [Token]>) {
+    for node in nodes {
+        if let Node::Block(b) = node {
+            if !b.opener_tokens.is_empty() {
+                out.push(&b.opener_tokens);
+            }
+            collect_opener_token_slices(&b.children, out);
+            if let BlockKind::If { branches } = &b.kind {
+                for branch in branches {
+                    collect_opener_token_slices(&branch.children, out);
+                }
+            }
+        }
+    }
+}
+
 fn push_variable_refs_in_tokens(tokens: &[Token], out: &mut Vec<VariableRefAt>) {
     for t in tokens {
         if let TokenKind::VariableRef { name } = &t.kind {
@@ -186,6 +209,27 @@ pub fn all_variable_refs(nodes: &[Node]) -> Vec<VariableRefAt> {
     // but conditions are appended after every statement here) — sorted
     // explicitly so callers can rely on the "source order" guarantee this
     // function documents.
+    out.sort_by_key(|r| r.span.start);
+    out
+}
+
+/// Every `@name@` reference in `nodes`, INCLUDING a reference on a
+/// block-opener statement's own line (e.g. `RUN PGM=@Prog@`) —
+/// 029-unused-token-diagnostic research.md §1-2. Unlike [`all_variable_refs`],
+/// which structurally excludes that position (a pre-existing, separately
+/// tested data-model constraint `020-undefined-token-diagnostic` relies on
+/// and this function must not disturb), this is a genuinely different
+/// function, not a modification: `all_variable_refs` is unchanged. Same
+/// "source order, any nesting depth, never panics" contract otherwise.
+pub fn all_variable_refs_including_openers(nodes: &[Node]) -> Vec<VariableRefAt> {
+    let mut out = all_variable_refs(nodes);
+
+    let mut opener_slices = Vec::new();
+    collect_opener_token_slices(nodes, &mut opener_slices);
+    for tokens in opener_slices {
+        push_variable_refs_in_tokens(tokens, &mut out);
+    }
+
     out.sort_by_key(|r| r.span.start);
     out
 }
@@ -383,6 +427,44 @@ mod tests {
     fn all_variable_refs_empty_for_document_with_none() {
         let result = parse("X = 1\n");
         assert!(all_variable_refs(&result.nodes).is_empty());
+    }
+
+    #[test]
+    fn all_variable_refs_including_openers_covers_everything_all_variable_refs_does() {
+        let result = parse("MSG1 = @First@\nIF (@Second@ = 1)\nMSG2 = @Third@\nENDIF\n");
+        let plain = all_variable_refs(&result.nodes);
+        let with_openers = all_variable_refs_including_openers(&result.nodes);
+        let plain_names: Vec<&str> = plain.iter().map(|r| r.name.as_str()).collect();
+        let with_openers_names: Vec<&str> = with_openers.iter().map(|r| r.name.as_str()).collect();
+        assert_eq!(plain_names, with_openers_names);
+    }
+
+    #[test]
+    fn all_variable_refs_including_openers_finds_a_block_opener_reference() {
+        // The one behavioral difference from all_variable_refs: @Prog@ here
+        // sits only on the RUN block-opener line, which Block::opener_tokens
+        // now preserves.
+        let result = parse("RUN PGM=@Prog@\nENDRUN\n");
+        let refs = all_variable_refs_including_openers(&result.nodes);
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].name, "Prog");
+    }
+
+    #[test]
+    fn all_variable_refs_including_openers_preserves_source_order() {
+        let result = parse("MSG1 = @First@\nRUN PGM=@Second@\nENDRUN\nMSG2 = @Third@\n");
+        let refs = all_variable_refs_including_openers(&result.nodes);
+        let names: Vec<&str> = refs.iter().map(|r| r.name.as_str()).collect();
+        assert_eq!(names, vec!["First", "Second", "Third"]);
+        for pair in refs.windows(2) {
+            assert!(pair[0].span.start < pair[1].span.start);
+        }
+    }
+
+    #[test]
+    fn all_variable_refs_including_openers_empty_for_document_with_none() {
+        let result = parse("X = 1\n");
+        assert!(all_variable_refs_including_openers(&result.nodes).is_empty());
     }
 
     #[test]

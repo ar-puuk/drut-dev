@@ -111,6 +111,20 @@ mod tests {
     }
 
     #[test]
+    fn unused_token_hint_never_surfaces_here() {
+        // 029-unused-token-diagnostic SC-005: this stream is LSP-only,
+        // built and published entirely inside drut-lsp/src/diagnostics.rs —
+        // diagnose() must keep exposing exactly the same DiagnosticKind
+        // names as before this feature, even on a script with an assignment
+        // that's never referenced via @token@.
+        let result = diagnose(&text_input("ScenarioDir = 'X:\\model'\n")).unwrap();
+        assert!(
+            result.is_empty(),
+            "an unused assignment must never appear in diagnose()'s output, got: {result:?}"
+        );
+    }
+
+    #[test]
     fn empty_input_has_zero_diagnostics_not_an_error() {
         let result = diagnose(&text_input("")).unwrap();
         assert!(result.is_empty());
