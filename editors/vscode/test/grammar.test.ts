@@ -494,19 +494,31 @@ async function main(): Promise<void> {
 
   // A bareword identifier not claimed by any earlier, more specific pattern
   // now gets variable.other.identifier -- fixing the reported inconsistency
-  // where _ANode (right after "=") rendered but _BNode (an operand two
-  // tokens later) did not.
+  // where _ANode (right after "=") rendered as a pair-value but _BNode (an
+  // operand two tokens later) fell through to variable.other.identifier.
+  // #pair-values now excludes a bareword that's itself followed by more
+  // expression (an operator/quote/paren/bracket), so both operands of the
+  // same expression render identically -- neither is a real keyword=value
+  // pair.
   {
     const line = "LINKID = _ANode + '_' + _BNode";
     const [tokens] = tokenizeAll(grammar, [line]);
-    const bNodeScopes = scopesAt(tokens, line.indexOf("_BNode"));
-    check("_BNode (an expression operand) scoped as variable.other.identifier (the reported gap)", bNodeScopes.some((s) => s.includes("variable.other.identifier")));
-
-    // _ANode keeps its pre-existing pair-value scope (documented =-adjacency
-    // trade-off, spec.md Assumptions) -- not a regression, not reclassified.
     const aNodeScopes = scopesAt(tokens, line.indexOf("_ANode"));
-    check("_ANode (immediately after =) still scoped as constant.other, unchanged", aNodeScopes.some((s) => s.includes("constant.other")));
-    check("_ANode is NOT scoped as variable.other.identifier", !aNodeScopes.some((s) => s.includes("variable.other.identifier")));
+    const bNodeScopes = scopesAt(tokens, line.indexOf("_BNode"));
+    check("_ANode (followed by more expression) scoped as variable.other.identifier", aNodeScopes.some((s) => s.includes("variable.other.identifier")));
+    check("_ANode is NOT scoped as constant.other", !aNodeScopes.some((s) => s.includes("constant.other")));
+    check("_BNode (an expression operand) scoped as variable.other.identifier", bNodeScopes.some((s) => s.includes("variable.other.identifier")));
+  }
+
+  // A bareword that IS the entire assignment right-hand side (nothing
+  // follows) still can't be told apart from a genuine keyword=value pair
+  // value by a grammar with no real parse tree -- documented trade-off,
+  // unchanged by the fix above.
+  {
+    const line = "X = _ANode";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const scopes = scopesAt(tokens, line.indexOf("_ANode"));
+    check("_ANode as a whole-RHS copy still scoped as constant.other (documented trade-off)", scopes.some((s) => s.includes("constant.other")));
   }
 
   // A name already owned by a more specific category never falls through to

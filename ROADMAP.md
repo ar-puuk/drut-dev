@@ -100,7 +100,10 @@ already been researched or partially unblocked; see the note per item.
    same `publish.yml` dispatch (extension + all 5 crates, `voyager-core` →
    `drut-config` → `drut-lsp`/`drut-mcp` → `drut-cli`). v0.3.1 published
    2026-08-19 the same way, same day (the `028-identifier-highlighting`
-   merge plus its accompanying `voyager-core` casing fix).
+   merge plus its accompanying `voyager-core` casing fix). v0.3.2 published
+   2026-08-19 the same way, same day (a `#pair-values` grammar follow-up fix
+   plus a README refresh, both found/requested immediately after the 0.3.1
+   publish).
    - ✅ *Fixed 2026-08-13*: `vsce` packaging `editors/vscode/` in isolation
      meant the repo-root `LICENSE-MIT`/`LICENSE-APACHE` files never made it
      into the `.vsix`. Both are now copied into `editors/vscode/` directly,

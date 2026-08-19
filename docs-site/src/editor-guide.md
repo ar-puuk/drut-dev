@@ -173,13 +173,19 @@ None of these ever touch a rule they didn't add themselves — another
 extension's customizations, or your own hand-written ones, always survive
 untouched.
 
-A bareword immediately before or after `=` always renders under
-`pairKeywords`/`pairValues`, even if it's also a `userVariables`-shaped
-identifier — this grammar has no real parse tree to tell a keyword-pair's
-own value (`PGM=MATRIX`'s `MATRIX`) apart from an ordinary assignment's
-variable reference (`X = _ANode`'s `_ANode`), so `userVariables` only
-covers identifier positions no other category already reaches (e.g. an
-operand elsewhere in an expression). `dataReferences` is the one exception:
+A bareword immediately before `=` always renders under `pairKeywords`, even
+if it's also a `userVariables`-shaped identifier (`LINKID` in `LINKID =
+_ANode`) — this grammar has no real parse tree to tell a keyword-pair's own
+name apart from an ordinary assignment's target variable. The bareword
+immediately *after* `=` renders under `pairValues` only when it's the
+entire right-hand side, with nothing else following (`X = _ANode` alone) —
+that shape is genuinely indistinguishable from a keyword-pair's own value
+(`PGM=MATRIX`'s `MATRIX`) without a real parse tree. As soon as anything
+else follows on the same right-hand side — another operand, an operator, a
+string — the whole expression falls to `userVariables` instead, so
+`LINKID = _ANode + '_' + _BNode`'s `_ANode` and `_BNode` render identically
+(neither is a real keyword-pair value). `dataReferences` is the one
+exception to the adjacency rule entirely:
 a recognized data-reference name always wins that category even when it's
 also pair-keyword-shaped (`ZONES` in `RUN PGM=MATRIX ZONES=5` renders under
 `dataReferences`, not `pairKeywords`).

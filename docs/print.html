@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-8657f792.js";
+            window.path_to_searchindex_js = "searchindex-2408f666.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c6afe1e7.js"></script>
@@ -588,13 +588,18 @@ clearing it afterward reverts to the theme’s color, not a stuck last value.
 None of these ever touch a rule they didn’t add themselves — another
 extension’s customizations, or your own hand-written ones, always survive
 untouched.</p>
-<p>A bareword immediately before or after <code>=</code> always renders under
-<code>pairKeywords</code>/<code>pairValues</code>, even if it’s also a <code>userVariables</code>-shaped
-identifier — this grammar has no real parse tree to tell a keyword-pair’s
-own value (<code>PGM=MATRIX</code>’s <code>MATRIX</code>) apart from an ordinary assignment’s
-variable reference (<code>X = _ANode</code>’s <code>_ANode</code>), so <code>userVariables</code> only
-covers identifier positions no other category already reaches (e.g. an
-operand elsewhere in an expression). <code>dataReferences</code> is the one exception:
+<p>A bareword immediately before <code>=</code> always renders under <code>pairKeywords</code>, even
+if it’s also a <code>userVariables</code>-shaped identifier (<code>LINKID</code> in <code>LINKID =  _ANode</code>) — this grammar has no real parse tree to tell a keyword-pair’s own
+name apart from an ordinary assignment’s target variable. The bareword
+immediately <em>after</em> <code>=</code> renders under <code>pairValues</code> only when it’s the
+entire right-hand side, with nothing else following (<code>X = _ANode</code> alone) —
+that shape is genuinely indistinguishable from a keyword-pair’s own value
+(<code>PGM=MATRIX</code>’s <code>MATRIX</code>) without a real parse tree. As soon as anything
+else follows on the same right-hand side — another operand, an operator, a
+string — the whole expression falls to <code>userVariables</code> instead, so
+<code>LINKID = _ANode + '_' + _BNode</code>’s <code>_ANode</code> and <code>_BNode</code> render identically
+(neither is a real keyword-pair value). <code>dataReferences</code> is the one
+exception to the adjacency rule entirely:
 a recognized data-reference name always wins that category even when it’s
 also pair-keyword-shaped (<code>ZONES</code> in <code>RUN PGM=MATRIX ZONES=5</code> renders under
 <code>dataReferences</code>, not <code>pairKeywords</code>).</p>

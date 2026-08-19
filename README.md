@@ -34,10 +34,16 @@ cargo build --release -p drut-cli
 
 ## Features
 
+- **Syntax highlighting** — a static TextMate grammar (works even before the
+  language server starts) covering control words, function calls,
+  `keyword=value` pairs, data references (`MI`/`MW`/`DBA`/`ZONES`/...), and
+  ordinary user variables, each independently recolorable via
+  `drut.highlight.*` settings.
 - **Structural diagnostics** — unmatched `IF`/`LOOP`/`RUN`/`PROCESS` blocks,
   unclosed comments, and other real mistakes, flagged before you run the
   model.
-- **Formatting** — consistent indentation and, optionally, keyword casing,
+- **Formatting** — consistent indentation and, optionally, casing (control
+  words, pair keywords, data references, and function names, independently),
   on save, on paste, or from the CLI. `; FMT: OFF` / `; FMT: ON` markers
   exclude a specific range when you need to.
 - **Hover, autocomplete, and "did you mean" spell-check** for control words

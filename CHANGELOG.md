@@ -11,6 +11,24 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-08-19
+
+### Fixed
+
+- `userVariables` highlighting still didn't reach an identifier immediately
+  after `=` when it was only the *first* operand of a larger expression
+  (`LINKID = _ANode + '_' + _BNode`'s `_ANode` rendered as a `pairValues`
+  bareword while `_BNode`, two tokens later, correctly rendered as
+  `userVariables`) — found in the same real production script as
+  `028-identifier-highlighting`'s original fix, immediately after upgrading
+  to 0.3.1. `#pair-values` now excludes a bareword that's itself followed by
+  more expression (an operator, a quoted string, `(`, or `[`), so both
+  operands of the same expression render identically. A bareword that *is*
+  the entire assignment right-hand side (`X = _ANode` alone) is still
+  genuinely indistinguishable from a real keyword-pair value without a real
+  parse tree, and keeps the `pairValues` scope — documented, not a
+  regression.
+
 ## [0.3.1] - 2026-08-19
 
 ### Fixed
