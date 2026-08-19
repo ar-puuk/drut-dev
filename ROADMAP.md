@@ -98,7 +98,9 @@ already been researched or partially unblocked; see the note per item.
    practice, so item 7 remains a real, tracked gap for the versions already
    live, not a hard blocker that held. v0.3.0 published 2026-08-19 via the
    same `publish.yml` dispatch (extension + all 5 crates, `voyager-core` →
-   `drut-config` → `drut-lsp`/`drut-mcp` → `drut-cli`).
+   `drut-config` → `drut-lsp`/`drut-mcp` → `drut-cli`). v0.3.1 published
+   2026-08-19 the same way, same day (the `028-identifier-highlighting`
+   merge plus its accompanying `voyager-core` casing fix).
    - ✅ *Fixed 2026-08-13*: `vsce` packaging `editors/vscode/` in isolation
      meant the repo-root `LICENSE-MIT`/`LICENSE-APACHE` files never made it
      into the `.vsix`. Both are now copied into `editors/vscode/` directly,
