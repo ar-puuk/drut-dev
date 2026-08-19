@@ -1,6 +1,6 @@
 [package]
 name = "drut-mcp"
-version = "0.3.3"
+version = "0.4.0"
 edition = "2021"
 description = "Drut MCP server: read-only diagnose/format/query_structure/lookup_keyword tools over voyager-core"
 license = "MIT OR Apache-2.0"
@@ -13,8 +13,8 @@ repository = "https://github.com/ar-puuk/drut-dev"
 # (research.md §1) -- but it stops here: voyager-core, drut-cli's other
 # subcommands, and drut-lsp remain fully synchronous (T004 verifies this).
 [dependencies]
-voyager-core = { path = "../voyager-core", version = "0.3.3" }
-drut-config = { path = "../drut-config", version = "0.3.3" }
+voyager-core = { path = "../voyager-core", version = "0.4.0" }
+drut-config = { path = "../drut-config", version = "0.4.0" }
 # schemars pinned to "1" (not "0.8") deliberately -- rmcp 3.1.2 itself
 # depends on schemars 1.2.2 for its own #[tool] macro's schema generation,
 # confirmed via `cargo tree -i schemars@1.2.2`; deriving JsonSchema from a

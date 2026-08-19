@@ -11,6 +11,8 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-19
+
 ### Added
 
 - Automatic line-width wrapping for over-long `Control` statements
