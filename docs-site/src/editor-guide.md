@@ -114,7 +114,7 @@ back) — unless you configure `drut.highlight.namedVariables` (below).
 
 ## Editor client settings
 
-All 10 `[format]` fields (see the [Configuration Reference](configuration-reference.md))
+All 13 `[format]` fields (see the [Configuration Reference](configuration-reference.md))
 are also available as personal VS Code settings, not only via a project's
 committed `drut.toml`:
 
@@ -130,6 +130,9 @@ committed `drut.toml`:
 | `drut.format.blankLines` | `blank_lines` |
 | `drut.format.blankLinesTopCap` | `blank_lines_top_cap` |
 | `drut.format.blankLinesNestedCap` | `blank_lines_nested_cap` |
+| `drut.format.lineWrap` | `line_wrap` |
+| `drut.format.lineWrapWidth` | `line_wrap_width` |
+| `drut.format.lineWrapStyle` | `line_wrap_style` |
 
 Set these through VS Code's built-in Settings UI (search for "drut"), or
 directly in `settings.json`. **A `drut.toml` value always wins** over a

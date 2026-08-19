@@ -50,6 +50,9 @@ for accepted values, defaults, and what each actually does:
 | `--blank-lines` | [`blank_lines`](configuration-reference.md#blank_lines) |
 | `--blank-lines-top-cap` | [`blank_lines_top_cap`](configuration-reference.md#blank_lines_top_cap) |
 | `--blank-lines-nested-cap` | [`blank_lines_nested_cap`](configuration-reference.md#blank_lines_nested_cap) |
+| `--line-wrap` | [`line_wrap`](configuration-reference.md#line_wrap) |
+| `--line-wrap-width` | [`line_wrap_width`](configuration-reference.md#line_wrap_width) |
+| `--line-wrap-style` | [`line_wrap_style`](configuration-reference.md#line_wrap_style) |
 
 An explicit flag here always wins over `drut.toml` and any editor setting for
 that one run — see the Configuration Reference's

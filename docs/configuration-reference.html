@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec7ea217.js";
+            window.path_to_searchindex_js = "searchindex-4740b0e1.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c6afe1e7.js"></script>
@@ -209,6 +209,9 @@ the full field list or its defaults from scratch:</p>
 # blank_lines = "preserve"             # preserve | auto
 # blank_lines_top_cap = 2              # 1-50, only used when blank_lines = "auto"
 # blank_lines_nested_cap = 1           # 1-50, only used when blank_lines = "auto"
+# line_wrap = "preserve"               # preserve | auto
+# line_wrap_width = 120                # 20-500, only used when line_wrap = "auto"
+# line_wrap_style = "fill"             # fill | one_per_line, only used when line_wrap = "auto"
 </code></pre>
 <p>See <a href="#fields">Fields</a> below for what each one actually does, and
 <a href="#precedence">Precedence</a> for how a set value interacts with CLI flags, MCP
@@ -410,6 +413,95 @@ blank_lines_nested_cap = 2
 <p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above. Same
 out-of-range handling as
 <a href="#blank_lines_top_cap"><code>blank_lines_top_cap</code></a>.</p>
+<h3 id="line_wrap"><a class="header" href="#line_wrap"><code>line_wrap</code></a></h3>
+<p>Whether an over-width <code>Control</code> statement’s <code>keyword=value</code> pair list is wrapped
+across multiple physical lines, using Cube Voyager’s own existing
+line-continuation syntax (a trailing comma already tells the parser the next
+physical line continues the same statement — no new syntax is introduced). Only
+<code>Control</code> statements are eligible — an <code>Assignment</code> statement’s arithmetic/string
+expression is out of scope. A statement that already contains a continuation
+character anywhere is left completely untouched, however long, regardless of
+width — never re-flowed, which is also what makes this field idempotent by
+construction: once wrapped, a statement is “already continued” on the next pass.</p>
+<p><strong>Values</strong>:</p>
+<ul>
+<li><code>preserve</code> <strong>← default</strong> — leave every line exactly as written, however long.</li>
+<li><code>auto</code> — wrap once a statement’s line length exceeds
+<a href="#line_wrap_width"><code>line_wrap_width</code></a>, using
+<a href="#line_wrap_style"><code>line_wrap_style</code></a> to decide how pairs are distributed
+across the new continuation lines.</li>
+</ul>
+<p><strong>Default</strong>: <code>preserve</code>.</p>
+<p><strong>Also known as</strong>: CLI flag <code>--line-wrap</code>; MCP <code>format</code> tool parameter
+<code>line_wrap</code>.</p>
+<p><strong>Example</strong> (width lowered to <code>40</code> here only to keep the before/after readable on
+this page — <code>120</code> is the real default):</p>
+<pre><code class="language-toml">[format]
+line_wrap = "auto"
+line_wrap_width = 40
+</code></pre>
+<p>Before:</p>
+<pre><code>RUN PGM=MATRIX, ZONES=5, PRINT=1, COMBINE=T
+</code></pre>
+<p>After, with <code>line_wrap_style = "fill"</code> (the default) — packs as many pairs as
+fit per continuation line:</p>
+<pre><code>RUN PGM=MATRIX, ZONES=5, PRINT=1,
+    COMBINE=T
+</code></pre>
+<p>After, with <code>line_wrap_style = "one_per_line"</code> instead — exactly one pair per
+continuation line:</p>
+<pre><code>RUN PGM=MATRIX,
+    ZONES=5,
+    PRINT=1,
+    COMBINE=T
+</code></pre>
+<p>See the <a href="formatter-guide.html#line-wrapping">Formatter Guide</a> for this same
+example plus the already-hand-wrapped case.</p>
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above.</p>
+<h3 id="line_wrap_width"><a class="header" href="#line_wrap_width"><code>line_wrap_width</code></a></h3>
+<p>The maximum line width <a href="#line_wrap"><code>line_wrap</code></a> <code>= "auto"</code> wraps toward — once
+a <code>Control</code> statement’s line exceeds this many characters, it becomes a wrap
+candidate. Only meaningful when <code>line_wrap</code> is <code>"auto"</code>.</p>
+<p><strong>Values</strong>: any integer from <code>20</code> to <code>500</code> — <strong>default <code>120</code></strong>.</p>
+<p><strong>Default</strong>: <code>120</code>.</p>
+<p><strong>Also known as</strong>: CLI flag <code>--line-wrap-width</code>; MCP <code>format</code> tool parameter
+<code>line_wrap_width</code>.</p>
+<p><strong>Example</strong>:</p>
+<pre><code class="language-toml">[format]
+line_wrap = "auto"
+line_wrap_width = 100
+</code></pre>
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above. An
+out-of-range value at any tier is treated as unset for that tier, same as
+<a href="#indent_width"><code>indent_width</code></a>.</p>
+<h3 id="line_wrap_style"><a class="header" href="#line_wrap_style"><code>line_wrap_style</code></a></h3>
+<p>How a wrapped statement’s <code>keyword=value</code> pairs are distributed across the new
+continuation lines once <a href="#line_wrap"><code>line_wrap</code></a> wraps it. Only meaningful when
+<code>line_wrap</code> is <code>"auto"</code>.</p>
+<p><strong>Values</strong>:</p>
+<ul>
+<li><code>fill</code> <strong>← default</strong> — greedily packs as many pairs as fit within
+<a href="#line_wrap_width"><code>line_wrap_width</code></a> onto each continuation line before
+breaking.</li>
+<li><code>one_per_line</code> — places exactly one pair per continuation line, regardless of
+how much width is left over on any given line.</li>
+</ul>
+<p><strong>Default</strong>: <code>fill</code> — chosen over <code>one_per_line</code> deliberately: a statement’s
+wrap style, once applied, is never undone by a later format pass (see
+<a href="#line_wrap"><code>line_wrap</code></a> above), so <code>fill</code> is the cheaper direction to
+manually diverge from afterward if you don’t like it for one specific
+statement, versus starting from <code>one_per_line</code> and wanting to hand-compact it
+back down.</p>
+<p><strong>Also known as</strong>: CLI flag <code>--line-wrap-style</code>; MCP <code>format</code> tool parameter
+<code>line_wrap_style</code>.</p>
+<p><strong>Example</strong>:</p>
+<pre><code class="language-toml">[format]
+line_wrap = "auto"
+line_wrap_style = "one_per_line"
+</code></pre>
+<p>See <a href="#line_wrap"><code>line_wrap</code></a> above for the before/after example showing both
+styles side by side.</p>
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above.</p>
 
                     </main>
 

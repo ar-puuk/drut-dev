@@ -11,6 +11,32 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+### Added
+
+- Automatic line-width wrapping for over-long `Control` statements
+  (`030-auto-line-wrap`), opt-in via a new `line_wrap` field
+  (`preserve`/`auto`, same mode-toggle shape as `blank_lines`) plus two
+  companion fields, `line_wrap_width` (`20`-`500`, default `120`) and
+  `line_wrap_style` (`fill`/`one_per_line`, default `fill`). Wraps a
+  `Control` statement's comma-separated `keyword=value` pair list across
+  physical lines using Cube Voyager's own existing line-continuation syntax
+  (a trailing comma) once it exceeds `line_wrap_width` — an `Assignment`
+  statement's arithmetic/string expression is out of scope. A statement
+  that already contains a continuation character anywhere is left
+  completely untouched, which is also what makes the feature idempotent by
+  construction. `fill` (greedy packing) is the default rather than
+  `one_per_line`, since a statement's wrap style is never undone by a later
+  format pass, so the cheaper-to-manually-diverge-from direction was
+  chosen as the default. Reachable via `drut.toml`'s `line_wrap`/
+  `line_wrap_width`/`line_wrap_style`, the CLI's `--line-wrap`/
+  `--line-wrap-width`/`--line-wrap-style`, the MCP `format` tool's
+  matching parameters, and the VS Code `drut.format.lineWrap`/
+  `drut.format.lineWrapWidth`/`drut.format.lineWrapStyle` settings.
+  Defaults to `preserve` — zero behavior change for any project that
+  doesn't opt in. Required a narrow Constitution Principle III amendment
+  (1.1.1 → 1.2.0) to permit configurable continuation-break insertion using
+  only the language's own existing continuation syntax.
+
 ## [0.3.3] - 2026-08-19
 
 ### Fixed

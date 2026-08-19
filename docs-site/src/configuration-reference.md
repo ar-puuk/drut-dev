@@ -35,6 +35,9 @@ the full field list or its defaults from scratch:
 # blank_lines = "preserve"             # preserve | auto
 # blank_lines_top_cap = 2              # 1-50, only used when blank_lines = "auto"
 # blank_lines_nested_cap = 1           # 1-50, only used when blank_lines = "auto"
+# line_wrap = "preserve"               # preserve | auto
+# line_wrap_width = 120                # 20-500, only used when line_wrap = "auto"
+# line_wrap_style = "fill"             # fill | one_per_line, only used when line_wrap = "auto"
 ```
 
 See [Fields](#fields) below for what each one actually does, and
@@ -325,3 +328,126 @@ blank_lines_nested_cap = 2
 **Precedence**: follows the [four-tier chain](#precedence) above. Same
 out-of-range handling as
 [`blank_lines_top_cap`](#blank_lines_top_cap).
+
+### `line_wrap`
+
+Whether an over-width `Control` statement's `keyword=value` pair list is wrapped
+across multiple physical lines, using Cube Voyager's own existing
+line-continuation syntax (a trailing comma already tells the parser the next
+physical line continues the same statement — no new syntax is introduced). Only
+`Control` statements are eligible — an `Assignment` statement's arithmetic/string
+expression is out of scope. A statement that already contains a continuation
+character anywhere is left completely untouched, however long, regardless of
+width — never re-flowed, which is also what makes this field idempotent by
+construction: once wrapped, a statement is "already continued" on the next pass.
+
+**Values**:
+- `preserve` **← default** — leave every line exactly as written, however long.
+- `auto` — wrap once a statement's line length exceeds
+  [`line_wrap_width`](#line_wrap_width), using
+  [`line_wrap_style`](#line_wrap_style) to decide how pairs are distributed
+  across the new continuation lines.
+
+**Default**: `preserve`.
+
+**Also known as**: CLI flag `--line-wrap`; MCP `format` tool parameter
+`line_wrap`.
+
+**Example** (width lowered to `40` here only to keep the before/after readable on
+this page — `120` is the real default):
+
+```toml
+[format]
+line_wrap = "auto"
+line_wrap_width = 40
+```
+
+Before:
+
+```
+RUN PGM=MATRIX, ZONES=5, PRINT=1, COMBINE=T
+```
+
+After, with `line_wrap_style = "fill"` (the default) — packs as many pairs as
+fit per continuation line:
+
+```
+RUN PGM=MATRIX, ZONES=5, PRINT=1,
+    COMBINE=T
+```
+
+After, with `line_wrap_style = "one_per_line"` instead — exactly one pair per
+continuation line:
+
+```
+RUN PGM=MATRIX,
+    ZONES=5,
+    PRINT=1,
+    COMBINE=T
+```
+
+See the [Formatter Guide](formatter-guide.md#line-wrapping) for this same
+example plus the already-hand-wrapped case.
+
+**Precedence**: follows the [four-tier chain](#precedence) above.
+
+### `line_wrap_width`
+
+The maximum line width [`line_wrap`](#line_wrap) `= "auto"` wraps toward — once
+a `Control` statement's line exceeds this many characters, it becomes a wrap
+candidate. Only meaningful when `line_wrap` is `"auto"`.
+
+**Values**: any integer from `20` to `500` — **default `120`**.
+
+**Default**: `120`.
+
+**Also known as**: CLI flag `--line-wrap-width`; MCP `format` tool parameter
+`line_wrap_width`.
+
+**Example**:
+
+```toml
+[format]
+line_wrap = "auto"
+line_wrap_width = 100
+```
+
+**Precedence**: follows the [four-tier chain](#precedence) above. An
+out-of-range value at any tier is treated as unset for that tier, same as
+[`indent_width`](#indent_width).
+
+### `line_wrap_style`
+
+How a wrapped statement's `keyword=value` pairs are distributed across the new
+continuation lines once [`line_wrap`](#line_wrap) wraps it. Only meaningful when
+`line_wrap` is `"auto"`.
+
+**Values**:
+- `fill` **← default** — greedily packs as many pairs as fit within
+  [`line_wrap_width`](#line_wrap_width) onto each continuation line before
+  breaking.
+- `one_per_line` — places exactly one pair per continuation line, regardless of
+  how much width is left over on any given line.
+
+**Default**: `fill` — chosen over `one_per_line` deliberately: a statement's
+wrap style, once applied, is never undone by a later format pass (see
+[`line_wrap`](#line_wrap) above), so `fill` is the cheaper direction to
+manually diverge from afterward if you don't like it for one specific
+statement, versus starting from `one_per_line` and wanting to hand-compact it
+back down.
+
+**Also known as**: CLI flag `--line-wrap-style`; MCP `format` tool parameter
+`line_wrap_style`.
+
+**Example**:
+
+```toml
+[format]
+line_wrap = "auto"
+line_wrap_style = "one_per_line"
+```
+
+See [`line_wrap`](#line_wrap) above for the before/after example showing both
+styles side by side.
+
+**Precedence**: follows the [four-tier chain](#precedence) above.

@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec7ea217.js";
+            window.path_to_searchindex_js = "searchindex-4740b0e1.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c6afe1e7.js"></script>
@@ -301,6 +301,45 @@ padding a shorter run up:</p>
  
  ENDRUN
 </code></pre>
+<h2 id="line-wrapping"><a class="header" href="#line-wrapping">Line wrapping</a></h2>
+<p><code>preserve</code> (the default) leaves every line exactly as written, however long.
+<code>auto</code> wraps an over-width <code>Control</code> statement’s <code>keyword=value</code> pair list
+across multiple physical lines once it exceeds
+<a href="configuration-reference.html#line_wrap_width"><code>line_wrap_width</code></a> (default
+<code>120</code>) — using Cube Voyager’s own existing line-continuation syntax, the same
+trailing comma that already makes the next physical line a continuation of the
+same statement. Only <code>Control</code> statements are eligible; an <code>Assignment</code>
+statement’s arithmetic/string expression is never touched by this feature.</p>
+<p><a href="configuration-reference.html#line_wrap_style"><code>line_wrap_style</code></a> decides how
+pairs are distributed across the new continuation lines. <code>fill</code> (the default)
+packs as many pairs as fit per line:</p>
+<pre><code class="language-diff">-RUN PGM=MATRIX, ZONES=5, PRINT=1, COMBINE=T
++RUN PGM=MATRIX, ZONES=5, PRINT=1,
++    COMBINE=T
+</code></pre>
+<p><code>one_per_line</code> places exactly one pair per continuation line instead, however
+much width is left over on any given line:</p>
+<pre><code class="language-diff">-RUN PGM=MATRIX, ZONES=5, PRINT=1, COMBINE=T
++RUN PGM=MATRIX,
++    ZONES=5,
++    PRINT=1,
++    COMBINE=T
+</code></pre>
+<p>(Both examples above use a narrowed <code>line_wrap_width = 40</code> so the wrap is
+visible at doc-page width — the real default is <code>120</code>.)</p>
+<p>A statement that already contains a continuation character anywhere — i.e. you
+already hand-wrapped it — is left completely untouched, regardless of width:</p>
+<pre><code>RUN PGM=MATRIX,
+    ZONES=5, PRINT=1, COMBINE=T
+</code></pre>
+<p>stays exactly as written under <code>line_wrap = "auto"</code>, even though the combined
+statement is well over 40 characters. This is deliberate, not a missed case:
+it’s the safest boundary for an output-modifying transform (no fighting
+hand-formatted content) and it’s also what makes the feature idempotent by
+construction — once <code>auto</code> wraps a statement, the wrapped result itself
+contains a continuation character, so a second format pass sees “already
+continued” and leaves it alone. <code>format(format(x)) == format(x)</code> holds without
+needing to re-derive it from scratch.</p>
 <h2 id="-fmt-off---fmt-on-regions"><a class="header" href="#-fmt-off---fmt-on-regions"><code>; FMT: OFF</code> / <code>; FMT: ON</code> regions</a></h2>
 <p>Wrap a range in <code>; FMT: OFF</code> / <code>; FMT: ON</code> to exclude it from formatting
 entirely — useful for a block whose hand-tuned spacing carries meaning to a

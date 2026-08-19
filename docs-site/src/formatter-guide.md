@@ -153,6 +153,58 @@ padding a shorter run up:
  ENDRUN
 ```
 
+## Line wrapping
+
+`preserve` (the default) leaves every line exactly as written, however long.
+`auto` wraps an over-width `Control` statement's `keyword=value` pair list
+across multiple physical lines once it exceeds
+[`line_wrap_width`](configuration-reference.md#line_wrap_width) (default
+`120`) — using Cube Voyager's own existing line-continuation syntax, the same
+trailing comma that already makes the next physical line a continuation of the
+same statement. Only `Control` statements are eligible; an `Assignment`
+statement's arithmetic/string expression is never touched by this feature.
+
+[`line_wrap_style`](configuration-reference.md#line_wrap_style) decides how
+pairs are distributed across the new continuation lines. `fill` (the default)
+packs as many pairs as fit per line:
+
+```diff
+-RUN PGM=MATRIX, ZONES=5, PRINT=1, COMBINE=T
++RUN PGM=MATRIX, ZONES=5, PRINT=1,
++    COMBINE=T
+```
+
+`one_per_line` places exactly one pair per continuation line instead, however
+much width is left over on any given line:
+
+```diff
+-RUN PGM=MATRIX, ZONES=5, PRINT=1, COMBINE=T
++RUN PGM=MATRIX,
++    ZONES=5,
++    PRINT=1,
++    COMBINE=T
+```
+
+(Both examples above use a narrowed `line_wrap_width = 40` so the wrap is
+visible at doc-page width — the real default is `120`.)
+
+A statement that already contains a continuation character anywhere — i.e. you
+already hand-wrapped it — is left completely untouched, regardless of width:
+
+```
+RUN PGM=MATRIX,
+    ZONES=5, PRINT=1, COMBINE=T
+```
+
+stays exactly as written under `line_wrap = "auto"`, even though the combined
+statement is well over 40 characters. This is deliberate, not a missed case:
+it's the safest boundary for an output-modifying transform (no fighting
+hand-formatted content) and it's also what makes the feature idempotent by
+construction — once `auto` wraps a statement, the wrapped result itself
+contains a continuation character, so a second format pass sees "already
+continued" and leaves it alone. `format(format(x)) == format(x)` holds without
+needing to re-derive it from scratch.
+
 ## `; FMT: OFF` / `; FMT: ON` regions
 
 Wrap a range in `; FMT: OFF` / `; FMT: ON` to exclude it from formatting
