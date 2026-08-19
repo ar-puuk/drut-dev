@@ -92,12 +92,13 @@ already been researched or partially unblocked; see the note per item.
    **before** item 8's extension publish goes live, not after — publishing an
    extension that isn't yet "batteries included" would ship a v1 that fails
    the project's own stated bar the moment someone installs it.
-8. **Actual publish** (VS Code Marketplace + Open VSX + crates.io) — *not
-   started*. Two independent sub-parts: the extension (Marketplace + Open
-   VSX, blocked on item 7 per above) and the Rust crates (`crates.io`,
-   independent of item 7 — blocked only on adding `version` fields to every
-   internal path dependency, which `cargo publish` requires and which are
-   currently absent from all five `Cargo.toml`s).
+8. **Actual publish** (VS Code Marketplace + Open VSX + crates.io) — ✅ *live*.
+   First published 2026-08-18 (v0.2.0, then v0.2.1 same day) ahead of item 7
+   landing — the "batteries included" ordering note below was not honored in
+   practice, so item 7 remains a real, tracked gap for the versions already
+   live, not a hard blocker that held. v0.3.0 published 2026-08-19 via the
+   same `publish.yml` dispatch (extension + all 5 crates, `voyager-core` →
+   `drut-config` → `drut-lsp`/`drut-mcp` → `drut-cli`).
    - ✅ *Fixed 2026-08-13*: `vsce` packaging `editors/vscode/` in isolation
      meant the repo-root `LICENSE-MIT`/`LICENSE-APACHE` files never made it
      into the `.vsix`. Both are now copied into `editors/vscode/` directly,
