@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-554d1b9c.js";
+            window.path_to_searchindex_js = "searchindex-8657f792.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c6afe1e7.js"></script>
@@ -501,6 +501,8 @@ server even attaches) recognizes these categories:</p>
 <tr><td>Function calls</td><td>A recognized Cube Voyager built-in function name immediately followed by <code>(</code> — <code>REPLACESTR(...)</code>, <code>ROUND(...)</code>, and 136 others (see the <a href="#function-call-casing">Formatter Guide</a> for the full list)</td><td><code>support.function.builtin.drut</code></td></tr>
 <tr><td>Pair-keyword names</td><td>A <code>keyword=value</code> pair’s keyword, e.g. <code>PATHLOAD</code>’s <code>PATH</code></td><td><code>variable.parameter.drut</code></td></tr>
 <tr><td>Values</td><td>A pair’s bareword value, e.g. <code>PGM=MATRIX</code>’s <code>MATRIX</code></td><td><code>constant.other.drut</code></td></tr>
+<tr><td>Data references</td><td>The Matrix/Line/Node/Zone/Database family (<code>MI</code>, <code>MW</code>, <code>DBA</code>, <code>ZONES</code>, …), by name, regardless of position</td><td><code>variable.language.data-reference.drut</code></td></tr>
+<tr><td>User variables</td><td>Any other bareword identifier not covered by a category above</td><td><code>variable.other.identifier.drut</code></td></tr>
 <tr><td><code>@name@</code> substitution</td><td>Variable references</td><td><code>variable.other.readwrite.drut</code>, plus a semantic-token <code>variable</code> override (below)</td></tr>
 <tr><td>Numbers</td><td>Numeric literals</td><td><code>constant.numeric.drut</code></td></tr>
 <tr><td>Operators</td><td><code>=</code>, <code>+</code>, <code>-</code>, <code>&lt;&gt;</code>, …</td><td><code>keyword.operator.drut</code></td></tr>
@@ -557,7 +559,7 @@ personal settings only</strong> — there is no <code>drut.toml</code> equivalen
 MCP parameter. Color is a personal/accessibility preference (theme,
 colorblindness, monitor), not a shared file-content convention the way casing
 or indentation is, so there’s nothing to put in a committed project file.</p>
-<p>Nine settings, one per category from the Syntax highlighting table above
+<p>Eleven settings, one per category from the Syntax highlighting table above
 (<code>@name@</code> excepted — see below), each an optional CSS color
 (e.g. <code>#RRGGBB</code>):</p>
 <div class="table-wrapper">
@@ -571,6 +573,8 @@ or indentation is, so there’s nothing to put in a committed project file.</p>
 <tr><td><code>drut.highlight.functionCalls</code></td><td>Function calls</td></tr>
 <tr><td><code>drut.highlight.pairKeywords</code></td><td>Pair-keyword names</td></tr>
 <tr><td><code>drut.highlight.values</code></td><td>Values</td></tr>
+<tr><td><code>drut.highlight.dataReferences</code></td><td>Data references</td></tr>
+<tr><td><code>drut.highlight.userVariables</code></td><td>User variables</td></tr>
 <tr><td><code>drut.highlight.numbers</code></td><td>Numbers</td></tr>
 <tr><td><code>drut.highlight.operators</code></td><td>Operators</td></tr>
 <tr><td><code>drut.highlight.comments</code></td><td>Comments</td></tr>
@@ -584,6 +588,16 @@ clearing it afterward reverts to the theme’s color, not a stuck last value.
 None of these ever touch a rule they didn’t add themselves — another
 extension’s customizations, or your own hand-written ones, always survive
 untouched.</p>
+<p>A bareword immediately before or after <code>=</code> always renders under
+<code>pairKeywords</code>/<code>pairValues</code>, even if it’s also a <code>userVariables</code>-shaped
+identifier — this grammar has no real parse tree to tell a keyword-pair’s
+own value (<code>PGM=MATRIX</code>’s <code>MATRIX</code>) apart from an ordinary assignment’s
+variable reference (<code>X = _ANode</code>’s <code>_ANode</code>), so <code>userVariables</code> only
+covers identifier positions no other category already reaches (e.g. an
+operand elsewhere in an expression). <code>dataReferences</code> is the one exception:
+a recognized data-reference name always wins that category even when it’s
+also pair-keyword-shaped (<code>ZONES</code> in <code>RUN PGM=MATRIX ZONES=5</code> renders under
+<code>dataReferences</code>, not <code>pairKeywords</code>).</p>
 <p><strong><code>drut.highlight.namedVariables</code></strong> (<code>@name@</code> substitution) works the same way
 from a user’s perspective, but is written into the current <em>workspace’s</em>
 settings (<code>.vscode/settings.json</code>), not your personal/global settings — VS
