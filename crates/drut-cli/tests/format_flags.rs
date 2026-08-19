@@ -707,3 +707,79 @@ fn blank_line_cap_out_of_range_is_a_usage_error_not_a_silent_clamp() {
     assert_ne!(out.status.code(), Some(0));
     assert_eq!(fs::read_to_string(&file).unwrap(), MESSY);
 }
+
+// -- 030-auto-line-wrap (tasks.md T020) --
+
+const LONG_RUN: &str = "RUN PGM=MATRIX, ZONES=5, PRINT=1, MSG='hello world', FILEI=ni.1, FILEO=no.1\nENDRUN\n";
+
+#[test]
+fn line_wrap_flag_overrides_a_drut_toml_resolved_preserve_for_one_run() {
+    let dir = TempDir::new("line-wrap-flag");
+    fs::write(dir.path().join("drut.toml"), "[format]\nline_wrap = \"preserve\"\n").unwrap();
+    let file = dir.path().join("x.s");
+    fs::write(&file, LONG_RUN).unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--line-wrap=auto", "--line-wrap-width=40"]);
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(stdout.contains(",\n    "), "expected at least one wrapped continuation line, got: {stdout:?}");
+}
+
+#[test]
+fn line_wrap_width_flag_overrides_the_default() {
+    let dir = TempDir::new("line-wrap-width-flag");
+    let file = dir.path().join("x.s");
+    fs::write(&file, LONG_RUN).unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--line-wrap=auto", "--line-wrap-width=20"]);
+    assert_eq!(out.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    // A tighter width than the default (120) produces more wrap points.
+    assert!(stdout.matches(",\n    ").count() >= 2, "expected multiple wrapped continuation lines at width 20, got: {stdout:?}");
+}
+
+#[test]
+fn line_wrap_style_flag_overrides_the_default() {
+    let dir = TempDir::new("line-wrap-style-flag");
+    let file = dir.path().join("x.s");
+    fs::write(&file, "RUN PGM=MATRIX, ZONES=5, PRINT=1\nENDRUN\n").unwrap();
+
+    let out = drut(&[
+        "format",
+        file.to_str().unwrap(),
+        "--line-wrap=auto",
+        "--line-wrap-width=20",
+        "--line-wrap-style=one-per-line",
+    ]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "RUN PGM=MATRIX,\n    ZONES=5,\n    PRINT=1\nENDRUN\n"
+    );
+}
+
+#[test]
+fn line_wrap_width_out_of_range_is_a_usage_error_not_a_silent_clamp() {
+    let dir = TempDir::new("line-wrap-width-out-of-range");
+    let file = dir.path().join("x.s");
+    fs::write(&file, MESSY).unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--line-wrap=auto", "--line-wrap-width=5"]);
+    assert_ne!(out.status.code(), Some(0));
+    assert_eq!(fs::read_to_string(&file).unwrap(), MESSY);
+
+    let out = drut(&["format", file.to_str().unwrap(), "--line-wrap=auto", "--line-wrap-width=5000"]);
+    assert_ne!(out.status.code(), Some(0));
+    assert_eq!(fs::read_to_string(&file).unwrap(), MESSY);
+}
+
+#[test]
+fn line_wrap_style_invalid_value_is_a_usage_error() {
+    let dir = TempDir::new("line-wrap-style-invalid");
+    let file = dir.path().join("x.s");
+    fs::write(&file, MESSY).unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--line-wrap-style=packed"]);
+    assert_ne!(out.status.code(), Some(0));
+    assert_eq!(fs::read_to_string(&file).unwrap(), MESSY);
+}

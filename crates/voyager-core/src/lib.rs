@@ -18,6 +18,7 @@ pub mod function_call;
 pub mod grammar_notes;
 pub mod keywords;
 pub mod lexer;
+pub mod line_wrap;
 pub mod operator_spacing;
 pub mod span;
 pub mod statement;
@@ -30,7 +31,7 @@ pub use data_reference::{data_reference_entries, data_reference_occurrences, Dat
 pub use diagnostic::{Diagnostic, DiagnosticKind};
 pub use format::{
     format, format_bytes, unclosed_fmt_off_markers, BlankLineMode, CasingConvention, CasingSettings, EncodingFidelity,
-    FormatOptions, FormatResult, OperatorSpacing, IndentTopLevelMode,
+    FormatOptions, FormatResult, LineWrapMode, LineWrapStyle, OperatorSpacing, IndentTopLevelMode,
 };
 pub use function_call::{function_call_entries, function_call_occurrences, FunctionCallEntry, FunctionCallOccurrence};
 pub use keywords::{completion_candidates, did_you_mean, CompletionContext, KeywordEntry, KeywordRole};

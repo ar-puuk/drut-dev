@@ -1,22 +1,43 @@
 <!--
 Sync Impact Report
 ===================
-Version change: 1.1.0 → 1.1.1
-Modified principles: none (no semantic change)
+Version change: 1.1.1 → 1.2.0
+Modified principles:
+  - III. Formatter Idempotence & Behavior Preservation — extended the
+    existing exception list (previously just "optionally and configurably,
+    keyword casing") to also permit optionally and configurably inserting
+    or removing a line-continuation break, using only the language's own
+    existing, already-valid continuation syntax, without altering program
+    meaning. Narrow, explicit carve-out — authorizes exactly this shape of
+    capability (opt-in reflow across physical lines using real continuation
+    syntax, non-meaning-altering) and nothing broader; the core
+    prohibitions (no reordering, no meaning changes, no changes beyond what
+    real continuation syntax already permits) remain fully intact. Driven
+    by 030-auto-line-wrap, an in-progress feature needing to wrap an
+    over-width Control statement across physical lines via Cube Voyager's
+    own existing continuation grammar (001-voyager-script-parser FR-006) —
+    a wrapped statement parses to the identical AST/meaning as its
+    unwrapped form, so this is the same category of presentation-only
+    change casing normalization already was, not a new kind of risk.
 Added sections: none
 Removed sections: none
-Modified sections:
-  - II. No Verbatim Redistribution of Vendor Documentation (bhereth extension
-    reference) — cross-reference fix only: the Credits section this principle
-    requires now lives in CONTRIBUTING.md, not README.md, following the
-    2026-08-13 README/docs restructure (short, visitor-facing README.md;
-    architecture/credits/etc. moved to CONTRIBUTING.md). The binding
-    requirement itself (credit recorded somewhere in the repo, with name,
-    GitHub handle, and a link to the original extension folder) is unchanged.
-  - Development Workflow & Quality Gates — same cross-reference fix, second
-    occurrence.
 Templates requiring follow-up: none
 Deferred/TODO items: none
+
+Previous Sync Impact Report (1.1.0 → 1.1.1), preserved as historical record:
+  Modified principles: none (no semantic change)
+  Added sections: none
+  Removed sections: none
+  Modified sections:
+    - II. No Verbatim Redistribution of Vendor Documentation (bhereth extension
+      reference) — cross-reference fix only: the Credits section this principle
+      requires now lives in CONTRIBUTING.md, not README.md, following the
+      2026-08-13 README/docs restructure (short, visitor-facing README.md;
+      architecture/credits/etc. moved to CONTRIBUTING.md). The binding
+      requirement itself (credit recorded somewhere in the repo, with name,
+      GitHub handle, and a link to the original extension folder) is unchanged.
+    - Development Workflow & Quality Gates — same cross-reference fix, second
+      occurrence.
 
 Previous Sync Impact Report (1.0.0 → 1.1.0), preserved as historical record:
   Modified principles:
@@ -84,12 +105,23 @@ vendor-documentation review gate to cover this case explicitly.
 
 ### III. Formatter Idempotence & Behavior Preservation
 The formatter MUST be idempotent (`format(format(x)) == format(x)`) and strictly
-behavior-preserving: it MUST NOT change which lines are continuations of a prior
-statement, MUST NOT reorder statements, and MUST NOT alter program meaning — only
-whitespace and, optionally and configurably, keyword casing. Every formatter change
-MUST be verified against the fixture corpus with a golden-file diff before merge.
+behavior-preserving: it MUST NOT reorder statements and MUST NOT alter program
+meaning. It MUST NOT change which lines are continuations of a prior statement,
+except optionally and configurably, using only the language's own existing,
+already-valid continuation syntax, and only in a way that does not alter program
+meaning — inserting or removing a continuation break this way reflows a statement's
+presentation across physical lines without changing what it does. Beyond
+whitespace, this narrow continuation carve-out, and optionally and configurably
+keyword casing, no other formatter-driven change to program text is permitted.
+Every formatter change MUST be verified against the fixture corpus with a
+golden-file diff before merge.
 Rationale: A formatter that silently changes program behavior is worse than no
-formatter; idempotence and behavior preservation are the minimum bar for trust.
+formatter; idempotence and behavior preservation are the minimum bar for trust. The
+continuation carve-out exists because the language's own grammar already treats a
+continued statement as semantically identical to its single-line form — reflowing
+between those forms, using only real, already-valid continuation syntax, changes
+presentation, not meaning, the same category of change keyword casing already was;
+it is not a license for broader structural rewrites.
 
 ### IV. False Negatives Over False Positives
 The linter MUST prefer false negatives over false positives. An unflagged bug is
@@ -185,4 +217,4 @@ again before merge. Downstream templates and commands (plan, tasks, checklist, e
 read this constitution at runtime; they are not modified by constitution amendments
 and must be checked separately for consistency when principles change materially.
 
-**Version**: 1.1.1 | **Ratified**: 2026-08-08 | **Last Amended**: 2026-08-13
+**Version**: 1.2.0 | **Ratified**: 2026-08-08 | **Last Amended**: 2026-08-19

@@ -5,9 +5,9 @@ use std::path::{Path, PathBuf};
 use drut_config::{resolve_format_options, ConfigWarning, ExplicitFormatOverride};
 use similar::TextDiff;
 use voyager_core::format::{format_bytes, CasingConvention, EncodingFidelity, OperatorSpacing, IndentTopLevelMode};
-use voyager_core::{BlankLineMode, Position};
+use voyager_core::{BlankLineMode, LineWrapMode, LineWrapStyle, Position};
 
-use crate::cli::{BlankLinesArg, CasingArg, OperatorSpacingArg, IndentTopLevelArg};
+use crate::cli::{BlankLinesArg, CasingArg, LineWrapArg, LineWrapStyleArg, OperatorSpacingArg, IndentTopLevelArg};
 use crate::exit::ExitOutcome;
 use crate::io_util::{write_stdout, write_stdout_line};
 use crate::traverse::{traverse, ReadFailure};
@@ -46,6 +46,24 @@ impl From<BlankLinesArg> for BlankLineMode {
         match value {
             BlankLinesArg::Preserve => BlankLineMode::Preserve,
             BlankLinesArg::Auto => BlankLineMode::Auto,
+        }
+    }
+}
+
+impl From<LineWrapArg> for LineWrapMode {
+    fn from(value: LineWrapArg) -> Self {
+        match value {
+            LineWrapArg::Preserve => LineWrapMode::Preserve,
+            LineWrapArg::Auto => LineWrapMode::Auto,
+        }
+    }
+}
+
+impl From<LineWrapStyleArg> for LineWrapStyle {
+    fn from(value: LineWrapStyleArg) -> Self {
+        match value {
+            LineWrapStyleArg::Fill => LineWrapStyle::Fill,
+            LineWrapStyleArg::OnePerLine => LineWrapStyle::OnePerLine,
         }
     }
 }
@@ -106,6 +124,9 @@ pub fn run(
     blank_lines: Option<BlankLinesArg>,
     blank_lines_top_cap: Option<u8>,
     blank_lines_nested_cap: Option<u8>,
+    line_wrap: Option<LineWrapArg>,
+    line_wrap_width: Option<u16>,
+    line_wrap_style: Option<LineWrapStyleArg>,
     isolated: bool,
 ) -> ExitOutcome {
     let mode = if write {
@@ -128,6 +149,9 @@ pub fn run(
         blank_lines: blank_lines.map(BlankLineMode::from),
         blank_lines_top_cap,
         blank_lines_nested_cap,
+        line_wrap: line_wrap.map(LineWrapMode::from),
+        line_wrap_width,
+        line_wrap_style: line_wrap_style.map(LineWrapStyle::from),
     };
 
     let traversal = traverse(path);

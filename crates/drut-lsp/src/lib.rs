@@ -352,6 +352,9 @@ fn parse_client_format_defaults(value: &serde_json::Value) -> drut_config::Expli
         blank_lines: field("blankLines").and_then(parse_client_blank_lines),
         blank_lines_top_cap: field("blankLinesTopCap").and_then(parse_client_u8),
         blank_lines_nested_cap: field("blankLinesNestedCap").and_then(parse_client_u8),
+        line_wrap: field("lineWrap").and_then(parse_client_line_wrap),
+        line_wrap_width: field("lineWrapWidth").and_then(parse_client_u16),
+        line_wrap_style: field("lineWrapStyle").and_then(parse_client_line_wrap_style),
     }
 }
 
@@ -404,6 +407,28 @@ fn parse_client_blank_lines(value: &serde_json::Value) -> Option<voyager_core::B
 /// here rather than silently clamped.
 fn parse_client_u8(value: &serde_json::Value) -> Option<u8> {
     value.as_u64().and_then(|n| u8::try_from(n).ok())
+}
+
+fn parse_client_line_wrap(value: &serde_json::Value) -> Option<voyager_core::LineWrapMode> {
+    match value.as_str()? {
+        "preserve" => Some(voyager_core::LineWrapMode::Preserve),
+        "auto" => Some(voyager_core::LineWrapMode::Auto),
+        _ => None,
+    }
+}
+
+fn parse_client_line_wrap_style(value: &serde_json::Value) -> Option<voyager_core::LineWrapStyle> {
+    match value.as_str()? {
+        "fill" => Some(voyager_core::LineWrapStyle::Fill),
+        "one_per_line" => Some(voyager_core::LineWrapStyle::OnePerLine),
+        _ => None,
+    }
+}
+
+/// Same `u8`-fits-check shape as `parse_client_u8`, widened for
+/// `line_wrap_width` (030-auto-line-wrap), which can plausibly exceed 255.
+fn parse_client_u16(value: &serde_json::Value) -> Option<u16> {
+    value.as_u64().and_then(|n| u16::try_from(n).ok())
 }
 
 /// Reports exactly which binary/build is running, directly from inside the

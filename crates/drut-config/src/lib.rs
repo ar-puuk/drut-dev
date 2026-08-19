@@ -56,6 +56,19 @@ pub struct FormatConfig {
     /// Same range-validated-with-fallback treatment as
     /// `blank_lines_top_cap` above, independently.
     pub blank_lines_nested_cap: Option<u8>,
+    /// `030-auto-line-wrap`. Single new setting, no legacy field — opt-in
+    /// only, precedence is `explicit > this field > client_defaults >
+    /// built-in default (preserve)`, same shape as `operator_spacing`/
+    /// `blank_lines` above.
+    pub line_wrap: Option<voyager_core::LineWrapMode>,
+    /// Valid range is enforced by `resolve_format_options`, not here — this
+    /// field carries whatever integer `drut.toml` actually had, valid or
+    /// not, mirroring `indent_width`/`blank_lines_top_cap`'s own precedent.
+    /// Only consulted when `line_wrap` resolves to `Auto`.
+    pub line_wrap_width: Option<u16>,
+    /// Same precedence shape as `line_wrap` above — only consulted when
+    /// `line_wrap` resolves to `Auto`.
+    pub line_wrap_style: Option<voyager_core::LineWrapStyle>,
 }
 
 /// A non-fatal problem found while parsing a `drut.toml` (spec.md FR-011).
@@ -108,6 +121,9 @@ pub struct ExplicitFormatOverride {
     pub blank_lines: Option<voyager_core::BlankLineMode>,
     pub blank_lines_top_cap: Option<u8>,
     pub blank_lines_nested_cap: Option<u8>,
+    pub line_wrap: Option<voyager_core::LineWrapMode>,
+    pub line_wrap_width: Option<u16>,
+    pub line_wrap_style: Option<voyager_core::LineWrapStyle>,
 }
 
 /// Built-in default indentation width (`FormatOptions::default().indent_width`,
@@ -133,6 +149,18 @@ const DEFAULT_BLANK_LINES_NESTED_CAP: u8 = 1;
 /// generous sane ceiling no real project's own style would plausibly
 /// exceed, mirroring `INDENT_WIDTH_RANGE`'s own precedent shape.
 const BLANK_LINE_CAP_RANGE: std::ops::RangeInclusive<u8> = 1..=50;
+
+/// Built-in default line-wrap width (`FormatOptions::default().line_wrap_width`,
+/// `030-auto-line-wrap` spec.md FR-002) — the fallback used whenever `line_wrap`
+/// resolves to `Auto` but no layer supplies an explicit width, or the
+/// supplied value is out of the valid range.
+const DEFAULT_LINE_WRAP_WIDTH: u16 = 120;
+/// The valid `line_wrap_width` range (030 spec.md Assumptions: a sane
+/// bound, not unlimited, is a planning-phase detail) — wide enough to cover
+/// any real house style without accepting a nonsensical value like `0` or
+/// `3`, mirroring `INDENT_WIDTH_RANGE`/`BLANK_LINE_CAP_RANGE`'s own
+/// precedent shape.
+const LINE_WRAP_WIDTH_RANGE: std::ops::RangeInclusive<u16> = 20..=500;
 
 /// The one entry point every adapter calls (contracts/toml-config-api.md).
 /// Per field, independently: explicit override wins, else the resolved
@@ -254,6 +282,24 @@ fn resolve_casing_and_indent(
         warnings,
     );
 
+    let line_wrap = explicit
+        .line_wrap
+        .or(config.format.line_wrap)
+        .or(client_defaults.line_wrap)
+        .unwrap_or_default();
+    let line_wrap_width = resolve_line_wrap_width(
+        explicit.line_wrap_width,
+        config.format.line_wrap_width,
+        client_defaults.line_wrap_width,
+        config_path,
+        warnings,
+    );
+    let line_wrap_style = explicit
+        .line_wrap_style
+        .or(config.format.line_wrap_style)
+        .or(client_defaults.line_wrap_style)
+        .unwrap_or_default();
+
     voyager_core::FormatOptions {
         casing: voyager_core::CasingSettings { control_words, pair_keywords, data_references, function_calls },
         indent_top_level,
@@ -262,6 +308,9 @@ fn resolve_casing_and_indent(
         blank_lines,
         blank_lines_top_cap,
         blank_lines_nested_cap,
+        line_wrap,
+        line_wrap_width,
+        line_wrap_style,
     }
 }
 
@@ -385,6 +434,55 @@ fn resolve_blank_line_cap(
         });
     }
     default
+}
+
+/// Identical range-validated-with-fallback shape as `resolve_indent_width`/
+/// `resolve_blank_line_cap` above, for `line_wrap_width` (`030-auto-line-wrap`).
+fn resolve_line_wrap_width(
+    explicit: Option<u16>,
+    config: Option<u16>,
+    client: Option<u16>,
+    config_path: Option<&Path>,
+    warnings: &mut Vec<ConfigWarning>,
+) -> u16 {
+    if let Some(value) = explicit {
+        if LINE_WRAP_WIDTH_RANGE.contains(&value) {
+            return value;
+        }
+    }
+    if let Some(value) = config {
+        if LINE_WRAP_WIDTH_RANGE.contains(&value) {
+            return value;
+        }
+        if let Some(path) = config_path {
+            warnings.push(ConfigWarning::InvalidValue {
+                path: path.to_path_buf(),
+                table: "format".to_string(),
+                key: "line_wrap_width".to_string(),
+                message: format!(
+                    "{value} is outside the valid range {}-{}; using the default ({DEFAULT_LINE_WRAP_WIDTH})",
+                    LINE_WRAP_WIDTH_RANGE.start(),
+                    LINE_WRAP_WIDTH_RANGE.end()
+                ),
+            });
+        }
+    }
+    if let Some(value) = client {
+        if LINE_WRAP_WIDTH_RANGE.contains(&value) {
+            return value;
+        }
+        warnings.push(ConfigWarning::InvalidValue {
+            path: client_setting_pseudo_path(),
+            table: "format".to_string(),
+            key: "line_wrap_width".to_string(),
+            message: format!(
+                "{value} is outside the valid range {}-{}; using the default ({DEFAULT_LINE_WRAP_WIDTH})",
+                LINE_WRAP_WIDTH_RANGE.start(),
+                LINE_WRAP_WIDTH_RANGE.end()
+            ),
+        });
+    }
+    DEFAULT_LINE_WRAP_WIDTH
 }
 
 fn default_options(

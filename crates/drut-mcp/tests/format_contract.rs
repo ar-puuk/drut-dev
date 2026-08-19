@@ -21,6 +21,9 @@ fn text_input(text: &str) -> FormatInput {
         blank_lines: None,
         blank_lines_top_cap: None,
         blank_lines_nested_cap: None,
+            line_wrap: None,
+            line_wrap_width: None,
+            line_wrap_style: None,
         isolated: None,
     }
 }

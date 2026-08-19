@@ -823,6 +823,46 @@ after this log.)
     (`undecodable_byte.s`) — fixed by converting the incidental assignments
     to non-`Assignment` statements, verified byte-for-byte that the fixture's
     actual invalid-UTF-8 byte was untouched.
+15. **Automatic line-width wrapping** — *done*, merged 2026-08-19 as
+    `030-auto-line-wrap`. An opt-in formatter axis (`line_wrap`: `preserve`
+    default/`auto`, plus `line_wrap_width` and `line_wrap_style` companion
+    settings) that wraps an over-width `Control` statement's
+    comma-separated `keyword=value` pair list across multiple physical
+    lines, using Cube Voyager's own existing line-continuation syntax
+    (`001-voyager-script-parser` FR-006) rather than inventing new syntax.
+    Required a **constitution amendment first** (v1.1.1 → v1.2.0): the
+    feature's entire premise — inserting a new continuation break —
+    literally conflicted with Principle III's prior wording ("MUST NOT
+    change which lines are continuations of a prior statement"), caught by
+    `/speckit-analyze` before implementation began, not discovered mid-build.
+    Resolved by extending Principle III's existing exception list (previously
+    just "keyword casing") to also permit optionally and configurably
+    inserting/removing a continuation break via the language's own already-
+    valid syntax, without altering program meaning — a narrow, explicit
+    carve-out, not a dilution of the principle's core prohibitions.
+    Scoped deliberately narrow for v1: only `Control`-statement pair-list
+    commas are wrapping candidates (arithmetic-expression/function-call/
+    bracket wrapping explicitly deferred); a statement that already contains
+    any continuation is never re-flowed, regardless of width — the mechanism
+    idempotence relies on structurally, not incidentally. `Fill` (pack as
+    many pairs as fit per line) is the default wrap style, not
+    `OnePerLine` — changed after the spec was first drafted, once a direct
+    conversation surfaced a real asymmetry: since an already-wrapped
+    statement is never re-flowed, whichever style wraps it first is
+    effectively permanent, and manually further-splitting an already-packed
+    line later is a smaller, safer edit than manually un-packing many
+    one-per-line continuations back into `Fill` form. Two real
+    implementation-time corrections, both caught by direct testing rather
+    than assumed correct from the original design: (1) the planning
+    research wrongly assumed a quoted value lexes as one atomic token in
+    this grammar — it doesn't (`'a, b'` lexes as separate tokens) — fixed by
+    reusing `operator_spacing.rs`'s own `quoted_token_mask` rather than
+    duplicating quote-tracking logic; (2) the `Fill`-packing algorithm's
+    first draft never checked whether the *trailing* segment (after the
+    last comma, with nothing further to break at) fit the width budget,
+    silently under-wrapping some statements — fixed with an explicit
+    post-loop tail check, caught by manual end-to-end testing before any
+    unit test would have caught it either.
 
 ## Open questions (not part of the pre-publish sequence)
 

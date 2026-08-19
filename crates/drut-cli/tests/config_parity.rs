@@ -84,6 +84,9 @@ fn cli_lsp_and_mcp_resolve_the_same_drut_toml_identically() {
         blank_lines: None,
         blank_lines_top_cap: None,
         blank_lines_nested_cap: None,
+        line_wrap: None,
+        line_wrap_width: None,
+        line_wrap_style: None,
         isolated: None,
     })
     .unwrap();
@@ -160,6 +163,9 @@ fn cli_lsp_and_mcp_resolve_the_new_granular_settings_identically() {
         blank_lines: None,
         blank_lines_top_cap: None,
         blank_lines_nested_cap: None,
+        line_wrap: None,
+        line_wrap_width: None,
+        line_wrap_style: None,
         isolated: None,
     })
     .unwrap();

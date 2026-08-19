@@ -92,6 +92,9 @@ fn parse_format_table(path: &Path, table: &toml::Table, warnings: &mut Vec<Confi
             "blank_lines_nested_cap" => {
                 format.blank_lines_nested_cap = parse_blank_line_cap(path, "blank_lines_nested_cap", value, warnings)
             }
+            "line_wrap" => format.line_wrap = parse_line_wrap(path, value, warnings),
+            "line_wrap_width" => format.line_wrap_width = parse_line_wrap_width(path, value, warnings),
+            "line_wrap_style" => format.line_wrap_style = parse_line_wrap_style(path, value, warnings),
             other => warnings.push(ConfigWarning::UnrecognizedKey {
                 path: path.to_path_buf(),
                 table: "format".to_string(),
@@ -258,6 +261,83 @@ fn parse_blank_line_cap(path: &Path, key: &str, value: &toml::Value, warnings: &
         },
         None => {
             warnings.push(invalid_value(path, key, format!("must be a positive integer, got {value:?}")));
+            None
+        }
+    }
+}
+
+/// `030-auto-line-wrap`. Same exact-lowercase-string shape
+/// `operator_spacing`/`blank_lines` already use.
+fn parse_line_wrap(
+    path: &Path,
+    value: &toml::Value,
+    warnings: &mut Vec<ConfigWarning>,
+) -> Option<voyager_core::LineWrapMode> {
+    match value.as_str() {
+        Some("preserve") => Some(voyager_core::LineWrapMode::Preserve),
+        Some("auto") => Some(voyager_core::LineWrapMode::Auto),
+        Some(other) => {
+            warnings.push(invalid_value(
+                path,
+                "line_wrap",
+                format!("must be \"preserve\" or \"auto\", got {other:?}"),
+            ));
+            None
+        }
+        None => {
+            warnings.push(invalid_value(
+                path,
+                "line_wrap",
+                format!("must be a string (\"preserve\" or \"auto\"), got {value:?}"),
+            ));
+            None
+        }
+    }
+}
+
+/// `030-auto-line-wrap`. Accepts any TOML integer here; the valid-range
+/// bound is enforced later, at `resolve_format_options`'s resolve layer,
+/// the same `indent_width`/`blank_lines_top_cap` precedent.
+fn parse_line_wrap_width(path: &Path, value: &toml::Value, warnings: &mut Vec<ConfigWarning>) -> Option<u16> {
+    match value.as_integer() {
+        Some(n) => match u16::try_from(n) {
+            Ok(width) => Some(width),
+            Err(_) => {
+                warnings.push(invalid_value(path, "line_wrap_width", format!("must be a positive integer, got {n}")));
+                None
+            }
+        },
+        None => {
+            warnings.push(invalid_value(path, "line_wrap_width", format!("must be a positive integer, got {value:?}")));
+            None
+        }
+    }
+}
+
+/// `030-auto-line-wrap`. Same exact-lowercase-string shape as `line_wrap`
+/// above.
+fn parse_line_wrap_style(
+    path: &Path,
+    value: &toml::Value,
+    warnings: &mut Vec<ConfigWarning>,
+) -> Option<voyager_core::LineWrapStyle> {
+    match value.as_str() {
+        Some("fill") => Some(voyager_core::LineWrapStyle::Fill),
+        Some("one_per_line") => Some(voyager_core::LineWrapStyle::OnePerLine),
+        Some(other) => {
+            warnings.push(invalid_value(
+                path,
+                "line_wrap_style",
+                format!("must be \"fill\" or \"one_per_line\", got {other:?}"),
+            ));
+            None
+        }
+        None => {
+            warnings.push(invalid_value(
+                path,
+                "line_wrap_style",
+                format!("must be a string (\"fill\" or \"one_per_line\"), got {value:?}"),
+            ));
             None
         }
     }
