@@ -37,6 +37,14 @@ import {
 } from "./binaryBootstrap";
 import { downloadToFile, extractArchive, fetchLatestRelease, sha256File } from "./bootstrapIO";
 import { shouldInjectFormatOnSave } from "./formatOnSaveDecision";
+import {
+  CATEGORY_SCOPES,
+  deepEqual,
+  HighlightCategory,
+  isEmptyTokenColorCustomizations,
+  mergeHighlightRules,
+  TokenColorCustomizations,
+} from "./highlightCustomization";
 
 let client: LanguageClient | undefined;
 
@@ -381,6 +389,50 @@ async function ensureFormatOnSaveEnabled(context: vscode.ExtensionContext): Prom
   await context.workspaceState.update(FORMAT_ON_SAVE_INJECTED_KEY, true);
 }
 
+// -- 026-highlight-customization ------------------------------------------
+//
+// drut.highlight.<category> settings, kept in sync with VS Code's own
+// editor.tokenColorCustomizations (Global/User scope). Unlike
+// ensureVariableColorCustomization/ensureFormatOnSaveEnabled above, this is
+// not a one-time-ever workspace nudge -- it's a live personal preference
+// that should already apply the same way in every project the user opens
+// (spec.md's resolved Scope decision), so it reads/writes Global scope only
+// and re-applies on every relevant settings change, not just once on first
+// activation (research.md §2). All merge/removal logic lives in
+// highlightCustomization.ts, imported above, and is unit-tested there
+// without any `vscode` dependency -- this function is only the
+// VS-Code-API-touching wrapper around it, same division of labor
+// formatOnSaveDecision.ts/ensureFormatOnSaveEnabled already established.
+async function applyHighlightCustomizations(): Promise<void> {
+  try {
+    const config = vscode.workspace.getConfiguration();
+    const desired: Partial<Record<HighlightCategory, string | undefined>> = {};
+    for (const category of Object.keys(CATEGORY_SCOPES) as HighlightCategory[]) {
+      // .inspect().globalValue only -- never the workspace-merged effective
+      // value, and never a workspace-scoped write target (FR-010).
+      desired[category] = config.inspect<string>(`drut.highlight.${category}`)?.globalValue;
+    }
+
+    const currentGlobalRaw = config.inspect<TokenColorCustomizations>("editor.tokenColorCustomizations")
+      ?.globalValue;
+    const next = mergeHighlightRules(currentGlobalRaw ?? {}, desired);
+    const nextOrUndefined = isEmptyTokenColorCustomizations(next) ? undefined : next;
+
+    // No-op guard: skip the write entirely when nothing would actually
+    // change -- otherwise every single activation (including for a user who
+    // never touches drut.highlight.* at all) would unconditionally rewrite
+    // editor.tokenColorCustomizations (/speckit-analyze finding,
+    // 026-highlight-customization).
+    if (!deepEqual(nextOrUndefined, currentGlobalRaw)) {
+      await config.update("editor.tokenColorCustomizations", nextOrUndefined, vscode.ConfigurationTarget.Global);
+    }
+  } catch {
+    // Never let this best-effort convenience fail extension activation --
+    // same discipline as ensureVariableColorCustomization/
+    // ensureFormatOnSaveEnabled above.
+  }
+}
+
 /// Builds and starts the LanguageClient against `command`. Extracted so
 /// the update-accept path (checkForUpdateInBackground) can construct a
 /// genuinely new client pointed at a new binary — `serverOptions` is fixed
@@ -430,6 +482,15 @@ function startLanguageClient(command: string): void {
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   void ensureVariableColorCustomization(context);
   void ensureFormatOnSaveEnabled(context);
+
+  void applyHighlightCustomizations();
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("drut.highlight")) {
+        void applyHighlightCustomizations();
+      }
+    })
+  );
 
   const resolved = await resolveDrutBinary(context);
   if (resolved === undefined) {

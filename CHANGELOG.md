@@ -32,6 +32,31 @@ CONTRIBUTING.md's "Versioning" section).
   parameter, and the VS Code `drut.format.casingFunctionCalls` setting.
   Defaults to `preserve` — zero behavior change for any project that
   doesn't opt in.
+- 9 new personal VS Code settings, `drut.highlight.<category>`
+  (`controlWords`, `statementWords`, `functionCalls`, `pairKeywords`,
+  `values`, `numbers`, `operators`, `comments`, `strings`), letting a user
+  recolor any one category of Voyager syntax to their own preference
+  without losing their color theme's own choices for every category left
+  unset. Each setting is kept in sync with VS Code's own
+  `editor.tokenColorCustomizations` (User/Global scope) — setting a color
+  takes effect immediately, no window reload needed; clearing it reverts to
+  the active theme's own color, not a stuck last value. Never touches any
+  rule this extension didn't itself add — another extension's rules, or a
+  user's own hand-written `editor.tokenColorCustomizations` entries, always
+  survive untouched. `statementWords` (`PRINT`, `FILEI`, ...) and
+  `functionCalls` (`REPLACESTR(...)`, `ROUND(...)`, ...) previously shared
+  one TextMate scope (`support.function.drut`, since
+  `024-function-call-highlighting`); split into
+  `support.function.statement.drut`/`support.function.builtin.drut` so the
+  two are now independently colorable — a pure rename, no visible change
+  for anyone not using the new settings. `@name@` substitution
+  (`variables`) is intentionally not one of the 9 categories — an existing,
+  separate mechanism (a semantic-token-based, one-time workspace injection)
+  already governs its color for themes that render it invisibly by
+  default, and this feature's own mechanism would not visibly win against
+  it. No `drut.toml` section, CLI flag, or MCP parameter — color is a
+  personal/accessibility preference, not a shared project convention the
+  way casing or indentation is.
 
 ### Changed
 
