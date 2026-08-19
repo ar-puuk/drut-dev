@@ -11,6 +11,8 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-18
+
 ### Added
 
 - A fourth, independently-configurable casing category, `casing_function_calls`
