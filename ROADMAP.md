@@ -754,6 +754,38 @@ after this log.)
     problem the original mechanism exists to fix. All new logic
     (`decideVariableColorSync`) is a pure, unit-tested function with zero
     `vscode` dependency, same testability discipline item 11 established.
+13. **Data-reference & user-variable highlighting** — *done*, merged
+    2026-08-19 as `028-identifier-highlighting`. Found by real-world testing
+    against a production script: two identifier classes had no genuine
+    highlighting mechanism, only accidental coloring from the unrelated
+    `pairKeywords`/`pairValues` position-based rules. Two more
+    `drut.highlight.*` settings (the 11th/12th), same item-11 personal-
+    setting mechanism, no new `vscode` capability. `dataReferences`: the
+    Matrix/Line/Node/Zone/Database family (`MI`, `MW`, `DBA`, `ZONES`, ...,
+    `casing_data_references`'s own 17-name list) now highlighted by name,
+    not position — `DBA` inside `ROUND(DBA.2.VOL[numrec])` renders the same
+    as `DBA` in `X = DBA.2.field`. Wins precedence over `pairKeywords`/
+    `pairValues` for the same name (`ZONES` in `RUN PGM=MATRIX ZONES=5`) via
+    grammar array order, mirroring `data_reference.rs`'s own one-name-one-
+    owner rule. `userVariables`: a catch-all for any bareword identifier not
+    already claimed by a more specific category, placed last in the
+    grammar's pattern list so array position alone is the filtering
+    mechanism — fixes `_BNode` rendering unstyled while `_ANode` (purely by
+    accident of sitting immediately after `=`) rendered, in the same
+    expression. Both skip `Label`/`ShellEscape` lines entirely (two new
+    small grammar patterns, `#label`/`#shell-escape`) — neither is real
+    Voyager syntax to highlight as a "variable." A bareword immediately
+    adjacent to `=` deliberately keeps its existing `pairKeywords`/
+    `pairValues` color rather than switching to `userVariables` — this
+    grammar has no real parse tree to distinguish a keyword-pair's enum-like
+    value from an ordinary assignment's variable reference, and reassigning
+    that position would silently change item 11's already-shipped
+    behavior. Same investigation also found and fixed an unrelated
+    `voyager-core` casing bug (not part of this feature; landed directly on
+    `main`): a data-reference name used as a block opener's own value (a
+    `LOOP` bound, `LOOP NUMREC = counter, DBI.2.NUMRECORDS`) was invisible
+    to `casing_data_references`'s rewrite, since only the opener's
+    *keyword*-pair spans were ever scanned, never its value tokens.
 
 ## Open questions (not part of the pre-publish sequence)
 

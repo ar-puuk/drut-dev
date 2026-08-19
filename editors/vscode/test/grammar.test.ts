@@ -428,6 +428,118 @@ async function main(): Promise<void> {
     check("REPLACESTR (function call) is NOT scoped as support.function.statement", !scopes.some((s) => s.includes("support.function.statement")));
   }
 
+  // -- 028-identifier-highlighting --
+  //
+  // The data-reference family (MI/MO/MW/LI/LW/NI/NW/ZI/ZONES/Z/DBI/DBA/RO/
+  // A/B/I/J) now gets its own variable.language.data-reference scope,
+  // regardless of position -- fixing the reported bug where DBA only
+  // rendered by accident when immediately after "=".
+
+  // DBA scopes the same whether it's a pair value or a function-call argument.
+  {
+    const line1 = "X = DBA.2.field";
+    const [tokens1] = tokenizeAll(grammar, [line1]);
+    const afterEquals = scopesAt(tokens1, line1.indexOf("DBA"));
+    check("DBA after = scoped as variable.language.data-reference", afterEquals.some((s) => s.includes("variable.language.data-reference")));
+
+    const line2 = "VOL_COR = ROUND(DBA.2.VOL[numrec]) / 100";
+    const [tokens2] = tokenizeAll(grammar, [line2]);
+    const insideCall = scopesAt(tokens2, line2.indexOf("DBA"));
+    check(
+      "DBA inside a function-call argument ALSO scoped as variable.language.data-reference (the reported gap)",
+      insideCall.some((s) => s.includes("variable.language.data-reference"))
+    );
+  }
+
+  // DBI on a LOOP opener's own bound expression -- not a keyword=value pair
+  // shape, so #pair-keywords/#pair-values could never reach it either.
+  {
+    const line = "LOOP NUMREC = counter, DBI.2.NUMRECORDS";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const scopes = scopesAt(tokens, line.indexOf("DBI"));
+    check("DBI on a LOOP opener's bound expression scoped as variable.language.data-reference", scopes.some((s) => s.includes("variable.language.data-reference")));
+  }
+
+  // ZONES is both a recognized data-reference name and pair-keyword-shaped
+  // (immediately followed by =) -- #data-references, listed first, wins.
+  {
+    const line = "RUN PGM=MATRIX ZONES=5";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const scopes = scopesAt(tokens, line.indexOf("ZONES"));
+    check("ZONES scoped as variable.language.data-reference, not variable.parameter", scopes.some((s) => s.includes("variable.language.data-reference")));
+    check("ZONES is NOT scoped as variable.parameter", !scopes.some((s) => s.includes("variable.parameter")));
+  }
+
+  // A ShellEscape line (leading "*") is raw OS shell text -- the whole line
+  // scopes as meta.embedded.shell-escape, and A/B (recognized data-reference
+  // link-endpoint names) do NOT scope as variable.language.data-reference
+  // inside it.
+  {
+    const line = "*copy A B";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const wholeLine = scopesAt(tokens, 0);
+    const aScopes = scopesAt(tokens, line.indexOf("A"));
+    check("ShellEscape line scoped as meta.embedded.shell-escape", wholeLine.some((s) => s.includes("meta.embedded.shell-escape")));
+    check("A inside a ShellEscape line is NOT scoped as variable.language.data-reference", !aScopes.some((s) => s.includes("variable.language.data-reference")));
+  }
+
+  // A Label declaration scopes as entity.name.label, not as a data reference
+  // or (once #user-identifiers exists below) a user variable.
+  {
+    const line = ":STEP0";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const scopes = scopesAt(tokens, line.indexOf("STEP0"));
+    check("Label name STEP0 scoped as entity.name.label", scopes.some((s) => s.includes("entity.name.label")));
+  }
+
+  // A bareword identifier not claimed by any earlier, more specific pattern
+  // now gets variable.other.identifier -- fixing the reported inconsistency
+  // where _ANode (right after "=") rendered but _BNode (an operand two
+  // tokens later) did not.
+  {
+    const line = "LINKID = _ANode + '_' + _BNode";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const bNodeScopes = scopesAt(tokens, line.indexOf("_BNode"));
+    check("_BNode (an expression operand) scoped as variable.other.identifier (the reported gap)", bNodeScopes.some((s) => s.includes("variable.other.identifier")));
+
+    // _ANode keeps its pre-existing pair-value scope (documented =-adjacency
+    // trade-off, spec.md Assumptions) -- not a regression, not reclassified.
+    const aNodeScopes = scopesAt(tokens, line.indexOf("_ANode"));
+    check("_ANode (immediately after =) still scoped as constant.other, unchanged", aNodeScopes.some((s) => s.includes("constant.other")));
+    check("_ANode is NOT scoped as variable.other.identifier", !aNodeScopes.some((s) => s.includes("variable.other.identifier")));
+  }
+
+  // A name already owned by a more specific category never falls through to
+  // variable.other.identifier -- comprehensive negative check across every
+  // other category (FR-004's full exclusion list).
+  {
+    const line = "IF (X=1) PRINT LIST=ROUND(DBA.1.field)";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const ifScopes = scopesAt(tokens, line.indexOf("IF"));
+    const printScopes = scopesAt(tokens, line.indexOf("PRINT"));
+    const roundScopes = scopesAt(tokens, line.indexOf("ROUND"));
+    const listScopes = scopesAt(tokens, line.indexOf("LIST"));
+    const dbaScopes = scopesAt(tokens, line.indexOf("DBA"));
+    check("IF (control word) is NOT scoped as variable.other.identifier", !ifScopes.some((s) => s.includes("variable.other.identifier")));
+    check("PRINT (statement word) is NOT scoped as variable.other.identifier", !printScopes.some((s) => s.includes("variable.other.identifier")));
+    check("ROUND (function call) is NOT scoped as variable.other.identifier", !roundScopes.some((s) => s.includes("variable.other.identifier")));
+    check("LIST (pair-keyword name) is NOT scoped as variable.other.identifier", !listScopes.some((s) => s.includes("variable.other.identifier")));
+    check("DBA (data-reference name) is NOT scoped as variable.other.identifier", !dbaScopes.some((s) => s.includes("variable.other.identifier")));
+  }
+
+  // Neither new category reaches inside a quoted string (FR-008;
+  // /speckit-analyze finding E1) -- inherited from #strings' existing
+  // begin/end nesting, but verified directly for both new categories here.
+  {
+    const line = "PRINT LIST='DBA and _BNode'";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const dbaScopes = scopesAt(tokens, line.indexOf("DBA"));
+    const bNodeScopes = scopesAt(tokens, line.indexOf("_BNode"));
+    check("DBA inside a quoted string is NOT scoped as variable.language.data-reference", !dbaScopes.some((s) => s.includes("variable.language.data-reference")));
+    check("_BNode inside a quoted string is NOT scoped as variable.other.identifier", !bNodeScopes.some((s) => s.includes("variable.other.identifier")));
+    check("both stay inside string.quoted", dbaScopes.some((s) => s.includes("string.quoted")) && bNodeScopes.some((s) => s.includes("string.quoted")));
+  }
+
   if (failures > 0) {
     console.error(`${failures} check(s) failed`);
     process.exit(1);

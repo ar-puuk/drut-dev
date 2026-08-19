@@ -51,6 +51,19 @@ pub struct Block {
     /// reach `RUN`/`LOOP`/`PROCESS`/etc.'s own pairs, not just non-block-
     /// forming statements) has to be captured at match time instead.
     pub opener_pairs: Vec<Span>,
+    /// The opening statement's full original token stream, verbatim —
+    /// unlike `opener_pairs` (keyword-name spans only), this includes the
+    /// *value* tokens too (e.g. `counter, dbi.2.NUMRECORDS` in `LOOP NUMREC
+    /// = counter, dbi.2.NUMRECORDS`). Needed so `data_reference.rs`'s casing
+    /// collection can recognize a data-reference name used as an opener's
+    /// value (a loop bound, a `RUN`/`PROCESS` pair value), not just its
+    /// keyword position — `opener_pairs` alone missed this (a block's
+    /// opening `Statement` is discarded once matched into this `Block`, same
+    /// reasoning as `opener_pairs`'s own doc comment). Always empty for
+    /// `If`, whose condition tokens are already carried per-branch on
+    /// `IfBranch::condition` — populating this too would double-report every
+    /// occurrence in the condition.
+    pub opener_tokens: Vec<Token>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -411,6 +424,7 @@ fn parse_if_chain(
                 // never an ENDIF to close it.
                 closer: None,
                 opener_pairs: opener_pairs.clone(),
+                opener_tokens: Vec::new(),
             },
             i + 2,
         );
@@ -445,6 +459,7 @@ fn parse_if_chain(
                     children: vec![],
                     closer: None,
                     opener_pairs: opener_pairs.clone(),
+                    opener_tokens: Vec::new(),
                 },
                 idx,
             );
@@ -471,6 +486,7 @@ fn parse_if_chain(
                         children: vec![],
                         closer: Some(end_span),
                         opener_pairs: opener_pairs.clone(),
+                        opener_tokens: Vec::new(),
                     },
                     idx,
                 );
@@ -491,6 +507,7 @@ fn parse_if_chain(
                         children: vec![],
                         closer: None,
                         opener_pairs: opener_pairs.clone(),
+                        opener_tokens: Vec::new(),
                     },
                     idx,
                 );
@@ -506,6 +523,7 @@ fn parse_run(
 ) -> (Block, usize) {
     let opener_span = statements[i].span;
     let opener_pairs = opener_pair_spans(&statements[i]);
+    let opener_tokens = statements[i].tokens.clone();
     let disabled = role_of(&statements[i]) == Role::BangRun;
     let pgm = pair_value_text(&statements[i], "PGM");
     let context = if disabled {
@@ -525,6 +543,7 @@ fn parse_run(
                 children,
                 closer: Some(end_span),
                 opener_pairs: opener_pairs.clone(),
+                opener_tokens: opener_tokens.clone(),
             },
             idx,
         );
@@ -543,6 +562,7 @@ fn parse_run(
                     children,
                     closer: None,
                     opener_pairs: opener_pairs.clone(),
+                    opener_tokens: opener_tokens.clone(),
                 },
                 idx,
             );
@@ -562,6 +582,7 @@ fn parse_run(
             children,
             closer: None,
             opener_pairs: opener_pairs.clone(),
+            opener_tokens: opener_tokens.clone(),
         },
         idx,
     )
@@ -574,6 +595,7 @@ fn parse_process(
 ) -> (Block, usize) {
     let opener_span = statements[i].span;
     let opener_pairs = opener_pair_spans(&statements[i]);
+    let opener_tokens = statements[i].tokens.clone();
     let name = pair_value_text(&statements[i], "PHASE");
     let (children, mut idx) = parse_sequence(
         statements,
@@ -593,6 +615,7 @@ fn parse_process(
                 children,
                 closer: Some(end_span),
                 opener_pairs: opener_pairs.clone(),
+                opener_tokens: opener_tokens.clone(),
             },
             idx,
         );
@@ -610,6 +633,7 @@ fn parse_process(
                 children,
                 closer: None,
                 opener_pairs: opener_pairs.clone(),
+                opener_tokens: opener_tokens.clone(),
             },
             idx,
         );
@@ -632,6 +656,7 @@ fn parse_process(
             children,
             closer: None,
             opener_pairs: opener_pairs.clone(),
+            opener_tokens: opener_tokens.clone(),
         },
         idx,
     )
@@ -647,6 +672,7 @@ fn parse_simple_block(
 ) -> (Block, usize) {
     let opener_span = statements[i].span;
     let opener_pairs = opener_pair_spans(&statements[i]);
+    let opener_tokens = statements[i].tokens.clone();
     let kind = kind_ctor(&statements[i]);
     let (children, mut idx) =
         parse_sequence(statements, i + 1, BodyContext::Generic, true, diagnostics);
@@ -661,6 +687,7 @@ fn parse_simple_block(
                 children,
                 closer: Some(end_span),
                 opener_pairs: opener_pairs.clone(),
+                opener_tokens: opener_tokens.clone(),
             },
             idx,
         );
@@ -677,6 +704,7 @@ fn parse_simple_block(
             children,
             closer: None,
             opener_pairs: opener_pairs.clone(),
+            opener_tokens: opener_tokens.clone(),
         },
         idx,
     )

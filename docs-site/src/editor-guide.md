@@ -91,6 +91,8 @@ server even attaches) recognizes these categories:
 | Function calls | A recognized Cube Voyager built-in function name immediately followed by `(` — `REPLACESTR(...)`, `ROUND(...)`, and 136 others (see the [Formatter Guide](formatter-guide.md#function-call-casing) for the full list) | `support.function.builtin.drut` |
 | Pair-keyword names | A `keyword=value` pair's keyword, e.g. `PATHLOAD`'s `PATH` | `variable.parameter.drut` |
 | Values | A pair's bareword value, e.g. `PGM=MATRIX`'s `MATRIX` | `constant.other.drut` |
+| Data references | The Matrix/Line/Node/Zone/Database family (`MI`, `MW`, `DBA`, `ZONES`, ...), by name, regardless of position | `variable.language.data-reference.drut` |
+| User variables | Any other bareword identifier not covered by a category above | `variable.other.identifier.drut` |
 | `@name@` substitution | Variable references | `variable.other.readwrite.drut`, plus a semantic-token `variable` override (below) |
 | Numbers | Numeric literals | `constant.numeric.drut` |
 | Operators | `=`, `+`, `-`, `<>`, ... | `keyword.operator.drut` |
@@ -146,7 +148,7 @@ MCP parameter. Color is a personal/accessibility preference (theme,
 colorblindness, monitor), not a shared file-content convention the way casing
 or indentation is, so there's nothing to put in a committed project file.
 
-Nine settings, one per category from the Syntax highlighting table above
+Eleven settings, one per category from the Syntax highlighting table above
 (`@name@` excepted — see below), each an optional CSS color
 (e.g. `#RRGGBB`):
 
@@ -157,6 +159,8 @@ Nine settings, one per category from the Syntax highlighting table above
 | `drut.highlight.functionCalls` | Function calls |
 | `drut.highlight.pairKeywords` | Pair-keyword names |
 | `drut.highlight.values` | Values |
+| `drut.highlight.dataReferences` | Data references |
+| `drut.highlight.userVariables` | User variables |
 | `drut.highlight.numbers` | Numbers |
 | `drut.highlight.operators` | Operators |
 | `drut.highlight.comments` | Comments |
@@ -168,6 +172,17 @@ clearing it afterward reverts to the theme's color, not a stuck last value.
 None of these ever touch a rule they didn't add themselves — another
 extension's customizations, or your own hand-written ones, always survive
 untouched.
+
+A bareword immediately before or after `=` always renders under
+`pairKeywords`/`pairValues`, even if it's also a `userVariables`-shaped
+identifier — this grammar has no real parse tree to tell a keyword-pair's
+own value (`PGM=MATRIX`'s `MATRIX`) apart from an ordinary assignment's
+variable reference (`X = _ANode`'s `_ANode`), so `userVariables` only
+covers identifier positions no other category already reaches (e.g. an
+operand elsewhere in an expression). `dataReferences` is the one exception:
+a recognized data-reference name always wins that category even when it's
+also pair-keyword-shaped (`ZONES` in `RUN PGM=MATRIX ZONES=5` renders under
+`dataReferences`, not `pairKeywords`).
 
 **`drut.highlight.namedVariables`** (`@name@` substitution) works the same way
 from a user's perspective, but is written into the current *workspace's*

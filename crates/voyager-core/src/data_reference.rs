@@ -138,13 +138,12 @@ fn collect(nodes: &[Node], lines: &[Vec<char>], out: &mut Vec<DataReferenceOccur
 }
 
 fn collect_block(block: &Block, lines: &[Vec<char>], out: &mut Vec<DataReferenceOccurrence>) {
-    for span in &block.opener_pairs {
-        if let Some(text) = text_at_span(lines, *span) {
-            if is_data_reference_name(&text) {
-                out.push(DataReferenceOccurrence { name: text.to_ascii_uppercase(), span: *span });
-            }
-        }
-    }
+    // `opener_tokens` (empty for `If`, whose condition is scanned per-branch
+    // below) is the opener statement's full token stream, so this alone
+    // covers everything `opener_pairs` used to (keyword-name positions) plus
+    // value positions `opener_pairs` couldn't reach — e.g. a `LOOP`'s bound
+    // expression (`LOOP NUMREC = counter, dbi.2.NUMRECORDS`).
+    collect_tokens(&block.opener_tokens, out);
     match &block.kind {
         BlockKind::If { branches } => {
             for branch in branches {
@@ -285,6 +284,26 @@ mod tests {
     fn zones_matched_in_run_pgm_matrix_opener_pair() {
         let occ = occurrences("RUN PGM=MATRIX ZONES=3\nX = 1\nENDRUN\n");
         assert!(occ.iter().any(|o| o.name == "ZONES"), "{occ:?}");
+    }
+
+    #[test]
+    fn loop_bound_expression_on_opener_line_matches() {
+        // Regression: the LOOP bound (`dbi.2.NUMRECORDS`) sits in a value
+        // position on the opener line itself, not inside a keyword=value
+        // pair -- `opener_pairs` (keyword-name spans only) could never see
+        // it, only `opener_tokens` (the full opener statement) can.
+        let occ = occurrences("LOOP NUMREC = counter, dbi.2.NUMRECORDS\nX = 1\nENDLOOP\n");
+        assert!(occ.iter().any(|o| o.name == "DBI"), "{occ:?}");
+    }
+
+    #[test]
+    fn run_pgm_value_on_opener_line_matches_alongside_keyword() {
+        // Both the keyword position (ZONES) and a data-reference-shaped
+        // value position on the same opener line are captured.
+        let occ = occurrences("RUN PGM=MATRIX ZONES=mi.1.NumZones\nX = 1\nENDRUN\n");
+        let names: Vec<&str> = occ.iter().map(|o| o.name.as_str()).collect();
+        assert!(names.contains(&"ZONES"), "{names:?}");
+        assert!(names.contains(&"MI"), "{names:?}");
     }
 
     #[test]

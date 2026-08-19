@@ -11,6 +11,45 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+### Fixed
+
+- A data-reference name (the Matrix/Line/Node/Zone/Database family — `MI`,
+  `MW`, `DBA`, `ZONES`, ...) used as a value on a block opener's own line
+  (e.g. a `LOOP`'s bound expression, `LOOP NUMREC = counter,
+  DBI.2.NUMRECORDS`) was invisible to the `casing_data_references` casing
+  rewrite — only that name's *keyword* position on an opener line was ever
+  scanned, never its value position. Found against a real production
+  script. Fixed in `voyager-core` (`Block::opener_tokens`, a new field
+  carrying the opener statement's full token stream, not just its
+  keyword-pair-name spans).
+
+### Added
+
+- 2 more `drut.highlight.*` settings, `drut.highlight.dataReferences` and
+  `drut.highlight.userVariables`, extending `026-highlight-customization`'s
+  personal-setting mechanism. Previously, the data-reference family (`MI`,
+  `MW`, `DBA`, `ZONES`, ...) and ordinary user-defined identifiers had no
+  real highlighting of their own — any color they got was accidental,
+  inherited from the unrelated `pairKeywords`/`pairValues` position-based
+  rules (immediately before/after `=`). A `DBA` inside a function-call
+  argument (`ROUND(DBA.2.VOL[numrec])`) rendered with no color at all, and
+  in an expression like `LINKID = _ANode + '_' + _BNode`, `_ANode`
+  (immediately after `=`) rendered while `_BNode` two tokens later did not
+  — both found against the same real production script as the fix above.
+  `dataReferences` now recognizes the same 17-name family
+  `casing_data_references` already recognizes, case-insensitively, by exact
+  name or dot-notation prefix, regardless of position; `userVariables` is a
+  catch-all for any bareword identifier not already claimed by a more
+  specific category (control word, statement word, function call,
+  pair-keyword name, pair value, or data-reference name). Both skip `Label`
+  declarations and `ShellEscape` lines entirely — neither is real Voyager
+  syntax to highlight as a "variable." A bareword immediately adjacent to
+  `=` keeps whatever category already claims that position today
+  (`pairKeywords`/`pairValues`, unchanged) rather than switching to
+  `userVariables` — a documented trade-off, not a bug, since this grammar
+  has no real parse tree to distinguish a keyword-pair's enum-like value
+  from an ordinary assignment's variable reference.
+
 ## [0.3.0] - 2026-08-18
 
 ### Added
