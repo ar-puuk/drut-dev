@@ -107,7 +107,10 @@ already been researched or partially unblocked; see the note per item.
    language-server-won't-start bug report against the freshly published
    0.3.2 extension — `isOnPath`'s Tier 1 pre-flight check treated any spawn
    error other than `ENOENT` as "found," so a blocked PATH entry was
-   confidently used instead of falling through to Tier 2/3).
+   confidently used instead of falling through to Tier 2/3). v0.4.0
+   published 2026-08-19 the same way (`release.yml` tag build, then
+   `publish.yml` dispatch): the `030-auto-line-wrap` feature (opt-in
+   `line_wrap`/`line_wrap_width`/`line_wrap_style`, Fill-style default).
    - ✅ *Fixed 2026-08-13*: `vsce` packaging `editors/vscode/` in isolation
      meant the repo-root `LICENSE-MIT`/`LICENSE-APACHE` files never made it
      into the `.vsix`. Both are now copied into `editors/vscode/` directly,
