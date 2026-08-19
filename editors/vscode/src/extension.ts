@@ -40,6 +40,7 @@ import { shouldInjectFormatOnSave } from "./formatOnSaveDecision";
 import {
   CATEGORY_SCOPES,
   deepEqual,
+  decideVariableColorSync,
   HighlightCategory,
   isEmptyTokenColorCustomizations,
   mergeHighlightRules,
@@ -280,21 +281,29 @@ class OneRestartErrorHandler {
   }
 }
 
-/// Workspace-state key tracking whether this workspace has already been
-/// offered the auto-injected `variable:drut` color rule — checked
-/// so the injection happens at most once ever per workspace, never
-/// reapplied on a later activation. This is what makes it safe to remove:
-/// a user who deletes the injected setting from `.vscode/settings.json`
-/// stays deleted, forever, for that workspace — the extension never fights
-/// that choice back.
+/// Workspace-state key tracking whether the `variable:drut` rule has ever
+/// been written for this workspace, by either the original one-time seed or
+/// a later live sync (`decideVariableColorSync`'s `alreadySeeded`). This is
+/// what makes the *untouched* case (no `drut.highlight.namedVariables` ever
+/// set) safe to remove by hand: a user who deletes the rule from
+/// `.vscode/settings.json` stays deleted, forever, for that workspace — the
+/// extension never fights that choice back (027-named-variable-highlight
+/// research.md §3 preserves this exactly).
 const VARIABLE_COLOR_INJECTED_KEY = "drutVariableColorInjected";
+
+/// Workspace-state key tracking whether `drut.highlight.namedVariables` has
+/// ever taken over live-sync duty for this workspace
+/// (027-named-variable-highlight, `decideVariableColorSync`'s
+/// `liveSyncActive`) — distinct from `VARIABLE_COLOR_INJECTED_KEY` above:
+/// this one specifically gates "should an unset value trigger one corrective
+/// revert to the default," not "was anything ever written at all."
+const VARIABLE_COLOR_LIVE_SYNC_KEY = "drutVariableColorLiveSyncActive";
 
 /// The scoped semantic-token-color rule key this function injects —
 /// `variable:drut` colors only `variable`-typed tokens in Drut
 /// documents, never touching semantic "variable" coloring in any other
 /// language the user might also have open.
 const VARIABLE_COLOR_RULE_KEY = "variable:drut";
-const VARIABLE_COLOR_VALUE = "#4EC9B0";
 
 /// Guarantees `@name@` references get a visible color the first time this
 /// extension activates in a workspace, regardless of the active color
@@ -302,22 +311,26 @@ const VARIABLE_COLOR_VALUE = "#4EC9B0";
 /// VS Code testing (see spec.md's dated Assumptions entry): no TextMate
 /// scope or standard LSP semantic token type is colored by every theme —
 /// coloring is opt-in per theme author, a structural property of VS Code's
-/// theming model, not something a "better" scope name can fix. Injects
-/// into this *workspace's* `editor.semanticTokenColorCustomizations`
-/// setting (`.vscode/settings.json`), never the user's global settings —
-/// scoped to the project asking for it, visible/inspectable, and trivial
-/// to remove or override by hand. Merges into any existing customization
-/// object rather than overwriting it (so a user's own unrelated semantic
-/// color rules for other languages are never clobbered), and never
-/// overwrites an existing `variable:drut` rule if one is already
-/// present — whether the user set it themselves or this function did on
-/// an earlier activation.
+/// theming model, not something a "better" scope name can fix.
+///
+/// Extended 2026-08-18 (027-named-variable-highlight) to also keep this
+/// rule live-synced to `drut.highlight.namedVariables` once a user
+/// explicitly sets it — `decideVariableColorSync` (highlightCustomization.ts)
+/// is the single source of truth for exactly when to write, what value, and
+/// how the two workspaceState flags above transition; this function is only
+/// the VS-Code-API-touching wrapper around it. Still writes into this
+/// *workspace's* `editor.semanticTokenColorCustomizations` setting
+/// (`.vscode/settings.json`), never the user's global settings — required
+/// for correctness (not just consistency with the original design), since
+/// VS Code resolves this whole setting per-scope, not as a cross-scope deep
+/// merge, and every previously-activated workspace already has a
+/// Workspace-scoped value from the original seed (027 research.md §2).
+/// Merges into any existing customization object rather than overwriting it
+/// (so a user's own unrelated semantic color rules for other languages are
+/// never clobbered).
 async function ensureVariableColorCustomization(context: vscode.ExtensionContext): Promise<void> {
   if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
     return; // A single loose file with no workspace folder open — nothing to write into.
-  }
-  if (context.workspaceState.get<boolean>(VARIABLE_COLOR_INJECTED_KEY)) {
-    return;
   }
 
   try {
@@ -325,21 +338,31 @@ async function ensureVariableColorCustomization(context: vscode.ExtensionContext
     const current =
       config.get<{ rules?: Record<string, unknown> }>("editor.semanticTokenColorCustomizations") ?? {};
     const rules = current.rules ?? {};
+    const configuredColor = config.inspect<string>("drut.highlight.namedVariables")?.globalValue;
 
-    if (!(VARIABLE_COLOR_RULE_KEY in rules)) {
+    const decision = decideVariableColorSync(
+      {
+        alreadySeeded: context.workspaceState.get<boolean>(VARIABLE_COLOR_INJECTED_KEY) ?? false,
+        liveSyncActive: context.workspaceState.get<boolean>(VARIABLE_COLOR_LIVE_SYNC_KEY) ?? false,
+      },
+      rules[VARIABLE_COLOR_RULE_KEY] as string | undefined,
+      configuredColor
+    );
+
+    if (decision.shouldWrite) {
       await config.update(
         "editor.semanticTokenColorCustomizations",
-        { ...current, rules: { ...rules, [VARIABLE_COLOR_RULE_KEY]: VARIABLE_COLOR_VALUE } },
+        { ...current, rules: { ...rules, [VARIABLE_COLOR_RULE_KEY]: decision.value } },
         vscode.ConfigurationTarget.Workspace
       );
     }
+    await context.workspaceState.update(VARIABLE_COLOR_INJECTED_KEY, decision.nextState.alreadySeeded);
+    await context.workspaceState.update(VARIABLE_COLOR_LIVE_SYNC_KEY, decision.nextState.liveSyncActive);
   } catch {
     // Never let this best-effort convenience fail extension activation —
     // static highlighting, diagnostics, hover, completion, and formatting
     // are all fully independent of whether this write succeeds.
   }
-
-  await context.workspaceState.update(VARIABLE_COLOR_INJECTED_KEY, true);
 }
 
 /// Workspace-state key tracking whether this workspace has already been
@@ -488,6 +511,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("drut.highlight")) {
         void applyHighlightCustomizations();
+        // 027-named-variable-highlight: drut.highlight.namedVariables is a
+        // separate code path (ensureVariableColorCustomization), not one of
+        // applyHighlightCustomizations' CATEGORY_SCOPES entries -- see that
+        // function's own comment for why.
+        void ensureVariableColorCustomization(context);
       }
     })
   );

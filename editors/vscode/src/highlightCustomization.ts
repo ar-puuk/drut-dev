@@ -9,11 +9,15 @@
 // wrapper that imports this module and calls it with real values read from
 // the VS Code configuration API.
 
-/** One customizable highlight category -- spec.md Key Entities. `variables`
- * (`@name@`) is deliberately not a member: an existing, separately-shipped
- * mechanism (extension.ts's ensureVariableColorCustomization, semantic-token
- * based) already governs it, and this module's TextMate-scope-based
- * mechanism would not visibly win against it (research.md §3). */
+/** One customizable highlight category recognized via `editor.
+ * tokenColorCustomizations` (026's own mechanism; spec.md Key Entities).
+ * `@name@` substitution is deliberately not a member here: it's governed by
+ * a different, pre-existing mechanism (extension.ts's
+ * ensureVariableColorCustomization, semantic-token based via `editor.
+ * semanticTokenColorCustomizations`) that this module's TextMate-scope-based
+ * mechanism would not visibly win against (026 research.md §3). It's
+ * reachable instead through `drut.highlight.namedVariables`, backed by
+ * `decideVariableColorSync` below (027-named-variable-highlight). */
 export type HighlightCategory =
   | "controlWords"
   | "statementWords"
@@ -156,4 +160,79 @@ export function deepEqual(a: unknown, b: unknown): boolean {
   return aKeys.every(
     (key) => key in (b as Record<string, unknown>) && deepEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])
   );
+}
+
+// -- 027-named-variable-highlight -------------------------------------------
+//
+// drut.highlight.namedVariables (@name@ substitution) reconciles a live,
+// user-driven preference with the pre-existing ensureVariableColorCustomization
+// mechanism's own guarantee ("a manual deletion of the seeded rule sticks
+// forever, for a workspace that never touches this new setting") -- see
+// 027's research.md §3 for the full truth table this function encodes.
+
+/** Tracked, per-workspace state this decision needs across calls (backed by
+ * two `context.workspaceState` keys in extension.ts). */
+export interface VariableColorSyncState {
+  /** True once the rule has ever been written for this workspace, by either
+   * the original one-time seed or a later live sync. */
+  alreadySeeded: boolean;
+  /** True once `drut.highlight.namedVariables` has taken over live-sync
+   * duty for this workspace (data-model.md §1). */
+  liveSyncActive: boolean;
+}
+
+export interface VariableColorDecision {
+  shouldWrite: boolean;
+  /** The color to write into the `variable:drut` rule -- present iff `shouldWrite`. */
+  value?: string;
+  nextState: VariableColorSyncState;
+}
+
+/** Unchanged from `026`'s originally-shipped hardcoded seed value. */
+export const DEFAULT_VARIABLE_COLOR = "#4EC9B0";
+
+/**
+ * Decides whether/how to update the workspace's `variable:drut` rule in
+ * `editor.semanticTokenColorCustomizations`.
+ *
+ * - `configuredColor` set: keep the rule live-synced to it (spec.md FR-002).
+ * - `configuredColor` unset, but live-sync was just active: one corrective
+ *   revert to `DEFAULT_VARIABLE_COLOR` (spec.md FR-005) -- never leaves the
+ *   rule stuck at a stale custom color, never removes it outright (a fully
+ *   theme-driven state would reintroduce the invisible-under-some-themes
+ *   bug this whole mechanism exists to fix).
+ * - `configuredColor` unset, never live-synced, never seeded, no existing
+ *   rule: the original one-time seed, byte-identical to `026`'s shipped
+ *   behavior.
+ * - `configuredColor` unset, already seeded (or the user removed the rule
+ *   by hand) and never live-synced: no write -- never fights a manual
+ *   choice (spec.md FR-004, the regression this feature must not cause).
+ */
+export function decideVariableColorSync(
+  state: VariableColorSyncState,
+  existingRuleValue: string | undefined,
+  configuredColor: string | undefined
+): VariableColorDecision {
+  if (configuredColor !== undefined) {
+    return {
+      shouldWrite: existingRuleValue !== configuredColor,
+      value: configuredColor,
+      nextState: { alreadySeeded: true, liveSyncActive: true },
+    };
+  }
+  if (state.liveSyncActive) {
+    return {
+      shouldWrite: true,
+      value: DEFAULT_VARIABLE_COLOR,
+      nextState: { alreadySeeded: true, liveSyncActive: false },
+    };
+  }
+  if (!state.alreadySeeded && existingRuleValue === undefined) {
+    return {
+      shouldWrite: true,
+      value: DEFAULT_VARIABLE_COLOR,
+      nextState: { alreadySeeded: true, liveSyncActive: false },
+    };
+  }
+  return { shouldWrite: false, nextState: { alreadySeeded: state.alreadySeeded, liveSyncActive: false } };
 }

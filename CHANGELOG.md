@@ -57,6 +57,22 @@ CONTRIBUTING.md's "Versioning" section).
   it. No `drut.toml` section, CLI flag, or MCP parameter — color is a
   personal/accessibility preference, not a shared project convention the
   way casing or indentation is.
+- A 10th `drut.highlight.*` setting, `drut.highlight.namedVariables`, for
+  `@name@` substitution — the one category the setting above deliberately
+  left out. Unlike the other 9, this one is written into the current
+  *workspace's* `editor.semanticTokenColorCustomizations` (not personal/
+  global settings), required because that setting resolves per-scope, not
+  as a cross-scope merge, and the extension's own pre-existing default
+  color for `@name@` (`#4EC9B0`, auto-seeded once per workspace since
+  themes render this category invisibly otherwise) already lives at
+  workspace scope. Leaving `drut.highlight.namedVariables` unset keeps that
+  original behavior byte-identical, including its "a manual deletion of
+  the seeded rule sticks forever" guarantee for anyone who doesn't use the
+  new setting; setting it takes over live, immediately, the same as every
+  other `drut.highlight.*` category; clearing it afterward reverts to the
+  `#4EC9B0` default (never removes the override outright, since a fully
+  theme-driven state would reintroduce the original invisibility problem
+  for the themes that need it).
 
 ### Changed
 

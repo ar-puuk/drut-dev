@@ -730,6 +730,29 @@ after this log.)
     narrow, 3-type semantic-tokens implementation to duplicate the
     grammar's own classification logic, for a feature with no cross-editor
     portability goal to begin with.
+12. **`@name@` variable highlight color customization** — *done*, merged
+    2026-08-18 as `027-named-variable-highlight`. The one category item 11
+    deliberately deferred, now added: `drut.highlight.namedVariables`, the
+    10th `drut.highlight.*` setting. Reconciles two guarantees that had to
+    coexist without regressing either: the pre-existing
+    `ensureVariableColorCustomization`'s "a manual deletion of the seeded
+    `variable:drut` rule sticks forever, for a workspace that never touches
+    this new setting" (fully preserved, verified by dedicated regression
+    tests, for anyone who doesn't use it) and this feature's own "live,
+    reactive, cleanly-reverting" behavior once a user does set it. Written
+    at **Workspace** scope specifically — a deliberate, documented exception
+    to item 11's Global-only rule for its other 9 categories, required
+    because VS Code resolves an object-valued setting like
+    `editor.semanticTokenColorCustomizations` per-scope (not a cross-scope
+    deep merge), and the pre-existing default already lives at Workspace
+    scope in any workspace this extension has ever activated in — a
+    Global-scope write would be silently masked there. Unsetting after a
+    custom color was configured reverts to the documented default
+    (`#4EC9B0`) rather than removing the override outright, since a fully
+    theme-driven state would reintroduce the invisible-under-some-themes
+    problem the original mechanism exists to fix. All new logic
+    (`decideVariableColorSync`) is a pure, unit-tested function with zero
+    `vscode` dependency, same testability discipline item 11 established.
 
 ## Open questions (not part of the pre-publish sequence)
 

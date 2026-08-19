@@ -189,6 +189,10 @@
         "drut.highlight.strings": {
           "type": "string",
           "markdownDescription": "Color for quoted string literals — a CSS color such as `#RRGGBB`. Leave unset to keep your color theme's own color for this category (scopes `string.quoted.single.drut`/`string.quoted.double.drut`). Personal setting only — there is no `drut.toml` equivalent."
+        },
+        "drut.highlight.namedVariables": {
+          "type": "string",
+          "markdownDescription": "Color for `@name@` substitution — a CSS color such as `#RRGGBB`. Leave unset to keep the extension's existing default (`#4EC9B0`), auto-applied per workspace since some color themes render this category invisibly otherwise. Unlike every other `drut.highlight.*` setting, this one is written into the current workspace's own settings (`.vscode/settings.json`), not your personal/global settings — required for this override to actually take effect. Personal setting only — there is no `drut.toml` equivalent."
         }
       }
     }

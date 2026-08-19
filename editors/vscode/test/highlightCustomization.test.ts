@@ -6,10 +6,13 @@
 import {
   CATEGORY_SCOPES,
   deepEqual,
+  DEFAULT_VARIABLE_COLOR,
+  decideVariableColorSync,
   isEmptyTokenColorCustomizations,
   mergeHighlightRules,
   TokenColorCustomizations,
   HighlightCategory,
+  VariableColorSyncState,
 } from "../src/highlightCustomization";
 
 let failures = 0;
@@ -136,6 +139,58 @@ function main(): void {
     check("deepEqual: order-sensitive arrays", !deepEqual(["a", "b"], ["b", "a"]));
     check("deepEqual: undefined vs undefined", deepEqual(undefined, undefined));
     check("deepEqual: nested structures", deepEqual({ textMateRules: [{ scope: "x" }] }, { textMateRules: [{ scope: "x" }] }));
+  }
+
+  // -- 027-named-variable-highlight: decideVariableColorSync --
+
+  const fresh: VariableColorSyncState = { alreadySeeded: false, liveSyncActive: false };
+
+  // T005/T006: configuredColor set keeps the rule live-synced to it.
+  {
+    const decision = decideVariableColorSync(fresh, undefined, "#FF0000");
+    check("configured color set: writes it", decision.shouldWrite && decision.value === "#FF0000");
+    check("configured color set: marks live-sync active", decision.nextState.liveSyncActive === true);
+    check("configured color set: marks seeded", decision.nextState.alreadySeeded === true);
+  }
+  {
+    const decision = decideVariableColorSync({ alreadySeeded: true, liveSyncActive: true }, "#FF0000", "#FF0000");
+    check("configured color already matching existing rule: no redundant write", !decision.shouldWrite);
+    check("configured color already matching: still marks live-sync active", decision.nextState.liveSyncActive === true);
+  }
+
+  // T007: unsetting after live-sync was active reverts to the default once.
+  {
+    const decision = decideVariableColorSync({ alreadySeeded: true, liveSyncActive: true }, "#FF0000", undefined);
+    check("unset after live-sync: writes the default", decision.shouldWrite && decision.value === DEFAULT_VARIABLE_COLOR);
+    check("unset after live-sync: clears live-sync active", decision.nextState.liveSyncActive === false);
+  }
+
+  // T008: first-ever activation with a synced-in configured color writes it
+  // directly, not the default followed by a second corrective write.
+  {
+    const decision = decideVariableColorSync(fresh, undefined, "#00FF00");
+    check("fresh workspace with a pre-configured color writes that color directly", decision.value === "#00FF00");
+  }
+
+  // T009: never-seeded, no override -- today's exact original one-time seed.
+  {
+    const decision = decideVariableColorSync(fresh, undefined, undefined);
+    check("fresh workspace, no override: seeds the documented default", decision.shouldWrite && decision.value === DEFAULT_VARIABLE_COLOR);
+    check("fresh workspace, no override: marks seeded", decision.nextState.alreadySeeded === true);
+  }
+
+  // T010: already seeded, rule manually deleted, no override -- must NOT
+  // re-add it (the regression this feature must not cause).
+  {
+    const decision = decideVariableColorSync({ alreadySeeded: true, liveSyncActive: false }, undefined, undefined);
+    check("already-seeded workspace with the rule manually deleted, no override: never re-added", !decision.shouldWrite);
+  }
+
+  // T011: already seeded, rule still present and untouched, no override --
+  // no redundant write either.
+  {
+    const decision = decideVariableColorSync({ alreadySeeded: true, liveSyncActive: false }, DEFAULT_VARIABLE_COLOR, undefined);
+    check("already-seeded workspace, rule intact, no override: no write needed", !decision.shouldWrite);
   }
 
   if (failures > 0) {
