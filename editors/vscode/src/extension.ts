@@ -89,11 +89,22 @@ function isOnPath(command: string): boolean {
   // `drut` is subcommand-only (clap's auto `--version` flag isn't enabled
   // here) and rejects a bare `--version` with a non-zero exit. That
   // doesn't actually break this check (spawnSync only sets `.error` on a
-  // genuine ENOENT, never on the child process merely exiting non-zero),
-  // but "--help" is the flag that's actually guaranteed to succeed, so
-  // it's the clearer probe to use.
+  // genuine spawn failure, never on the child process merely exiting
+  // non-zero), so "--help" is just the flag that's actually guaranteed to
+  // succeed, making it the clearer probe to use.
+  //
+  // Any `.error` at all means "not usable" -- not just ENOENT. A real-world
+  // report surfaced a PATH entry that exists but can't actually launch (a
+  // local Windows Application Control policy blocking a dev-built exe);
+  // Node/libuv reported that as `code: "UNKNOWN"`, not ENOENT, so a
+  // narrower "only ENOENT means unusable" check confidently reported this
+  // Tier 1 as available and the real client.start() failed downstream with
+  // no fallback to Tier 2/3 ever attempted. Any error here means the exact
+  // same primitive vscode-languageclient itself uses to spawn the server
+  // would fail identically, so it's never actually usable regardless of
+  // its specific error code.
   const result = spawnSync(command, ["--help"], { stdio: "ignore" });
-  return result.error === undefined || (result.error as NodeJS.ErrnoException).code !== "ENOENT";
+  return result.error === undefined;
 }
 
 function readPackageRepositoryUrl(context: vscode.ExtensionContext): string {

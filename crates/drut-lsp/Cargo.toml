@@ -1,6 +1,6 @@
 [package]
 name = "drut-lsp"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2021"
 description = "Drut LSP server: diagnostics, hover, completion, spell-check, and semantic tokens over voyager-core"
 license = "MIT OR Apache-2.0"
@@ -10,8 +10,8 @@ repository = "https://github.com/ar-puuk/drut-dev"
 # Not bound by voyager-core's zero-dependency rule (scoped to the core crate
 # specifically). Versions pinned per research.md §11.
 [dependencies]
-voyager-core = { path = "../voyager-core", version = "0.3.2" }
-drut-config = { path = "../drut-config", version = "0.3.2" }
+voyager-core = { path = "../voyager-core", version = "0.3.3" }
+drut-config = { path = "../drut-config", version = "0.3.3" }
 lsp-server = "0.10.0"
 lsp-types = "0.97.0"
 serde = "1.0.229"

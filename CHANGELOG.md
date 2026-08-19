@@ -11,6 +11,22 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-08-19
+
+### Fixed
+
+- The extension's Tier 1 ("is `drut` already on PATH?") pre-flight check
+  treated any spawn failure other than `ENOENT` as "found and usable" —
+  reported against a real environment where a locally built dev binary sat
+  on `PATH` and was blocked from executing by a Windows Application Control
+  policy. Node/libuv surfaces that as `code: "UNKNOWN"`, not `ENOENT`, so the
+  old check confidently picked Tier 1, and the language server then failed
+  to start with "Could not start the Drut language server (drut server) —
+  ... spawn UNKNOWN" and no fallback to Tier 2 (stored)/Tier 3 (download)
+  ever attempted. `isOnPath` now only treats a *successful* spawn (no
+  `.error` at all) as usable — any spawn error, whatever its code, now
+  correctly falls through to the next tier.
+
 ## [0.3.2] - 2026-08-19
 
 ### Fixed

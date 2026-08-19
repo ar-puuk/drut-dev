@@ -103,7 +103,11 @@ already been researched or partially unblocked; see the note per item.
    merge plus its accompanying `voyager-core` casing fix). v0.3.2 published
    2026-08-19 the same way, same day (a `#pair-values` grammar follow-up fix
    plus a README refresh, both found/requested immediately after the 0.3.1
-   publish).
+   publish). v0.3.3 published 2026-08-19 the same way, same day (a real
+   language-server-won't-start bug report against the freshly published
+   0.3.2 extension — `isOnPath`'s Tier 1 pre-flight check treated any spawn
+   error other than `ENOENT` as "found," so a blocked PATH entry was
+   confidently used instead of falling through to Tier 2/3).
    - ✅ *Fixed 2026-08-13*: `vsce` packaging `editors/vscode/` in isolation
      meant the repo-root `LICENSE-MIT`/`LICENSE-APACHE` files never made it
      into the `.vsix`. Both are now copied into `editors/vscode/` directly,
