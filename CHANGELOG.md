@@ -32,6 +32,47 @@ CONTRIBUTING.md's "Versioning" section).
   parameter, and the VS Code `drut.format.casingFunctionCalls` setting.
   Defaults to `preserve` — zero behavior change for any project that
   doesn't opt in.
+- 9 new personal VS Code settings, `drut.highlight.<category>`
+  (`controlWords`, `statementWords`, `functionCalls`, `pairKeywords`,
+  `values`, `numbers`, `operators`, `comments`, `strings`), letting a user
+  recolor any one category of Voyager syntax to their own preference
+  without losing their color theme's own choices for every category left
+  unset. Each setting is kept in sync with VS Code's own
+  `editor.tokenColorCustomizations` (User/Global scope) — setting a color
+  takes effect immediately, no window reload needed; clearing it reverts to
+  the active theme's own color, not a stuck last value. Never touches any
+  rule this extension didn't itself add — another extension's rules, or a
+  user's own hand-written `editor.tokenColorCustomizations` entries, always
+  survive untouched. `statementWords` (`PRINT`, `FILEI`, ...) and
+  `functionCalls` (`REPLACESTR(...)`, `ROUND(...)`, ...) previously shared
+  one TextMate scope (`support.function.drut`, since
+  `024-function-call-highlighting`); split into
+  `support.function.statement.drut`/`support.function.builtin.drut` so the
+  two are now independently colorable — a pure rename, no visible change
+  for anyone not using the new settings. `@name@` substitution
+  (`variables`) is intentionally not one of the 9 categories — an existing,
+  separate mechanism (a semantic-token-based, one-time workspace injection)
+  already governs its color for themes that render it invisibly by
+  default, and this feature's own mechanism would not visibly win against
+  it. No `drut.toml` section, CLI flag, or MCP parameter — color is a
+  personal/accessibility preference, not a shared project convention the
+  way casing or indentation is.
+- A 10th `drut.highlight.*` setting, `drut.highlight.namedVariables`, for
+  `@name@` substitution — the one category the setting above deliberately
+  left out. Unlike the other 9, this one is written into the current
+  *workspace's* `editor.semanticTokenColorCustomizations` (not personal/
+  global settings), required because that setting resolves per-scope, not
+  as a cross-scope merge, and the extension's own pre-existing default
+  color for `@name@` (`#4EC9B0`, auto-seeded once per workspace since
+  themes render this category invisibly otherwise) already lives at
+  workspace scope. Leaving `drut.highlight.namedVariables` unset keeps that
+  original behavior byte-identical, including its "a manual deletion of
+  the seeded rule sticks forever" guarantee for anyone who doesn't use the
+  new setting; setting it takes over live, immediately, the same as every
+  other `drut.highlight.*` category; clearing it afterward reverts to the
+  `#4EC9B0` default (never removes the override outright, since a fully
+  theme-driven state would reintroduce the original invisibility problem
+  for the themes that need it).
 
 ### Changed
 

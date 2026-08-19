@@ -43,6 +43,7 @@ for accepted values, defaults, and what each actually does:
 | `--casing-control-words` | [`casing_control_words`](configuration-reference.md#casing_control_words) |
 | `--casing-pair-keywords` | [`casing_pair_keywords`](configuration-reference.md#casing_pair_keywords) |
 | `--casing-data-references` | [`casing_data_references`](configuration-reference.md#casing_data_references) |
+| `--casing-function-calls` | [`casing_function_calls`](configuration-reference.md#casing_function_calls) |
 | `--indent-top-level` | [`indent_top_level`](configuration-reference.md#indent_top_level) |
 | `--indent-width` | [`indent_width`](configuration-reference.md#indent_width) |
 | `--operator-spacing` | [`operator_spacing`](configuration-reference.md#operator_spacing) |

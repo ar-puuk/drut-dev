@@ -406,6 +406,28 @@ async function main(): Promise<void> {
     check("REPLACESTR inside a quoted string is still inside string.quoted", scopes.some((s) => s.includes("string.quoted")));
   }
 
+  // -- 026-highlight-customization --
+  //
+  // #statement-words and #function-calls now use two distinct scopes
+  // (support.function.statement.drut / support.function.builtin.drut)
+  // instead of one shared support.function.drut, so drut.highlight.
+  // statementWords and drut.highlight.functionCalls can color them
+  // independently.
+  {
+    const line = "PRINT LIST='x'";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const scopes = scopesAt(tokens, line.indexOf("PRINT"));
+    check("PRINT (statement word) scoped as support.function.statement", scopes.some((s) => s.includes("support.function.statement")));
+    check("PRINT (statement word) is NOT scoped as support.function.builtin", !scopes.some((s) => s.includes("support.function.builtin")));
+  }
+  {
+    const line = "X = REPLACESTR(y,'-','',0)";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const scopes = scopesAt(tokens, line.indexOf("REPLACESTR"));
+    check("REPLACESTR (function call) scoped as support.function.builtin", scopes.some((s) => s.includes("support.function.builtin")));
+    check("REPLACESTR (function call) is NOT scoped as support.function.statement", !scopes.some((s) => s.includes("support.function.statement")));
+  }
+
   if (failures > 0) {
     console.error(`${failures} check(s) failed`);
     process.exit(1);

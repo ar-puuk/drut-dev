@@ -695,6 +695,64 @@ after this log.)
     additionally checked with zero extra fixture files (`check_idempotent`
     needs no golden file, only a format-twice self-diff). Defaults to
     `preserve` — zero behavior change for any project that doesn't opt in.
+11. **Editor highlight color customization** — *done*, merged 2026-08-18 as
+    `026-highlight-customization`. 9 new personal VS Code settings,
+    `drut.highlight.<category>` (`controlWords`, `statementWords`,
+    `functionCalls`, `pairKeywords`, `values`, `numbers`, `operators`,
+    `comments`, `strings`), kept in sync with VS Code's own native
+    `editor.tokenColorCustomizations` (User/Global scope) rather than a new
+    coloring engine or an LSP semantic-tokens rebuild — reuses the TextMate
+    scopes `024`/`025` already ship. Unlike `[format]`/`drut.format.*`,
+    deliberately **no** `drut.toml [highlight]` section, CLI flag, or MCP
+    parameter: color is a personal/accessibility preference (theme,
+    colorblindness, monitor), not a shared file-content convention the way
+    casing or indentation is — a decision made explicitly, not defaulted
+    into, after discussion. Prerequisite grammar fix: `#statement-words`
+    and `#function-calls` shared one scope (`support.function.drut`) since
+    `024`, so `statementWords`/`functionCalls` couldn't be colored
+    independently; split into `support.function.statement.drut`/
+    `support.function.builtin.drut` (pure rename, no visible change for
+    anyone not using the new settings). `@name@` substitution
+    (`variables`) is deliberately excluded — a real, already-shipped
+    mechanism (`ensureVariableColorCustomization`, semantic-token-based,
+    workspace-scoped, one-time, added because some themes render that scope
+    invisibly) already owns its color, and this feature's TextMate-scope
+    mechanism would not visibly win against it; folding it in would mean
+    changing that mechanism's tested lifecycle, not just adding a setting.
+    Never touches a rule this extension didn't add (exact scope-set match,
+    not substring), and skips the write entirely when nothing would
+    actually change (found via `/speckit-analyze`: an unconditional write
+    on every activation would be harmless in value but still an
+    unnecessary `settings.json` touch for a user who never configures this
+    at all). Constitution Principle VI (prefer LSP-standard mechanisms) was
+    explicitly weighed and set aside — the LSP-standard alternative
+    (semantic tokens) would mean substantially expanding `drut-lsp`'s
+    narrow, 3-type semantic-tokens implementation to duplicate the
+    grammar's own classification logic, for a feature with no cross-editor
+    portability goal to begin with.
+12. **`@name@` variable highlight color customization** — *done*, merged
+    2026-08-18 as `027-named-variable-highlight`. The one category item 11
+    deliberately deferred, now added: `drut.highlight.namedVariables`, the
+    10th `drut.highlight.*` setting. Reconciles two guarantees that had to
+    coexist without regressing either: the pre-existing
+    `ensureVariableColorCustomization`'s "a manual deletion of the seeded
+    `variable:drut` rule sticks forever, for a workspace that never touches
+    this new setting" (fully preserved, verified by dedicated regression
+    tests, for anyone who doesn't use it) and this feature's own "live,
+    reactive, cleanly-reverting" behavior once a user does set it. Written
+    at **Workspace** scope specifically — a deliberate, documented exception
+    to item 11's Global-only rule for its other 9 categories, required
+    because VS Code resolves an object-valued setting like
+    `editor.semanticTokenColorCustomizations` per-scope (not a cross-scope
+    deep merge), and the pre-existing default already lives at Workspace
+    scope in any workspace this extension has ever activated in — a
+    Global-scope write would be silently masked there. Unsetting after a
+    custom color was configured reverts to the documented default
+    (`#4EC9B0`) rather than removing the override outright, since a fully
+    theme-driven state would reintroduce the invisible-under-some-themes
+    problem the original mechanism exists to fix. All new logic
+    (`decideVariableColorSync`) is a pure, unit-tested function with zero
+    `vscode` dependency, same testability discipline item 11 established.
 
 ## Open questions (not part of the pre-publish sequence)
 

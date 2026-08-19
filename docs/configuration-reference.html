@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-b368c168.js";
+            window.path_to_searchindex_js = "searchindex-554d1b9c.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c6afe1e7.js"></script>
@@ -202,6 +202,7 @@ the full field list or its defaults from scratch:</p>
 # casing_control_words = "preserve"    # preserve | upper | lower
 # casing_pair_keywords = "preserve"    # preserve | upper | lower
 # casing_data_references = "preserve"  # preserve | upper | lower
+# casing_function_calls = "preserve"   # preserve | upper | lower
 # indent_top_level = "preserve"        # preserve | auto
 # indent_width = 4                     # 1-16
 # operator_spacing = "preserve"        # preserve | fixed | auto
@@ -279,6 +280,26 @@ parameter <code>casing_data_references</code>.</p>
 <p><strong>Example</strong>:</p>
 <pre><code class="language-toml">[format]
 casing_data_references = "lower"
+</code></pre>
+<p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above.</p>
+<h3 id="casing_function_calls"><a class="header" href="#casing_function_calls"><code>casing_function_calls</code></a></h3>
+<p>Casing for recognized Cube Voyager built-in function names (e.g. <code>REPLACESTR</code>,
+<code>ROUND</code>, <code>TRIM</code>) — only a name immediately followed by <code>(</code> with no intervening
+whitespace counts as a call; the same name elsewhere (a <code>keyword=value</code> pair
+name, a plain identifier) is untouched by this field. Covers 138 names spanning
+the general Control Language core (Numeric/Trig/Character-String functions),
+Highway/Matrix-program functions, Public Transport skim functions, the
+CONVERGE-phase iteration-statistics family, and CUBE Cluster utility functions —
+see the <a href="formatter-guide.html#function-call-casing">Formatter Guide</a> for the full
+list and how two real names (<code>FORMAT</code>, <code>LOG</code>) that also exist as a pair-keyword/
+control word respectively are disambiguated by position.</p>
+<p><strong>Values</strong>: <code>preserve</code> <strong>← default</strong>, <code>upper</code>, <code>lower</code>.</p>
+<p><strong>Default</strong>: <code>preserve</code>.</p>
+<p><strong>Also known as</strong>: CLI flag <code>--casing-function-calls</code>; MCP <code>format</code> tool
+parameter <code>casing_function_calls</code>.</p>
+<p><strong>Example</strong>:</p>
+<pre><code class="language-toml">[format]
+casing_function_calls = "upper"
 </code></pre>
 <p><strong>Precedence</strong>: follows the <a href="#precedence">four-tier chain</a> above.</p>
 <h3 id="indent_top_level"><a class="header" href="#indent_top_level"><code>indent_top_level</code></a></h3>

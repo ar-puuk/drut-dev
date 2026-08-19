@@ -28,6 +28,7 @@ the full field list or its defaults from scratch:
 # casing_control_words = "preserve"    # preserve | upper | lower
 # casing_pair_keywords = "preserve"    # preserve | upper | lower
 # casing_data_references = "preserve"  # preserve | upper | lower
+# casing_function_calls = "preserve"   # preserve | upper | lower
 # indent_top_level = "preserve"        # preserve | auto
 # indent_width = 4                     # 1-16
 # operator_spacing = "preserve"        # preserve | fixed | auto
@@ -135,6 +136,35 @@ parameter `casing_data_references`.
 ```toml
 [format]
 casing_data_references = "lower"
+```
+
+**Precedence**: follows the [four-tier chain](#precedence) above.
+
+### `casing_function_calls`
+
+Casing for recognized Cube Voyager built-in function names (e.g. `REPLACESTR`,
+`ROUND`, `TRIM`) — only a name immediately followed by `(` with no intervening
+whitespace counts as a call; the same name elsewhere (a `keyword=value` pair
+name, a plain identifier) is untouched by this field. Covers 138 names spanning
+the general Control Language core (Numeric/Trig/Character-String functions),
+Highway/Matrix-program functions, Public Transport skim functions, the
+CONVERGE-phase iteration-statistics family, and CUBE Cluster utility functions —
+see the [Formatter Guide](formatter-guide.md#function-call-casing) for the full
+list and how two real names (`FORMAT`, `LOG`) that also exist as a pair-keyword/
+control word respectively are disambiguated by position.
+
+**Values**: `preserve` **← default**, `upper`, `lower`.
+
+**Default**: `preserve`.
+
+**Also known as**: CLI flag `--casing-function-calls`; MCP `format` tool
+parameter `casing_function_calls`.
+
+**Example**:
+
+```toml
+[format]
+casing_function_calls = "upper"
 ```
 
 **Precedence**: follows the [four-tier chain](#precedence) above.
