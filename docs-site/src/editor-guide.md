@@ -174,9 +174,10 @@ extension's customizations, or your own hand-written ones, always survive
 untouched.
 
 A bareword immediately before `=` always renders under `pairKeywords`, even
-if it's also a `userVariables`-shaped identifier (`LINKID` in `LINKID =
-_ANode`) — this grammar has no real parse tree to tell a keyword-pair's own
-name apart from an ordinary assignment's target variable. The bareword
+if it's also a `userVariables`-shaped identifier (`LINKID` in
+`LINKID = _ANode`) — this grammar has no real parse tree to tell a
+keyword-pair's own name apart from an ordinary assignment's target variable.
+The bareword
 immediately *after* `=` renders under `pairValues` only when it's the
 entire right-hand side, with nothing else following (`X = _ANode` alone) —
 that shape is genuinely indistinguishable from a keyword-pair's own value

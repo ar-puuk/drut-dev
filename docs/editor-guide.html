@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-2408f666.js";
+            window.path_to_searchindex_js = "searchindex-ec7ea217.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c6afe1e7.js"></script>
@@ -356,8 +356,10 @@ None of these ever touch a rule they didn’t add themselves — another
 extension’s customizations, or your own hand-written ones, always survive
 untouched.</p>
 <p>A bareword immediately before <code>=</code> always renders under <code>pairKeywords</code>, even
-if it’s also a <code>userVariables</code>-shaped identifier (<code>LINKID</code> in <code>LINKID =  _ANode</code>) — this grammar has no real parse tree to tell a keyword-pair’s own
-name apart from an ordinary assignment’s target variable. The bareword
+if it’s also a <code>userVariables</code>-shaped identifier (<code>LINKID</code> in
+<code>LINKID = _ANode</code>) — this grammar has no real parse tree to tell a
+keyword-pair’s own name apart from an ordinary assignment’s target variable.
+The bareword
 immediately <em>after</em> <code>=</code> renders under <code>pairValues</code> only when it’s the
 entire right-hand side, with nothing else following (<code>X = _ANode</code> alone) —
 that shape is genuinely indistinguishable from a keyword-pair’s own value
