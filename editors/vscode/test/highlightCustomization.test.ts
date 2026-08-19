@@ -61,12 +61,15 @@ function main(): void {
     check("functionCalls rule present with correct color", functionRule?.settings?.foreground === "#FF6B35");
   }
 
-  // T010: every one of the 9 categories individually produces a correct
-  // rule when set alone -- data-driven, not a hand-picked sample (mirrors
-  // 024's/025's own SC-001 remediation).
+  // T010/T017 (028-identifier-highlighting): every one of the 11 categories
+  // (the original 9, plus dataReferences/userVariables) individually
+  // produces a correct rule when set alone -- data-driven, not a hand-picked
+  // sample (mirrors 024's/025's own SC-001 remediation).
   {
     const categories = Object.keys(CATEGORY_SCOPES) as HighlightCategory[];
-    check("category table has 9 entries", categories.length === 9);
+    check("category table has 11 entries", categories.length === 11);
+    check("category table includes dataReferences", categories.includes("dataReferences"));
+    check("category table includes userVariables", categories.includes("userVariables"));
     let allCorrect = true;
     const misses: string[] = [];
     for (const category of categories) {
@@ -79,7 +82,7 @@ function main(): void {
         misses.push(category);
       }
     }
-    check(`all 9 categories produce correct rules when set alone${misses.length ? ` (missed: ${misses.join(", ")})` : ""}`, allCorrect);
+    check(`all 11 categories produce correct rules when set alone${misses.length ? ` (missed: ${misses.join(", ")})` : ""}`, allCorrect);
   }
 
   // T012: an unrelated rule plus an unrelated top-level key survive a set.

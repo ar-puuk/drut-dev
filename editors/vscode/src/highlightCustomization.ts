@@ -27,7 +27,9 @@ export type HighlightCategory =
   | "numbers"
   | "operators"
   | "comments"
-  | "strings";
+  | "strings"
+  | "dataReferences"
+  | "userVariables";
 
 /** Single source of truth for category -> TextMate scope(s) (data-model.md
  * §1). A category's value is a single scope string, or an array of exactly
@@ -43,6 +45,8 @@ export const CATEGORY_SCOPES: Record<HighlightCategory, string | string[]> = {
   operators: "keyword.operator.drut",
   comments: ["comment.line.semicolon.drut", "comment.block.drut"],
   strings: ["string.quoted.single.drut", "string.quoted.double.drut"],
+  dataReferences: "variable.language.data-reference.drut",
+  userVariables: "variable.other.identifier.drut",
 };
 
 const ALL_CATEGORIES = Object.keys(CATEGORY_SCOPES) as HighlightCategory[];

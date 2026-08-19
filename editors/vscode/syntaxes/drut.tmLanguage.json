@@ -5,16 +5,20 @@
   "fileTypes": ["s", "block"],
   "patterns": [
     { "include": "#comments" },
+    { "include": "#shell-escape" },
+    { "include": "#label" },
     { "include": "#strings" },
     { "include": "#variable-ref" },
     { "include": "#control-words" },
     { "include": "#statement-words" },
     { "include": "#function-calls" },
+    { "include": "#data-references" },
     { "include": "#pair-keywords" },
     { "include": "#pair-values" },
     { "include": "#numbers" },
     { "include": "#operators" },
-    { "include": "#punctuation" }
+    { "include": "#punctuation" },
+    { "include": "#user-identifiers" }
   ],
   "repository": {
     "comments": {
@@ -31,6 +35,16 @@
       "begin": "/\\*",
       "end": "\\*/",
       "patterns": [{ "include": "#block-comment" }]
+    },
+    "shell-escape": {
+      "comment": "028-identifier-highlighting: a ShellEscape statement (statement.rs's classify_statement: first token is a bare '*' punctuation) is one physical line of literal OS shell text, not Voyager syntax at all -- one flat match over the whole line (leading '*' included) so nothing else, old pattern or new, ever matches inside it (research.md Sec 5). Matches only when '*' is the first non-whitespace character on its physical line, the same statement-start shape voyager-core's own parser requires; a bare '*' used as multiplication mid-expression is never at line-start, so this never misfires there.",
+      "name": "meta.embedded.shell-escape.drut",
+      "match": "^[ \\t]*(\\*.*)$"
+    },
+    "label": {
+      "comment": "028-identifier-highlighting: a Label statement (statement.rs: first token ':' punctuation, second is the name) is exactly this shape -- one flat match, own scope, so the name is claimed here rather than by #user-identifiers (research.md Sec 5). Bonus: labels get real, dedicated highlighting for the first time (previously unstyled).",
+      "name": "entity.name.label.drut",
+      "match": "^[ \\t]*(:)[ \\t]*([A-Za-z_][A-Za-z0-9_]*)"
     },
     "strings": {
       "patterns": [
@@ -72,6 +86,11 @@
       "name": "support.function.builtin.drut",
       "match": "(?i)(?<![A-Za-z0-9_])(AADAVE|AADCHANGE|AADCHANGEAVE|AADCHANGEMAX|AADCHANGEMIN|AADMAX|AADMIN|ABS|ARCCOS|ARCSIN|ARCTAN|ARRAYSUM|BRDINGS|BRDPEN|CAPACITYFOR|CHECKNAME|CMPNUMRETNUM|COMPCOST|COS|CURRENTTIME|CWDCOSTP|CWDWAITA|CWDWAITP|DELETESTR|DIST|DUPSTR|EXP|EXPDIST|EXPINV|FAREA|FAREP|FILESEXIST|FIRSTREADYNODE|FORMAT|FORMATDATETIME|GAMMADIST|GAMMAINV|GAPAVE|GAPCHANGE|GAPCHANGEAVE|GAPCHANGEMAX|GAPCHANGEMIN|GAPMAX|GAPMIN|GCOST|GETMATRIXROW|GETVALUE|INLIST|INSERTSTR|INT|IWAITA|IWAITP|LEFTSTR|LINKNUM|LN|LOG|LOGNORMDIST|LOGNORMINV|LOWEST|LTRIM|MATVAL|MAX|MIN|NORMDIST|NORMINV|NUMREADYNODES|PATHTRACE|PDIFFAVE|PDIFFCHANGE|PDIFFCHANGEAVE|PDIFFCHANGEMAX|PDIFFCHANGEMIN|PDIFFMAX|PDIFFMIN|POISSONDIST|POISSONINV|POW|PRINTPROGRESS|RAADAVE|RAADCHANGE|RAADCHANGEAVE|RAADCHANGEMAX|RAADCHANGEMIN|RAADMAX|RAADMIN|RAND|RANDOM|RANDSEED|REPLACESTR|REPLACESTRIC|REVERSESTR|RGAPAVE|RGAPCHANGE|RGAPCHANGEAVE|RGAPCHANGEMAX|RGAPCHANGEMIN|RGAPMAX|RGAPMIN|RIGHTSTR|RMSEAVE|RMSECHANGE|RMSECHANGEAVE|RMSECHANGEMAX|RMSECHANGEMIN|RMSEMAX|RMSEMIN|ROUND|ROWADD|ROWAVE|ROWCNT|ROWDIV|ROWFAC|ROWFIX|ROWMAX|ROWMIN|ROWMPY|ROWREAD|ROWSUM|SIN|SPEEDFOR|SQRT|STR|STRLEN|STRLOWER|STRPOS|STRPOSEX|STRUPPER|SUBSTR|TAN|TIMEA|TIMEP|TRIM|VAL|VALOFCHOICE|XFERPENA|XFERPENP|XWAITA|XWAITP)(?=\\()"
     },
+    "data-references": {
+      "comment": "028-identifier-highlighting: the Matrix/Line/Node/Zone/Database data-reference family voyager-core's data_reference.rs already recognizes for casing (MI/MO/MW/LI/LW/NI/NW/ZI/ZONES/Z/DBI/DBA/RO/A/B/I/J) -- matched case-insensitively by exact name or dot-notation prefix (dba.2.field), regardless of position (research.md Sec 2). The trailing lookahead (a literal '.' for dot-notation, or a non-identifier boundary for a bare occurrence) means alternative order inside the group doesn't matter for correctness even though some names are string-prefixes of others (Z of ZI/ZONES) -- a premature Z-only match against ZONES fails its own lookahead (next char is a word char) and falls through to the ZONES alternative. Listed before #pair-keywords/#pair-values so a name that's also keyword-pair-shaped (e.g. ZONES in RUN PGM=MATRIX ZONES=5) is claimed here instead -- one name, one owning category, mirroring data_reference.rs's own FR-005 rule (research.md Sec 3).",
+      "name": "variable.language.data-reference.drut",
+      "match": "(?i)(?<![A-Za-z0-9_])(MI|MO|MW|LI|LW|NI|NW|ZI|ZONES|Z|DBI|DBA|RO|A|B|I|J)(?=\\.|(?![A-Za-z0-9_]))"
+    },
     "pair-keywords": {
       "comment": "A keyword=value pair's keyword name (optionally bracket-subscripted, e.g. VOL[01]=), colored like a Python keyword argument's parameter name (func(param=value)) -- variable.parameter, distinct from control-words/statement-words above. Deliberately structural/generic (matches FR-003's `word[subscript]=` shape from voyager-core's own grammar, not a fixed name list) rather than vendor-sourced, since FR-003 already establishes there's no closed keyword vocabulary. Listed after control-words/statement-words in the top-level patterns array so a word like PHASE (control-words) or PRINT (statement-words) that's *also* immediately followed by = still gets its more specific scope -- TextMate resolves same-position ties by array order.",
       "match": "(?<![A-Za-z0-9_])([A-Za-z_][A-Za-z0-9_]*(?:\\[[^\\]\\n]*\\])?)(?=\\s*=(?!=))",
@@ -102,6 +121,11 @@
         { "name": "punctuation.section.group.begin.drut", "match": "\\(" },
         { "name": "punctuation.section.group.end.drut", "match": "\\)" }
       ]
+    },
+    "user-identifiers": {
+      "comment": "028-identifier-highlighting: catch-all for a bareword identifier not already claimed by an earlier, more specific pattern (control word, statement word, function-call name, #data-references, pair-keyword name, pair value) -- placed last in the top-level patterns array, so array position alone is the entire filtering mechanism (research.md Sec 4). This is what makes FR-004's 'none of the above' definition free: it falls out of pattern-list order, not a hand-written negative-lookahead blacklist that would have to duplicate every other pattern's word list inline. A bareword immediately adjacent to '=' is never offered to this pattern at all -- #pair-keywords/#pair-values are listed well before this one and already claim that shape (spec.md Assumptions' documented =-adjacency trade-off).",
+      "name": "variable.other.identifier.drut",
+      "match": "(?<![A-Za-z0-9_])[A-Za-z_][A-Za-z0-9_]*(?![A-Za-z0-9_])"
     }
   }
 }

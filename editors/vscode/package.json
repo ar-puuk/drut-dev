@@ -193,6 +193,14 @@
         "drut.highlight.namedVariables": {
           "type": "string",
           "markdownDescription": "Color for `@name@` substitution — a CSS color such as `#RRGGBB`. Leave unset to keep the extension's existing default (`#4EC9B0`), auto-applied per workspace since some color themes render this category invisibly otherwise. Unlike every other `drut.highlight.*` setting, this one is written into the current workspace's own settings (`.vscode/settings.json`), not your personal/global settings — required for this override to actually take effect. Personal setting only — there is no `drut.toml` equivalent."
+        },
+        "drut.highlight.dataReferences": {
+          "type": "string",
+          "markdownDescription": "Color for the Matrix/Line/Node/Zone/Database data-reference family (`MI`, `MW`, `DBA`, `ZONES`, ...) — a CSS color such as `#RRGGBB`. Leave unset to keep your color theme's own color for this category (scope `variable.language.data-reference.drut`). Personal setting only — there is no `drut.toml` equivalent."
+        },
+        "drut.highlight.userVariables": {
+          "type": "string",
+          "markdownDescription": "Color for a user-defined identifier that isn't any recognized keyword, function call, pair-keyword, or data-reference name — a CSS color such as `#RRGGBB`. Leave unset to keep your color theme's own color for this category (scope `variable.other.identifier.drut`). Personal setting only — there is no `drut.toml` equivalent."
         }
       }
     }
