@@ -15,6 +15,7 @@ use voyager_core::{Position, Span};
 use crate::document_store::ServerState;
 use crate::position::to_lsp_range;
 use crate::undefined_token;
+use crate::unused_token;
 use crate::workspace::resolve_path;
 
 fn kind_name(kind: voyager_core::DiagnosticKind) -> &'static str {
@@ -130,10 +131,40 @@ pub fn publish(connection: &Connection, state: &ServerState, uri: &Uri) {
             })
             .collect();
 
+    // 029-unused-token-diagnostic: a fifth, independently-sourced stream for
+    // Assignment statements whose target name is never referenced via
+    // @name@ anywhere in scope -- the exact inverse of UndefinedToken above.
+    // Same "additive, non-Diagnostic-kind, distinct code" treatment, sharing
+    // UndefinedToken's own "drut-token" source (same conceptual domain,
+    // different diagnostic code). Applies unconditionally regardless of
+    // whether this document participates in any READ FILE relationship --
+    // a documented, accepted false-positive risk for the shared-parameters-
+    // file pattern (spec.md Clarification Q2), not a bug.
+    let unused_token_diagnostics: Vec<lsp_types::Diagnostic> =
+        unused_token::unused_token_assignments(uri, doc)
+            .into_iter()
+            .map(|a| lsp_types::Diagnostic {
+                range: to_lsp_range(&doc.text, a.statement_span),
+                severity: Some(DiagnosticSeverity::HINT),
+                code: Some(lsp_types::NumberOrString::String("UnusedToken".to_string())),
+                code_description: None,
+                source: Some("drut-token".to_string()),
+                message: format!(
+                    "'{}' is assigned but never referenced via '@{}@' in this file or a \
+                     directly included one — it may still be used elsewhere Drut can't see",
+                    a.target, a.target
+                ),
+                related_information: None,
+                tags: None,
+                data: None,
+            })
+            .collect();
+
     let diagnostics = structural_diagnostics
         .chain(fmt_marker_diagnostics)
         .chain(config_warnings)
         .chain(undefined_token_diagnostics)
+        .chain(unused_token_diagnostics)
         .collect();
 
     send(connection, uri.clone(), diagnostics, Some(doc.version));

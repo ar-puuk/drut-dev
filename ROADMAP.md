@@ -795,6 +795,34 @@ after this log.)
     `LOOP` bound, `LOOP NUMREC = counter, DBI.2.NUMRECORDS`) was invisible
     to `casing_data_references`'s rewrite, since only the opener's
     *keyword*-pair spans were ever scanned, never its value tokens.
+14. **Unused `@token@` diagnostic** — *done*, merged 2026-08-19 as
+    `029-unused-token-diagnostic`. A fifth Hint-severity, LSP-only diagnostic
+    stream (source `drut-token`, code `UnusedToken`) — the exact inverse of
+    item-020's `UndefinedToken`: flags an `Assignment` statement whose target
+    name is never referenced via `@name@` anywhere in scope. Required one
+    real new piece of `voyager-core` logic, not just wiring:
+    `all_variable_refs_including_openers`, a new function (not a
+    modification — `all_variable_refs` and its `020` consumer are untouched)
+    that also scans `Block::opener_tokens` (already added this session for
+    the item-13 casing fix) so a token used only on a block-opener line
+    (`RUN PGM=@Prog@`) counts as a genuine use — reusing the *unmodified*
+    `all_variable_refs` here would have made that position a false positive
+    instead of `020`'s own acceptable false negative for the same gap. Two
+    scope decisions resolved via direct clarification rather than assumed:
+    every dead assignment site is flagged independently when reassigned
+    with zero reads (not deduplicated to one-per-name), and the check
+    applies unconditionally regardless of whether a file participates in
+    any `READ FILE` relationship — a deliberately accepted, documented
+    false-positive risk for the shared-parameters-file authoring pattern
+    (a name used only by a file that includes this one is invisible to any
+    existing resolution logic, in either direction), permanently mitigated
+    by staying at Hint severity, never CLI/MCP reach. Surfaced and fixed a
+    latent bug in several pre-existing tests' fixtures along the way (bare
+    `Y = 1`-shaped assignments incidental to what those tests actually
+    checked, now genuinely flagged) and one shared corpus fixture
+    (`undecodable_byte.s`) — fixed by converting the incidental assignments
+    to non-`Assignment` statements, verified byte-for-byte that the fixture's
+    actual invalid-UTF-8 byte was untouched.
 
 ## Open questions (not part of the pre-publish sequence)
 

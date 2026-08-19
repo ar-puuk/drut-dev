@@ -1,4 +1,4 @@
 ; EXPECT: InvalidEncoding
-X = 1
+PRINT LIST='before'
 ; a comment containing an undecodable byte -> Å <- right there
-Y = 2
+PRINT LIST='after'

@@ -93,3 +93,28 @@ fn check_never_surfaces_the_lsp_only_undefined_token_hint() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn check_never_surfaces_the_lsp_only_unused_token_hint() {
+    // 029-unused-token-diagnostic SC-005: this stream is LSP-only, built
+    // and published entirely inside drut-lsp/src/diagnostics.rs — `check`
+    // must keep exposing exactly the same DiagnosticKind names as before
+    // this feature, even on a document containing an assignment that's
+    // never referenced via @token@.
+    let dir = std::env::temp_dir().join(format!(
+        "drut-cli-sarif-unused-token-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("a.s"), "ScenarioDir = 'X:\\model'\n").unwrap();
+
+    let log = run_check_sarif(dir.to_str().unwrap());
+    let results = log["runs"][0]["results"].as_array().expect("runs[0].results is an array");
+    assert!(
+        results.is_empty(),
+        "an unused assignment must never appear in check's output, got: {results:#?}"
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

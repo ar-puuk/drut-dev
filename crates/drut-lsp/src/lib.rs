@@ -15,6 +15,7 @@ pub mod range_formatting;
 pub mod semantic_tokens;
 pub mod spellcheck;
 pub mod undefined_token;
+pub mod unused_token;
 pub mod workspace;
 
 use lsp_server::{Connection, Message, Notification as ServerNotification, Request as ServerRequest, Response};

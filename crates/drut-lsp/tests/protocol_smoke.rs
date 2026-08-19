@@ -174,10 +174,16 @@ fn did_open_publishes_unmatched_process_for_a_genuinely_unclosed_phase() {
     let (client, _handle) = spawn_server();
     initialize(&client);
 
+    // "FILEI=ni.1" parses as a plain Assignment (not a recognized Control
+    // statement in this exact shape), so it also -- correctly --
+    // incidentally trips 029-unused-token-diagnostic's UnusedToken hint
+    // (FILEI is never referenced via @FILEI@); this test only cares about
+    // UnmatchedProcess coexisting correctly, so it checks for that
+    // specifically rather than asserting an exact diagnostic count.
     let note = did_open(&client, "file:///unclosed_phase.s", "PROCESS PHASE=INPUT\nFILEI=ni.1\n");
     let diagnostics = note.params["diagnostics"].as_array().unwrap();
-    assert_eq!(diagnostics.len(), 1);
-    assert_eq!(diagnostics[0]["code"], json!("UnmatchedProcess"));
+    let process = diagnostics.iter().find(|d| d["code"] == json!("UnmatchedProcess")).expect("UnmatchedProcess missing");
+    assert_eq!(process["source"], json!("drut"));
 
     shutdown(&client);
 }
@@ -221,7 +227,7 @@ fn did_open_publishes_an_unclosed_fmt_off_hint_distinct_from_structural_diagnost
     let (client, _handle) = spawn_server();
     initialize(&client);
 
-    let note = did_open(&client, "file:///unclosed_marker.s", "IF (X=1)\n; FMT: OFF\nY = 1\nENDIF\n");
+    let note = did_open(&client, "file:///unclosed_marker.s", "IF (X=1)\n; FMT: OFF\nPRINT LIST='y'\nENDIF\n");
     let diagnostics = note.params["diagnostics"].as_array().unwrap();
     assert_eq!(diagnostics.len(), 1, "expected exactly one diagnostic, got: {diagnostics:?}");
     assert_eq!(diagnostics[0]["code"], json!("UnclosedFmtOff"));
@@ -236,7 +242,7 @@ fn did_open_publishes_zero_fmt_off_hints_for_a_clean_document() {
     let (client, _handle) = spawn_server();
     initialize(&client);
 
-    let note = did_open(&client, "file:///clean_markers.s", "IF (X=1)\n; FMT: OFF\nY = 1\n; FMT: ON\nENDIF\n");
+    let note = did_open(&client, "file:///clean_markers.s", "IF (X=1)\n; FMT: OFF\nPRINT LIST='y'\n; FMT: ON\nENDIF\n");
     let diagnostics = note.params["diagnostics"].as_array().unwrap();
     assert!(diagnostics.is_empty(), "every marker matched -- expected zero diagnostics, got: {diagnostics:?}");
 
@@ -259,7 +265,7 @@ fn did_open_publishes_an_undefined_token_hint_distinct_from_structural_diagnosti
     let note = did_open(
         &client,
         "file:///undefined_token.s",
-        "IF (X=1)\nMSG = @ScenarioDir@\n; no ENDIF\n",
+        "IF (X=1)\nPRINT LIST='@ScenarioDir@'\n; no ENDIF\n",
     );
     let diagnostics = note.params["diagnostics"].as_array().unwrap();
     assert_eq!(diagnostics.len(), 2, "expected exactly two diagnostics, got: {diagnostics:?}");
@@ -284,7 +290,7 @@ fn did_open_publishes_zero_undefined_token_hints_for_a_resolvable_reference() {
     let (client, _handle) = spawn_server();
     initialize(&client);
 
-    let note = did_open(&client, "file:///resolvable_token.s", "Prog = MATRIX\nMSG = @Prog@\n");
+    let note = did_open(&client, "file:///resolvable_token.s", "Prog = MATRIX\nPRINT LIST='@Prog@'\n");
     let diagnostics = note.params["diagnostics"].as_array().unwrap();
     assert!(diagnostics.is_empty(), "Prog resolves via a same-file assignment -- expected zero diagnostics, got: {diagnostics:?}");
 
@@ -295,7 +301,7 @@ fn did_open_publishes_zero_undefined_token_hints_for_a_resolvable_reference() {
 fn editing_in_the_missing_assignment_clears_the_undefined_token_hint() {
     let (client, _handle) = spawn_server();
     initialize(&client);
-    let note = did_open(&client, "file:///live_update.s", "MSG = @Prog@\n");
+    let note = did_open(&client, "file:///live_update.s", "PRINT LIST='@Prog@'\n");
     let diagnostics = note.params["diagnostics"].as_array().unwrap();
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(diagnostics[0]["code"], json!("UndefinedToken"));
@@ -305,12 +311,80 @@ fn editing_in_the_missing_assignment_clears_the_undefined_token_hint() {
         "textDocument/didChange",
         json!({
             "textDocument": {"uri": "file:///live_update.s", "version": 2},
-            "contentChanges": [{"text": "Prog = MATRIX\nMSG = @Prog@\n"}]
+            "contentChanges": [{"text": "Prog = MATRIX\nPRINT LIST='@Prog@'\n"}]
         }),
     );
     let note = recv_notification(&client, "textDocument/publishDiagnostics");
     let diagnostics = note.params["diagnostics"].as_array().unwrap();
     assert!(diagnostics.is_empty(), "adding the missing assignment should clear the hint without reopening, got: {diagnostics:?}");
+
+    shutdown(&client);
+}
+
+#[test]
+fn did_open_publishes_an_unused_token_hint_distinct_from_structural_diagnostics() {
+    // 029-unused-token-diagnostic: an Assignment whose target is never
+    // referenced via @name@ anywhere publishes through the same
+    // textDocument/publishDiagnostics cycle as structural diagnostics, but
+    // as its own additive, HINT-severity, "drut-token"-sourced stream
+    // (sharing UndefinedToken's source, distinct code) -- never a
+    // voyager_core::DiagnosticKind. The document also contains a real
+    // unmatched IF, to prove the two streams coexist without either
+    // affecting the other (SC-004).
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+
+    let note = did_open(&client, "file:///unused_token.s", "IF (X=1)\nScenarioDir = 'X:\\model'\n; no ENDIF\n");
+    let diagnostics = note.params["diagnostics"].as_array().unwrap();
+    assert_eq!(diagnostics.len(), 2, "expected exactly two diagnostics, got: {diagnostics:?}");
+
+    let structural = diagnostics.iter().find(|d| d["code"] == json!("UnmatchedIf")).expect("UnmatchedIf missing");
+    assert_eq!(structural["source"], json!("drut"));
+    assert_eq!(structural["severity"], json!(1), "ERROR is severity 1 in the LSP spec");
+
+    let token = diagnostics.iter().find(|d| d["code"] == json!("UnusedToken")).expect("UnusedToken missing");
+    assert_eq!(token["source"], json!("drut-token"));
+    assert_eq!(token["severity"], json!(4), "HINT is severity 4 in the LSP spec, distinct from ERROR (1)");
+    assert!(
+        token["message"].as_str().unwrap().contains("ScenarioDir"),
+        "expected the message to name the unused assignment, got: {token:?}"
+    );
+
+    shutdown(&client);
+}
+
+#[test]
+fn did_open_publishes_zero_unused_token_hints_for_a_referenced_assignment() {
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+
+    let note = did_open(&client, "file:///referenced_token.s", "Prog = MATRIX\nPRINT LIST='@Prog@'\n");
+    let diagnostics = note.params["diagnostics"].as_array().unwrap();
+    assert!(diagnostics.is_empty(), "Prog is referenced -- expected zero diagnostics, got: {diagnostics:?}");
+
+    shutdown(&client);
+}
+
+#[test]
+fn editing_in_a_reference_clears_the_unused_token_hint() {
+    let (client, _handle) = spawn_server();
+    initialize(&client);
+    let note = did_open(&client, "file:///live_update_unused.s", "Prog = MATRIX\n");
+    let diagnostics = note.params["diagnostics"].as_array().unwrap();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0]["code"], json!("UnusedToken"));
+
+    send_notification(
+        &client,
+        "textDocument/didChange",
+        json!({
+            "textDocument": {"uri": "file:///live_update_unused.s", "version": 2},
+            "contentChanges": [{"text": "Prog = MATRIX\nPRINT LIST='@Prog@'\n"}]
+        }),
+    );
+    let note = recv_notification(&client, "textDocument/publishDiagnostics");
+    let diagnostics = note.params["diagnostics"].as_array().unwrap();
+    assert!(diagnostics.is_empty(), "adding a reference should clear the hint without reopening, got: {diagnostics:?}");
 
     shutdown(&client);
 }
@@ -1038,7 +1112,17 @@ fn drut_toml_wins_for_its_own_field_while_a_client_setting_still_wins_for_a_fiel
     );
 
     let note = did_open(&client, &uri, "if (a=b)\ny=1\nendif\n");
-    assert!(note.params["diagnostics"].as_array().unwrap().is_empty());
+    // "y=1" is a valid, structurally clean Assignment -- no ERROR-severity
+    // diagnostics -- but it's also never referenced via @y@, so it
+    // incidentally trips 029-unused-token-diagnostic's Hint-severity
+    // UnusedToken; this test only cares about drut.toml/client config
+    // precedence, not token bookkeeping, so it checks specifically for the
+    // absence of real (ERROR-severity) diagnostics.
+    assert!(note.params["diagnostics"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|d| d["severity"] != json!(1)));
 
     send_request(
         &client,
