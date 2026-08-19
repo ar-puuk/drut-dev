@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use drut_config::{parse::parse, ConfigWarning};
-use voyager_core::{BlankLineMode, CasingConvention, OperatorSpacing, IndentTopLevelMode};
+use voyager_core::{BlankLineMode, CasingConvention, LineWrapMode, LineWrapStyle, OperatorSpacing, IndentTopLevelMode};
 
 fn write_config(name: &str, content: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("drut_config_parse_test_{}_{name}", std::process::id()));
@@ -367,6 +367,81 @@ fn a_malformed_blank_line_cap_value_warns_and_falls_back_only_for_that_key() {
     assert_eq!(config.format.blank_lines_nested_cap, Some(1));
     assert_eq!(warnings.len(), 1);
     assert!(matches!(&warnings[0], ConfigWarning::InvalidValue { key, .. } if key == "blank_lines_top_cap"));
+
+    cleanup(&path);
+}
+
+// -- 030-auto-line-wrap: line_wrap + line_wrap_width + line_wrap_style --
+
+#[test]
+fn line_wrap_parses_both_accepted_values_with_zero_warnings() {
+    for (value, expected) in [("preserve", LineWrapMode::Preserve), ("auto", LineWrapMode::Auto)] {
+        let path = write_config(&format!("line_wrap_{value}"), &format!("[format]\nline_wrap = \"{value}\"\n"));
+
+        let (config, warnings) = parse(&path);
+        assert_eq!(config.format.line_wrap, Some(expected), "value: {value}");
+        assert!(warnings.is_empty(), "expected zero warnings for {value:?}, got {warnings:?}");
+
+        cleanup(&path);
+    }
+}
+
+#[test]
+fn line_wrap_malformed_value_warns_and_falls_back_to_none() {
+    let path = write_config("line_wrap_malformed", "[format]\nline_wrap = \"sometimes\"\n");
+
+    let (config, warnings) = parse(&path);
+    assert_eq!(config.format.line_wrap, None);
+    assert_eq!(warnings.len(), 1);
+    assert!(matches!(&warnings[0], ConfigWarning::InvalidValue { key, .. } if key == "line_wrap"));
+
+    cleanup(&path);
+}
+
+#[test]
+fn line_wrap_width_parses_a_plain_integer_cleanly() {
+    let path = write_config("line_wrap_width_valid", "[format]\nline_wrap_width = 100\n");
+
+    let (config, warnings) = parse(&path);
+    assert_eq!(config.format.line_wrap_width, Some(100));
+    assert!(warnings.is_empty(), "expected zero warnings, got {warnings:?}");
+
+    cleanup(&path);
+}
+
+#[test]
+fn line_wrap_width_malformed_value_warns_and_falls_back_to_none() {
+    let path = write_config("line_wrap_width_malformed", "[format]\nline_wrap_width = \"wide\"\n");
+
+    let (config, warnings) = parse(&path);
+    assert_eq!(config.format.line_wrap_width, None);
+    assert_eq!(warnings.len(), 1);
+    assert!(matches!(&warnings[0], ConfigWarning::InvalidValue { key, .. } if key == "line_wrap_width"));
+
+    cleanup(&path);
+}
+
+#[test]
+fn line_wrap_style_parses_both_accepted_values_with_zero_warnings() {
+    for (value, expected) in [("fill", LineWrapStyle::Fill), ("one_per_line", LineWrapStyle::OnePerLine)] {
+        let path = write_config(&format!("line_wrap_style_{value}"), &format!("[format]\nline_wrap_style = \"{value}\"\n"));
+
+        let (config, warnings) = parse(&path);
+        assert_eq!(config.format.line_wrap_style, Some(expected), "value: {value}");
+        assert!(warnings.is_empty(), "expected zero warnings for {value:?}, got {warnings:?}");
+
+        cleanup(&path);
+    }
+}
+
+#[test]
+fn line_wrap_style_malformed_value_warns_and_falls_back_to_none() {
+    let path = write_config("line_wrap_style_malformed", "[format]\nline_wrap_style = \"packed\"\n");
+
+    let (config, warnings) = parse(&path);
+    assert_eq!(config.format.line_wrap_style, None);
+    assert_eq!(warnings.len(), 1);
+    assert!(matches!(&warnings[0], ConfigWarning::InvalidValue { key, .. } if key == "line_wrap_style"));
 
     cleanup(&path);
 }

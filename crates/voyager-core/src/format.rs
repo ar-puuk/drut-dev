@@ -39,6 +39,7 @@ use crate::function_call;
 use crate::decode;
 use crate::diagnostic::{Diagnostic, DiagnosticKind};
 use crate::lexer::tokenize;
+use crate::line_wrap;
 use crate::operator_spacing;
 use crate::span::{Position, Span};
 use crate::statement::{build_statements, pair_keyword_boundaries, Statement, StatementKind};
@@ -152,6 +153,37 @@ pub enum BlankLineMode {
     Auto,
 }
 
+/// Whether `format` wraps an over-width `Control` statement's
+/// comma-separated `keyword=value` pair list across multiple physical
+/// lines using Cube Voyager's own existing line-continuation syntax (spec.md
+/// FR-001, `030-auto-line-wrap`). Two-valued, matching `IndentTopLevelMode`/
+/// `BlankLineMode`'s own shape — opt-in only, `Preserve` is the default and
+/// the only behavior when this feature is unconfigured (FR-007). Permitted
+/// under constitution Principle III's narrow line-continuation carve-out
+/// (v1.2.0) — this axis only ever inserts/removes a break at a position
+/// already valid under the language's own continuation grammar, never
+/// altering program meaning.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LineWrapMode {
+    #[default]
+    Preserve,
+    Auto,
+}
+
+/// How pairs are distributed across continuation lines once `LineWrapMode::Auto`
+/// activates (spec.md FR-002a). `Fill` is the `#[default]`, not `OnePerLine`
+/// — a deliberate choice driven by FR-005's "never re-flow an already-
+/// continued statement" rule: whichever style wraps a statement first is
+/// effectively permanent for it, and further-splitting an already-packed
+/// `Fill` line by hand later is a smaller, safer edit than manually
+/// un-packing many `OnePerLine` continuations back into `Fill` form.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LineWrapStyle {
+    #[default]
+    Fill,
+    OnePerLine,
+}
+
 /// Caller-supplied configuration for one `format`/`format_bytes` call.
 ///
 /// **No longer `#[derive(Default)]`** (`017-casing-categories-indent-width`):
@@ -215,6 +247,20 @@ pub struct FormatOptions {
     /// contracting the run (spec.md FR-002/FR-008). Defaults to `1` (see
     /// `impl Default` below).
     pub blank_lines_nested_cap: u8,
+    /// Whether an over-width `Control` statement's pair list is wrapped
+    /// across multiple physical lines (spec.md FR-001, `030-auto-line-wrap`).
+    /// Defaults to `Preserve` (see `impl Default` below) — a project with
+    /// nothing configured sees zero behavior change from before this field
+    /// existed (FR-007).
+    pub line_wrap: LineWrapMode,
+    /// The maximum line width `Auto` wraps toward (spec.md FR-002). Defaults
+    /// to `120` (see `impl Default` below) when `Auto` is enabled with no
+    /// explicit width configured — used only when `line_wrap == Auto`.
+    pub line_wrap_width: u16,
+    /// How pairs are distributed across continuation lines under `Auto`
+    /// (spec.md FR-002a). Defaults to `Fill` (see `impl Default` below) —
+    /// used only when `line_wrap == Auto`.
+    pub line_wrap_style: LineWrapStyle,
 }
 
 impl Default for FormatOptions {
@@ -227,6 +273,9 @@ impl Default for FormatOptions {
             blank_lines: BlankLineMode::default(),
             blank_lines_top_cap: 2,
             blank_lines_nested_cap: 1,
+            line_wrap: LineWrapMode::default(),
+            line_wrap_width: 120,
+            line_wrap_style: LineWrapStyle::default(),
         }
     }
 }
@@ -455,6 +504,87 @@ fn render(source: &str, nodes: &[Node], diagnostics: &[Diagnostic], options: For
         // through (`push_if_present`'s pattern) — a protected line never
         // receives an operator-spacing edit either.
         spacing_edits.retain(|(line, _, _, _)| !protected.contains(line));
+    }
+
+    // Line-width wrapping (030-auto-line-wrap) — short-circuited on
+    // Preserve (the default), same performance-only gate shape every other
+    // axis already uses. Reuses the same flat statement list operator-
+    // spacing already uses (build_statements), for the same reason
+    // (research.md §4 in that feature's own research). Feeds the same
+    // SpacingEdit-shaped mechanism 018 already established -- the one
+    // difference is that a wrap edit's replacement embeds a literal
+    // line-terminator character, actually splitting a line for the first
+    // time (030's own research.md §1). Width/geometry is measured against
+    // each statement's original token text, a deliberate simplification
+    // (030 spec.md Assumptions) — not a hypothetical post-casing/post-
+    // operator-spacing simulation.
+    if options.line_wrap != LineWrapMode::Preserve {
+        let statements = build_statements(tokens.clone());
+        let mut wrap_edits: Vec<SpacingEdit> = Vec::new();
+        for stmt in &statements {
+            let StatementKind::Control { .. } = &stmt.kind else {
+                continue;
+            };
+            if stmt.span.start.line != stmt.span.end.line {
+                // Defensive: a Control statement that isn't already-continued
+                // (checked next) should always be a single physical line;
+                // never touch one that somehow isn't.
+                continue;
+            }
+            if line_wrap::already_continued(&stmt.tokens) {
+                // FR-005: never re-flow a statement the author (or an
+                // earlier format pass) already wrapped -- the mechanism
+                // this feature's idempotence relies on.
+                continue;
+            }
+            let split_points = line_wrap::top_level_split_points(&stmt.tokens);
+            if split_points.is_empty() {
+                continue;
+            }
+            let line_num = stmt.span.start.line;
+            let original_indent = original_indent_width(&char_lines, line_num);
+            let total_content_len = char_lines
+                .get((line_num - 1) as usize)
+                .map(|l| l.len())
+                .unwrap_or(0)
+                .saturating_sub(original_indent);
+            let target_indent = computed_indent(&indent_plan, &char_lines, line_num);
+            let continuation_indent = target_indent + options.indent_width as usize;
+            let Some(chosen) = line_wrap::plan_wrap(
+                &split_points,
+                original_indent,
+                total_content_len,
+                target_indent,
+                continuation_indent,
+                options.line_wrap_width as usize,
+                options.line_wrap_style,
+            ) else {
+                continue;
+            };
+            // This specific line's own already-captured terminator
+            // (research.md §1) -- never a hardcoded "\n", so a CRLF file
+            // gets a CRLF-terminated inserted line too.
+            let terminator = raw_lines.get((line_num - 1) as usize).map(|(_, term)| *term).unwrap_or("\n");
+            let continuation_indent_str = " ".repeat(continuation_indent);
+            let line_chars = &char_lines[(line_num - 1) as usize];
+            for idx in chosen {
+                let sp = &split_points[idx];
+                // Consume any spaces/tabs immediately following the comma
+                // on this line -- the original single space that already
+                // separated it from the next pair must be replaced, not
+                // left in place alongside the new indentation (data-model.md
+                // §1-2, caught by manual end-to-end testing).
+                let mut consume_end = (sp.span.end.column as usize).saturating_sub(1);
+                while consume_end < line_chars.len() && matches!(line_chars[consume_end], ' ' | '\t') {
+                    consume_end += 1;
+                }
+                wrap_edits.push(line_wrap::wrap_edit(sp, consume_end, terminator, &continuation_indent_str));
+            }
+        }
+        // Same protected-line funnel every other edit kind already goes
+        // through -- a protected line never receives a wrap edit either.
+        wrap_edits.retain(|(line, _, _, _)| !protected.contains(line));
+        spacing_edits.extend(wrap_edits);
     }
 
     // Blank-line-run normalization (019-blank-line-normalization) —
@@ -1051,6 +1181,9 @@ function_calls: CasingConvention::Preserve,
             blank_lines: BlankLineMode::default(),
             blank_lines_top_cap: 2,
             blank_lines_nested_cap: 1,
+            line_wrap: LineWrapMode::default(),
+            line_wrap_width: 120,
+            line_wrap_style: LineWrapStyle::default(),
         }
     }
 
@@ -1063,6 +1196,9 @@ function_calls: CasingConvention::Preserve,
             blank_lines: BlankLineMode::default(),
             blank_lines_top_cap: 2,
             blank_lines_nested_cap: 1,
+            line_wrap: LineWrapMode::default(),
+            line_wrap_width: 120,
+            line_wrap_style: LineWrapStyle::default(),
         }
     }
 
@@ -2082,5 +2218,159 @@ function_calls: CasingConvention::Preserve,
             "; FMT: OFF\nA = 1\nBB = 2\n; FMT: ON\nCCC  = 3\nDDDD = 4\n",
             "protected run untouched; unprotected run aligns to its own longest member"
         );
+    }
+
+    // ---------------------------------------------------------------------
+    // 030-auto-line-wrap
+    // ---------------------------------------------------------------------
+
+    fn line_wrap_opts(width: u16, style: LineWrapStyle) -> FormatOptions {
+        FormatOptions { line_wrap: LineWrapMode::Auto, line_wrap_width: width, line_wrap_style: style, ..FormatOptions::default() }
+    }
+
+    #[test]
+    fn line_wrap_default_is_preserve() {
+        assert_eq!(LineWrapMode::default(), LineWrapMode::Preserve);
+        assert_eq!(FormatOptions::default().line_wrap, LineWrapMode::Preserve);
+        assert_eq!(FormatOptions::default().line_wrap_width, 120);
+        assert_eq!(FormatOptions::default().line_wrap_style, LineWrapStyle::Fill);
+    }
+
+    #[test]
+    fn line_wrap_preserve_is_byte_identical_to_before_this_feature_existed() {
+        // FR-007/SC-003 regression case -- a genuinely over-width Control
+        // statement, confirmed untouched when line_wrap is left at its
+        // default.
+        let src = "RUN PGM=MATRIX, ZONES=5, PRINT=1, MSG='hello world', FILEI=ni.1, FILEO=no.1\nENDRUN\n";
+        let result = format(src, FormatOptions::default());
+        assert!(!result.changed);
+        assert_eq!(result.text, src);
+    }
+
+    #[test]
+    fn line_wrap_auto_wraps_an_over_width_control_statement_with_crlf_terminator() {
+        // A CRLF-terminated input file's newly-inserted continuation line
+        // must end in CRLF, not a bare '\n' (data-model.md §2) -- a
+        // dedicated test, not inferred from an LF-only fixture.
+        let src = "RUN PGM=MATRIX, ZONES=5, PRINT=1, MSG='hello world', FILEI=ni.1, FILEO=no.1\r\nENDRUN\r\n";
+        let out = format(src, line_wrap_opts(40, LineWrapStyle::Fill)).text;
+        assert!(out.contains(",\r\n    "), "expected at least one CRLF-terminated inserted continuation line, got: {out:?}");
+        // Every inserted break must be CRLF, never a bare '\n' mixed in --
+        // check by confirming no line in the wrapped output ends in a bare
+        // '\n' without a preceding '\r'.
+        for line in out.split("\r\n") {
+            assert!(!line.ends_with('\n'), "found a bare LF terminator mixed into a CRLF file: {out:?}");
+        }
+    }
+
+    #[test]
+    fn line_wrap_continuation_indent_is_independent_of_indent_plan() {
+        // A newly-inserted continuation line's indentation is one level
+        // deeper than the statement's own opening line, correct even though
+        // indent_plan has no entry for that synthetic line (research.md §1).
+        let src = "IF (a=b)\nRUN PGM=MATRIX, ZONES=5, PRINT=1, MSG='hello world', FILEI=ni.1\nENDRUN\nENDIF\n";
+        let mut opts = line_wrap_opts(50, LineWrapStyle::OnePerLine);
+        opts.indent_width = 4;
+        let out = format(src, opts).text;
+        // RUN sits at depth 1 (4 spaces); its continuation lines must sit at
+        // depth 2 (8 spaces) -- one level deeper than RUN's own line, not
+        // relative to column 0.
+        for line in out.lines() {
+            if line.trim_start().starts_with("ZONES=") || line.trim_start().starts_with("PRINT=") || line.trim_start().starts_with("MSG=") || line.trim_start().starts_with("FILEI=") {
+                let leading = line.chars().take_while(|c| *c == ' ').count();
+                assert_eq!(leading, 8, "continuation line not indented one level past RUN's own depth: {line:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn line_wrap_respects_fmt_off_on() {
+        // A protected (; FMT: OFF) Control statement receives no wrap edits
+        // even when over-width.
+        let src = "; FMT: OFF\nRUN PGM=MATRIX, ZONES=5, PRINT=1, MSG='hello world', FILEI=ni.1, FILEO=no.1\nENDRUN\n; FMT: ON\n";
+        let out = format(src, line_wrap_opts(40, LineWrapStyle::Fill)).text;
+        assert_eq!(out, src, "protected region must stay exactly as written, even though it's over-width");
+    }
+
+    #[test]
+    fn line_wrap_never_touches_an_already_continued_statement() {
+        // FR-005: a statement that already spans multiple physical lines
+        // via an author-written continuation is left completely untouched,
+        // regardless of its own width.
+        let src = "RUN PGM=MATRIX,\n     ZONES=5, PRINT=1, MSG='hello world', FILEI=ni.1, FILEO=no.1\nENDRUN\n";
+        let out = format(src, line_wrap_opts(40, LineWrapStyle::Fill)).text;
+        assert_eq!(out, src);
+    }
+
+    #[test]
+    fn line_wrap_auto_is_idempotent() {
+        // SC-004, structural: a once-wrapped statement now contains a
+        // ContinuationMarker, so the second pass leaves it alone by
+        // FR-005's own rule -- not a generic re-run-and-diff check alone.
+        let src = "RUN PGM=MATRIX, ZONES=5, PRINT=1, MSG='hello world', FILEI=ni.1, FILEO=no.1\nENDRUN\n";
+        let opts = line_wrap_opts(40, LineWrapStyle::Fill);
+        let once = format(src, opts).text;
+        let twice = format(&once, opts).text;
+        assert_eq!(once, twice);
+    }
+
+    #[test]
+    fn line_wrap_one_per_line_places_exactly_one_pair_per_continuation_line() {
+        let src = "RUN PGM=MATRIX, ZONES=5, PRINT=1\nENDRUN\n";
+        let out = format(src, line_wrap_opts(20, LineWrapStyle::OnePerLine)).text;
+        assert_eq!(out, "RUN PGM=MATRIX,\n    ZONES=5,\n    PRINT=1\nENDRUN\n");
+    }
+
+    #[test]
+    fn line_wrap_fill_packs_multiple_pairs_per_continuation_line() {
+        let src = "RUN PGM=MATRIX, ZONES=5, PRINT=1\nENDRUN\n";
+        let out = format(src, line_wrap_opts(20, LineWrapStyle::Fill)).text;
+        // "RUN PGM=MATRIX," (15 chars) fits under 20; including the next
+        // comma ("RUN PGM=MATRIX, ZONES=5," = 25 chars) would not, so the
+        // first break lands after MATRIX's own comma. On the new
+        // (indent-4) continuation line, "ZONES=5," is only 4+10=14 chars,
+        // well under 20 -- but the trailing "PRINT=1" (no comma after it)
+        // pushes that line's total to 4+17=21, over budget, so a second
+        // break is needed too: three lines, one pair packed alone per line
+        // in this particular case (not because Fill defaults to
+        // one-per-line, but because each successive pair genuinely doesn't
+        // fit alongside the previous one at this width).
+        assert_eq!(out, "RUN PGM=MATRIX,\n    ZONES=5,\n    PRINT=1\nENDRUN\n");
+    }
+
+    #[test]
+    fn line_wrap_fill_genuinely_packs_two_pairs_onto_one_continuation_line() {
+        // Demonstrates Fill actually differing from OnePerLine: at a wide
+        // enough budget, two short pairs land together on the same
+        // continuation line.
+        let src = "RUN PGM=MATRIX, A=1, B=2, C=3, D=4\nENDRUN\n";
+        let out = format(src, line_wrap_opts(24, LineWrapStyle::Fill)).text;
+        assert_eq!(out, "RUN PGM=MATRIX, A=1,\n    B=2, C=3, D=4\nENDRUN\n");
+    }
+
+    #[test]
+    fn line_wrap_never_wraps_a_non_control_statement() {
+        let long_value = "X".repeat(100);
+        let src = format!("Y = '{long_value}'\n");
+        let out = format(&src, line_wrap_opts(40, LineWrapStyle::Fill)).text;
+        assert_eq!(out, src);
+    }
+
+    #[test]
+    fn line_wrap_never_wraps_a_control_statement_with_no_eligible_comma() {
+        let long_value = "X".repeat(100);
+        let src = format!("RUN PGM='{long_value}'\nENDRUN\n");
+        let out = format(&src, line_wrap_opts(40, LineWrapStyle::Fill)).text;
+        assert_eq!(out, src);
+    }
+
+    #[test]
+    fn line_wrap_never_splits_a_comma_inside_a_function_call_or_quoted_value() {
+        let src = "RUN PGM=MATRIX, MSG=REPLACESTR(A,B,C), NOTE='x, y'\nENDRUN\n";
+        let out = format(src, line_wrap_opts(5, LineWrapStyle::OnePerLine)).text;
+        // Only the two real top-level commas (before MSG= and before NOTE=)
+        // are eligible split points -- never the ones inside REPLACESTR(...)
+        // or 'x, y'.
+        assert_eq!(out, "RUN PGM=MATRIX,\n    MSG=REPLACESTR(A,B,C),\n    NOTE='x, y'\nENDRUN\n");
     }
 }

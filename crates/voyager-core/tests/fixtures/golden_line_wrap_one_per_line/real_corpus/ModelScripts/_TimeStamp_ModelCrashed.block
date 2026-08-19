@@ -1,0 +1,25 @@
+
+;print timestamp
+RUN PGM=MATRIX
+    
+    ZONES = 1
+    
+    ;end model runtime report
+    ModelEndTime = currenttime()
+    ModelRunTime = ModelEndTime - @ModelStartTime@
+    
+    PRINT FILE='@ParentDir@@ScenarioDir@_Log\_RunTime - @RID@.txt',
+        APPEND=T,
+        LIST='\n',
+             '\n=======================================================================',
+             '\n -- Model Crashed --',
+             '\nThe model crashed in:  ', @ModelStep@,
+             '\n',
+             '\nTOTAL MODEL RUN TIME',
+             '\n    Beg Time:  ', formatdatetime(@ModelStartTime@, 40, 0, 'yyyy-mm-dd,  hh:nn:ss'),
+             '\n    End Time:  ', formatdatetime(ModelEndTime, 40, 0, 'yyyy-mm-dd,  hh:nn:ss'),
+             '\n    Run Time:  ', formatdatetime(ModelRunTime, 40, 0, 'hhh:nn:ss'),
+             '\n',
+             '\n'
+    
+ENDRUN

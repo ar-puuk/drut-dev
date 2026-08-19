@@ -69,6 +69,22 @@ pub struct FormatInput {
     /// 1–50 if given. Same precedence as `blank_lines_top_cap` above,
     /// independently — built-in default `1`.
     pub blank_lines_nested_cap: Option<u8>,
+    /// `"preserve"` / `"auto"` / absent — same absent-means-"consult
+    /// drut.toml, then default (preserve)" precedence as `casing`/
+    /// `blank_lines` above (030-auto-line-wrap). `"preserve"` leaves an
+    /// over-width `Control` statement's pair list exactly as written;
+    /// `"auto"` wraps it across multiple physical lines at top-level commas
+    /// once the configured width is exceeded.
+    pub line_wrap: Option<String>,
+    /// The maximum line width `"auto"` wraps toward
+    /// (030-auto-line-wrap FR-002), 20–500 if given. Same absent-means-
+    /// "consult drut.toml, then default (120)" precedence as every other
+    /// setting here. Only consulted when `line_wrap` resolves to `"auto"`.
+    pub line_wrap_width: Option<u16>,
+    /// `"fill"` / `"one_per_line"` / absent — how pairs are distributed
+    /// across continuation lines under `"auto"` (030-auto-line-wrap
+    /// FR-002a). Only consulted when `line_wrap` resolves to `"auto"`.
+    pub line_wrap_style: Option<String>,
     /// Skip `drut.toml` discovery entirely for this call, using built-in
     /// defaults plus `casing_control_words`/`indent_top_level` above if
     /// given (012-toml-configuration US3, mirroring the CLI's
@@ -172,6 +188,29 @@ fn explicit_override(input: &FormatInput) -> Result<drut_config::ExplicitFormatO
             return Err(format!("`blank_lines_nested_cap` must be between 1 and 50 if given, got {cap}"));
         }
     }
+    let line_wrap = match input.line_wrap.as_deref() {
+        None => None,
+        Some("preserve") => Some(voyager_core::LineWrapMode::Preserve),
+        Some("auto") => Some(voyager_core::LineWrapMode::Auto),
+        Some(other) => {
+            return Err(format!("`line_wrap` must be \"preserve\" or \"auto\" if given, got {other:?}"))
+        }
+    };
+    if let Some(width) = input.line_wrap_width {
+        if !(20..=500).contains(&width) {
+            return Err(format!("`line_wrap_width` must be between 20 and 500 if given, got {width}"));
+        }
+    }
+    let line_wrap_style = match input.line_wrap_style.as_deref() {
+        None => None,
+        Some("fill") => Some(voyager_core::LineWrapStyle::Fill),
+        Some("one_per_line") => Some(voyager_core::LineWrapStyle::OnePerLine),
+        Some(other) => {
+            return Err(format!(
+                "`line_wrap_style` must be \"fill\" or \"one_per_line\" if given, got {other:?}"
+            ))
+        }
+    };
     Ok(drut_config::ExplicitFormatOverride {
         casing_control_words,
         casing_pair_keywords,
@@ -183,6 +222,9 @@ fn explicit_override(input: &FormatInput) -> Result<drut_config::ExplicitFormatO
         blank_lines,
         blank_lines_top_cap: input.blank_lines_top_cap,
         blank_lines_nested_cap: input.blank_lines_nested_cap,
+        line_wrap,
+        line_wrap_width: input.line_wrap_width,
+        line_wrap_style,
     })
 }
 
@@ -243,6 +285,9 @@ mod tests {
             blank_lines: None,
             blank_lines_top_cap: None,
             blank_lines_nested_cap: None,
+            line_wrap: None,
+            line_wrap_width: None,
+            line_wrap_style: None,
             isolated: None,
         }
     }
@@ -263,6 +308,9 @@ mod tests {
             blank_lines: None,
             blank_lines_top_cap: None,
             blank_lines_nested_cap: None,
+            line_wrap: None,
+            line_wrap_width: None,
+            line_wrap_style: None,
             isolated,
         }
     }
@@ -289,6 +337,9 @@ mod tests {
             blank_lines: None,
             blank_lines_top_cap: None,
             blank_lines_nested_cap: None,
+            line_wrap: None,
+            line_wrap_width: None,
+            line_wrap_style: None,
             isolated: None,
         }
     }
@@ -650,5 +701,62 @@ mod tests {
         let mut input = text_input("X = 1\n");
         input.blank_lines_nested_cap = Some(51);
         assert!(format(&input).is_err(), "an explicit out-of-range blank_lines_nested_cap must be a clean error");
+    }
+
+    // -- 030-auto-line-wrap (tasks.md T021) --
+
+    const LONG_RUN: &str = "RUN PGM=MATRIX, ZONES=5, PRINT=1, MSG='hello world', FILEI=ni.1, FILEO=no.1\nENDRUN\n";
+
+    #[test]
+    fn line_wrap_param_overrides_a_drut_toml_resolved_preserve() {
+        let dir = temp_project("line_wrap");
+        write_config(&dir, "[format]\nline_wrap = \"preserve\"\n");
+        let file = dir.join("x.s");
+        std::fs::write(&file, LONG_RUN).unwrap();
+
+        let mut overridden = path_input(file.to_str().unwrap(), None, None, None);
+        overridden.line_wrap = Some("auto".to_string());
+        overridden.line_wrap_width = Some(40);
+        let result = format(&overridden).unwrap();
+        assert!(result.text.contains(",\n    "), "expected at least one wrapped continuation line, got: {:?}", result.text);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn line_wrap_width_and_style_params_override_the_built_in_defaults() {
+        let mut input = text_input("RUN PGM=MATRIX, ZONES=5, PRINT=1\nENDRUN\n");
+        input.line_wrap = Some("auto".to_string());
+        input.line_wrap_width = Some(20);
+        input.line_wrap_style = Some("one_per_line".to_string());
+        let result = format(&input).unwrap();
+        assert_eq!(result.text, "RUN PGM=MATRIX,\n    ZONES=5,\n    PRINT=1\nENDRUN\n");
+    }
+
+    #[test]
+    fn line_wrap_invalid_value_is_a_clean_error() {
+        let mut input = text_input("X = 1\n");
+        input.line_wrap = Some("sometimes".to_string());
+        let err = format(&input).unwrap_err();
+        assert!(err.contains("line_wrap"), "expected an error naming the field, got: {err}");
+    }
+
+    #[test]
+    fn line_wrap_style_invalid_value_is_a_clean_error() {
+        let mut input = text_input("X = 1\n");
+        input.line_wrap_style = Some("packed".to_string());
+        let err = format(&input).unwrap_err();
+        assert!(err.contains("line_wrap_style"), "expected an error naming the field, got: {err}");
+    }
+
+    #[test]
+    fn line_wrap_width_out_of_range_is_a_clean_error_not_a_silent_clamp() {
+        let mut input = text_input("X = 1\n");
+        input.line_wrap_width = Some(5);
+        assert!(format(&input).is_err(), "an explicit out-of-range line_wrap_width must be a clean error");
+
+        let mut input = text_input("X = 1\n");
+        input.line_wrap_width = Some(5000);
+        assert!(format(&input).is_err(), "an explicit out-of-range line_wrap_width must be a clean error");
     }
 }

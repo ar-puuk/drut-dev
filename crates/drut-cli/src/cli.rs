@@ -117,6 +117,27 @@ pub enum Command {
         /// independently — built-in default `1`.
         #[arg(long, value_parser = clap::value_parser!(u8).range(1..=50))]
         blank_lines_nested_cap: Option<u8>,
+        /// Whether an over-width `Control` statement's `keyword=value` pair
+        /// list is wrapped across multiple physical lines
+        /// (030-auto-line-wrap) — `preserve` (default) leaves it exactly as
+        /// written, however long; `auto` wraps at top-level commas once the
+        /// configured width is exceeded. Same `Option`-typed, "requires an
+        /// explicit value, no bare flag" shape every other format mode flag
+        /// already uses.
+        #[arg(long, value_enum)]
+        line_wrap: Option<LineWrapArg>,
+        /// The maximum line width `auto` wraps toward (030-auto-line-wrap
+        /// FR-002). `Option`-typed like `--indent-width` — omitting the flag
+        /// means "consult `drut.toml`, then the built-in default (120)."
+        /// Only consulted when `--line-wrap=auto`.
+        #[arg(long, value_parser = clap::value_parser!(u16).range(20..=500))]
+        line_wrap_width: Option<u16>,
+        /// How pairs are distributed across continuation lines under `auto`
+        /// (030-auto-line-wrap FR-002a) — `fill` (default) packs as many
+        /// pairs as fit per line; `one-per-line` places exactly one pair
+        /// per line. Only consulted when `--line-wrap=auto`.
+        #[arg(long, value_enum)]
+        line_wrap_style: Option<LineWrapStyleArg>,
         /// Skip `drut.toml` discovery entirely for this run, using built-in
         /// defaults plus any other explicit flags (012-toml-configuration
         /// US3, mirroring Ruff's `--isolated`).
@@ -166,6 +187,18 @@ pub enum OperatorSpacingArg {
 pub enum BlankLinesArg {
     Preserve,
     Auto,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum LineWrapArg {
+    Preserve,
+    Auto,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum LineWrapStyleArg {
+    Fill,
+    OnePerLine,
 }
 
 // The CasingArg -> voyager_core::CasingConvention and IndentTopLevelArg ->

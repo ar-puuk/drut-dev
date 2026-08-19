@@ -154,6 +154,28 @@
           "maximum": 50,
           "markdownDescription": "Maximum number of consecutive blank lines `auto` allows inside any block's own body, uniformly regardless of nesting depth, before contracting the run. A workspace `drut.toml` setting for this field always wins over this personal setting."
         },
+        "drut.format.lineWrap": {
+          "type": "string",
+          "enum": [
+            "preserve",
+            "auto"
+          ],
+          "markdownDescription": "Whether an over-width `Control` statement's `keyword=value` pair list is wrapped across multiple physical lines — `preserve` (default) leaves it exactly as written, however long; `auto` wraps it at top-level commas once the configured width (see `drut.format.lineWrapWidth`) is exceeded. A workspace `drut.toml` setting for this field always wins over this personal setting."
+        },
+        "drut.format.lineWrapWidth": {
+          "type": "integer",
+          "minimum": 20,
+          "maximum": 500,
+          "markdownDescription": "The maximum line width `auto` wraps toward. Only consulted when `drut.format.lineWrap` is `auto`. A workspace `drut.toml` setting for this field always wins over this personal setting."
+        },
+        "drut.format.lineWrapStyle": {
+          "type": "string",
+          "enum": [
+            "fill",
+            "one_per_line"
+          ],
+          "markdownDescription": "How pairs are distributed across continuation lines once `drut.format.lineWrap` wraps a statement — `fill` (default) packs as many pairs as fit per line; `one_per_line` places exactly one pair per line. Only consulted when `drut.format.lineWrap` is `auto`. A workspace `drut.toml` setting for this field always wins over this personal setting."
+        },
         "drut.highlight.controlWords": {
           "type": "string",
           "markdownDescription": "Color for control-flow keywords (`IF`, `LOOP`, `RUN`, `ENDIF`, ...) — a CSS color such as `#RRGGBB`. Leave unset to keep your color theme's own color for this category (scope `keyword.control.drut`). Personal setting only — there is no `drut.toml` equivalent."

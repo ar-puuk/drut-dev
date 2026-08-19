@@ -5,7 +5,7 @@
 use std::path::{Path, PathBuf};
 
 use drut_config::{resolve_format_options, ExplicitFormatOverride};
-use voyager_core::{BlankLineMode, CasingConvention, OperatorSpacing, IndentTopLevelMode};
+use voyager_core::{BlankLineMode, CasingConvention, LineWrapMode, LineWrapStyle, OperatorSpacing, IndentTopLevelMode};
 
 fn test_file(name: &str, config: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("drut_config_resolve_test_{}_{name}", std::process::id()));
@@ -418,6 +418,86 @@ fn blank_lines_nested_cap_unreasonably_large_falls_back_to_default_with_a_warnin
 
     let (options, warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), ExplicitFormatOverride::default());
     assert_eq!(options.blank_lines_nested_cap, 1, "must fall back to the built-in default, never fail");
+    assert_eq!(warnings.len(), 1);
+
+    cleanup(&target);
+}
+
+#[test]
+fn line_wrap_explicit_overrides_config_file() {
+    let target = test_file("line_wrap_explicit_override", "[format]\nline_wrap = \"preserve\"\n");
+
+    let (options, _warnings) = resolve_format_options(
+        Some(&target),
+        false,
+        ExplicitFormatOverride { line_wrap: Some(LineWrapMode::Auto), ..Default::default() },
+        ExplicitFormatOverride::default(),
+    );
+    assert_eq!(options.line_wrap, LineWrapMode::Auto);
+
+    cleanup(&target);
+}
+
+#[test]
+fn line_wrap_width_and_style_unset_anywhere_resolve_to_built_in_defaults() {
+    let target = test_file("line_wrap_unset", "[format]\ncasing_control_words = \"upper\"\n");
+
+    let (options, warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), ExplicitFormatOverride::default());
+    assert_eq!(options.line_wrap, LineWrapMode::Preserve);
+    assert_eq!(options.line_wrap_width, 120);
+    assert_eq!(options.line_wrap_style, LineWrapStyle::Fill);
+    assert!(warnings.is_empty());
+
+    cleanup(&target);
+}
+
+#[test]
+fn line_wrap_width_explicit_overrides_config_file() {
+    let target = test_file("line_wrap_width_explicit_override", "[format]\nline_wrap_width = 200\n");
+
+    let (options, _warnings) = resolve_format_options(
+        Some(&target),
+        false,
+        ExplicitFormatOverride { line_wrap_width: Some(80), ..Default::default() },
+        ExplicitFormatOverride::default(),
+    );
+    assert_eq!(options.line_wrap_width, 80);
+
+    cleanup(&target);
+}
+
+#[test]
+fn line_wrap_style_explicit_overrides_config_file() {
+    let target = test_file("line_wrap_style_explicit_override", "[format]\nline_wrap_style = \"fill\"\n");
+
+    let (options, _warnings) = resolve_format_options(
+        Some(&target),
+        false,
+        ExplicitFormatOverride { line_wrap_style: Some(LineWrapStyle::OnePerLine), ..Default::default() },
+        ExplicitFormatOverride::default(),
+    );
+    assert_eq!(options.line_wrap_style, LineWrapStyle::OnePerLine);
+
+    cleanup(&target);
+}
+
+#[test]
+fn line_wrap_width_out_of_range_in_config_falls_back_to_default_with_a_warning() {
+    let target = test_file("line_wrap_width_zero", "[format]\nline_wrap_width = 5\n");
+
+    let (options, warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), ExplicitFormatOverride::default());
+    assert_eq!(options.line_wrap_width, 120, "must fall back to the built-in default, never fail");
+    assert_eq!(warnings.len(), 1);
+
+    cleanup(&target);
+}
+
+#[test]
+fn line_wrap_width_unreasonably_large_falls_back_to_default_with_a_warning() {
+    let target = test_file("line_wrap_width_large", "[format]\nline_wrap_width = 5000\n");
+
+    let (options, warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), ExplicitFormatOverride::default());
+    assert_eq!(options.line_wrap_width, 120, "must fall back to the built-in default, never fail");
     assert_eq!(warnings.len(), 1);
 
     cleanup(&target);

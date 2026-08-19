@@ -20,7 +20,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use voyager_core::format::{format_bytes, CasingConvention, CasingSettings, EncodingFidelity, FormatOptions};
-use voyager_core::{parse, BlankLineMode, BlockKind, Node, OperatorSpacing, Statement, StatementKind, IndentTopLevelMode};
+use voyager_core::{
+    parse, BlankLineMode, BlockKind, LineWrapMode, LineWrapStyle, Node, OperatorSpacing, Statement, StatementKind,
+    IndentTopLevelMode,
+};
 
 const VALID_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/valid");
 const GOLDEN_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/golden");
@@ -128,6 +131,40 @@ fn function_calls_upper_options() -> FormatOptions {
         indent_top_level: IndentTopLevelMode::default(),
         indent_width: 4,
         operator_spacing: OperatorSpacing::default(),
+        ..FormatOptions::default()
+    }
+}
+
+// -- 030-auto-line-wrap: two more variants (Fill and OnePerLine), same
+// golden-directory pattern already established -- applied only to the 9
+// already-reviewed real_corpus fixtures. Default width (120) -- not an
+// artificially tight one -- so the golden output reflects what a project
+// actually gets by just opting in, not a contrived worst case.
+const REAL_CORPUS_GOLDEN_LINE_WRAP_FILL_DIR: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/golden_line_wrap_fill/real_corpus");
+const REAL_CORPUS_GOLDEN_LINE_WRAP_ONE_PER_LINE_DIR: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/golden_line_wrap_one_per_line/real_corpus");
+
+fn line_wrap_fill_options() -> FormatOptions {
+    FormatOptions {
+        casing: CasingSettings::default(),
+        indent_top_level: IndentTopLevelMode::default(),
+        indent_width: 4,
+        operator_spacing: OperatorSpacing::default(),
+        line_wrap: LineWrapMode::Auto,
+        line_wrap_style: LineWrapStyle::Fill,
+        ..FormatOptions::default()
+    }
+}
+
+fn line_wrap_one_per_line_options() -> FormatOptions {
+    FormatOptions {
+        casing: CasingSettings::default(),
+        indent_top_level: IndentTopLevelMode::default(),
+        indent_width: 4,
+        operator_spacing: OperatorSpacing::default(),
+        line_wrap: LineWrapMode::Auto,
+        line_wrap_style: LineWrapStyle::OnePerLine,
         ..FormatOptions::default()
     }
 }
@@ -459,6 +496,62 @@ fn real_corpus_fixtures_are_idempotent_under_operator_spacing_auto() {
 #[test]
 fn real_corpus_fixtures_preserve_structure_and_diagnostics_under_operator_spacing_auto() {
     check_structure_and_diagnostics_preserved(real_corpus_fixtures(), operator_spacing_auto_options());
+}
+
+// -- 030-auto-line-wrap, T027 --
+
+fn golden_line_wrap_fill_path_for_real_corpus(fixture: &Path) -> PathBuf {
+    let rel = fixture
+        .strip_prefix(REAL_CORPUS_DIR)
+        .expect("real_corpus_fixtures() only returns paths under REAL_CORPUS_DIR");
+    Path::new(REAL_CORPUS_GOLDEN_LINE_WRAP_FILL_DIR).join(rel)
+}
+
+#[test]
+fn real_corpus_fixtures_match_golden_output_under_line_wrap_fill() {
+    check_golden(
+        real_corpus_fixtures(),
+        Path::new(REAL_CORPUS_GOLDEN_LINE_WRAP_FILL_DIR),
+        golden_line_wrap_fill_path_for_real_corpus,
+        line_wrap_fill_options(),
+    );
+}
+
+#[test]
+fn real_corpus_fixtures_are_idempotent_under_line_wrap_fill() {
+    check_idempotent(real_corpus_fixtures(), line_wrap_fill_options());
+}
+
+#[test]
+fn real_corpus_fixtures_preserve_structure_and_diagnostics_under_line_wrap_fill() {
+    check_structure_and_diagnostics_preserved(real_corpus_fixtures(), line_wrap_fill_options());
+}
+
+fn golden_line_wrap_one_per_line_path_for_real_corpus(fixture: &Path) -> PathBuf {
+    let rel = fixture
+        .strip_prefix(REAL_CORPUS_DIR)
+        .expect("real_corpus_fixtures() only returns paths under REAL_CORPUS_DIR");
+    Path::new(REAL_CORPUS_GOLDEN_LINE_WRAP_ONE_PER_LINE_DIR).join(rel)
+}
+
+#[test]
+fn real_corpus_fixtures_match_golden_output_under_line_wrap_one_per_line() {
+    check_golden(
+        real_corpus_fixtures(),
+        Path::new(REAL_CORPUS_GOLDEN_LINE_WRAP_ONE_PER_LINE_DIR),
+        golden_line_wrap_one_per_line_path_for_real_corpus,
+        line_wrap_one_per_line_options(),
+    );
+}
+
+#[test]
+fn real_corpus_fixtures_are_idempotent_under_line_wrap_one_per_line() {
+    check_idempotent(real_corpus_fixtures(), line_wrap_one_per_line_options());
+}
+
+#[test]
+fn real_corpus_fixtures_preserve_structure_and_diagnostics_under_line_wrap_one_per_line() {
+    check_structure_and_diagnostics_preserved(real_corpus_fixtures(), line_wrap_one_per_line_options());
 }
 
 // -- 019-blank-line-normalization, T025 --
