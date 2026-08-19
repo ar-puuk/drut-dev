@@ -235,6 +235,177 @@ async function main(): Promise<void> {
     check("\\n's scope is still nested inside string.quoted", scopes.some((s) => s.includes("string.quoted")));
   }
 
+  // -- 024-function-call-highlighting --
+  //
+  // A built-in function call now gets support.function regardless of where
+  // in the statement it sits (fixing the bug this feature exists for: only
+  // REPLACESTR used to render colored, and only by accident, when it
+  // happened to sit immediately after "=" and got caught by #pair-values).
+
+  // A function nested inside a condition, itself nested inside another call.
+  {
+    const line = "if (RIGHTSTR(TRIM(RouteName),1)='-')";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const outer = scopesAt(tokens, line.indexOf("RIGHTSTR"));
+    const inner = scopesAt(tokens, line.indexOf("TRIM"));
+    check("RIGHTSTR (nested in a condition) scoped as support.function", outer.some((s) => s.includes("support.function")));
+    check("TRIM (nested inside RIGHTSTR's call) scoped as support.function", inner.some((s) => s.includes("support.function")));
+  }
+
+  // Two functions nested inside one condition; the @variable@ substitution
+  // inside stays unaffected.
+  {
+    const line = "if (STRLEN(TRIM(@SEGIDExField@))>0)";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const strlen = scopesAt(tokens, line.indexOf("STRLEN"));
+    const trim = scopesAt(tokens, line.indexOf("TRIM"));
+    const variable = scopesAt(tokens, line.indexOf("@SEGIDExField@"));
+    check("STRLEN scoped as support.function", strlen.some((s) => s.includes("support.function")));
+    check("TRIM (nested inside STRLEN's call) scoped as support.function", trim.some((s) => s.includes("support.function")));
+    check("@SEGIDExField@ still scoped as variable.other.readwrite", variable.some((s) => s.includes("variable.other.readwrite")));
+  }
+
+  // A function call on an assignment's right-hand side -- REPLACESTR already
+  // rendered colored before this feature (via the unrelated #pair-values
+  // accident); confirm it still does, now via #function-calls.
+  {
+    const line = "RouteName = REPLACESTR(RouteName,'-','',0)";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const scopes = scopesAt(tokens, line.indexOf("REPLACESTR"));
+    check("REPLACESTR (assignment RHS) scoped as support.function", scopes.some((s) => s.includes("support.function")));
+  }
+
+  // A function call whose argument is a data reference, not another call --
+  // the data reference itself is untouched.
+  {
+    const line = "ANGLE = ROUND(_L.S_Angle * 10) / 10";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const roundScopes = scopesAt(tokens, line.indexOf("ROUND"));
+    const dataRefScopes = scopesAt(tokens, line.indexOf("_L.S_Angle"));
+    check("ROUND scoped as support.function", roundScopes.some((s) => s.includes("support.function")));
+    check("_L.S_Angle (a data reference, not a function) is NOT scoped as support.function", !dataRefScopes.some((s) => s.includes("support.function")));
+  }
+
+  // Matching is case-insensitive, same as every other word list in this
+  // grammar -- real corpus usage writes this one in mixed case.
+  {
+    const line = "X = CmpNumRetNum(V,'=',0,1,V)";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const scopes = scopesAt(tokens, line.indexOf("CmpNumRetNum"));
+    check("CmpNumRetNum (mixed case) scoped as support.function", scopes.some((s) => s.includes("support.function")));
+  }
+
+  // Vendor-reference-only functions with no WF-TDM-Official-Releases corpus
+  // occurrence at all still scope correctly -- this is the check that would
+  // have failed under this feature's original, corpus-only 21-name draft
+  // (research.md Sec 1).
+  {
+    const line1 = "Y = SUBSTR(street,4,6)";
+    const [tokens1] = tokenizeAll(grammar, [line1]);
+    const substrScopes = scopesAt(tokens1, line1.indexOf("SUBSTR"));
+    check("SUBSTR (no corpus evidence) scoped as support.function", substrScopes.some((s) => s.includes("support.function")));
+
+    const line2 = "Z = ARCSIN(0.5)";
+    const [tokens2] = tokenizeAll(grammar, [line2]);
+    const arcsinScopes = scopesAt(tokens2, line2.indexOf("ARCSIN"));
+    check("ARCSIN (no corpus evidence) scoped as support.function", arcsinScopes.some((s) => s.includes("support.function")));
+  }
+
+  // A real CONVERGE-phase usage line from the reference guide (research.md
+  // Sec 2, CONVERGE-phase family) -- BALANCE is not one of the 138
+  // recognized names, so it is NOT scoped as support.function.
+  {
+    const line = "IF (GAPCHANGEAVE(3) < 0.006 && GAPCHANGEMAX(3) < 0.009) BALANCE = 1";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const ave = scopesAt(tokens, line.indexOf("GAPCHANGEAVE"));
+    const max = scopesAt(tokens, line.indexOf("GAPCHANGEMAX"));
+    const balance = scopesAt(tokens, line.indexOf("BALANCE"));
+    check("GAPCHANGEAVE(3) scoped as support.function", ave.some((s) => s.includes("support.function")));
+    check("GAPCHANGEMAX(3) scoped as support.function", max.some((s) => s.includes("support.function")));
+    check("BALANCE is NOT scoped as support.function", !balance.some((s) => s.includes("support.function")));
+  }
+
+  // Data-driven: every one of the 138 recognized function names (data-model.md
+  // Sec 1 / research.md Sec 2 -- keep this array in sync with the grammar's
+  // own #function-calls alternation, the same manual-sync convention already
+  // accepted for #control-words mirroring voyager-core's FIXED_KEYWORDS)
+  // scopes as support.function when called. This is what makes spec.md's
+  // SC-001 ("every function name... verified") literally true, not just true
+  // for the hand-picked scenarios above.
+  {
+    const allFunctionNames = [
+      "AADAVE", "AADCHANGE", "AADCHANGEAVE", "AADCHANGEMAX", "AADCHANGEMIN", "AADMAX", "AADMIN",
+      "ABS", "ARCCOS", "ARCSIN", "ARCTAN", "ARRAYSUM", "BRDINGS", "BRDPEN", "CAPACITYFOR",
+      "CHECKNAME", "CMPNUMRETNUM", "COMPCOST", "COS", "CURRENTTIME", "CWDCOSTP", "CWDWAITA",
+      "CWDWAITP", "DELETESTR", "DIST", "DUPSTR", "EXP", "EXPDIST", "EXPINV", "FAREA", "FAREP",
+      "FILESEXIST", "FIRSTREADYNODE", "FORMAT", "FORMATDATETIME", "GAMMADIST", "GAMMAINV",
+      "GAPAVE", "GAPCHANGE", "GAPCHANGEAVE", "GAPCHANGEMAX", "GAPCHANGEMIN", "GAPMAX", "GAPMIN",
+      "GCOST", "GETMATRIXROW", "GETVALUE", "INLIST", "INSERTSTR", "INT", "IWAITA", "IWAITP",
+      "LEFTSTR", "LINKNUM", "LN", "LOG", "LOGNORMDIST", "LOGNORMINV", "LOWEST", "LTRIM",
+      "MATVAL", "MAX", "MIN", "NORMDIST", "NORMINV", "NUMREADYNODES", "PATHTRACE", "PDIFFAVE",
+      "PDIFFCHANGE", "PDIFFCHANGEAVE", "PDIFFCHANGEMAX", "PDIFFCHANGEMIN", "PDIFFMAX",
+      "PDIFFMIN", "POISSONDIST", "POISSONINV", "POW", "PRINTPROGRESS", "RAADAVE", "RAADCHANGE",
+      "RAADCHANGEAVE", "RAADCHANGEMAX", "RAADCHANGEMIN", "RAADMAX", "RAADMIN", "RAND", "RANDOM",
+      "RANDSEED", "REPLACESTR", "REPLACESTRIC", "REVERSESTR", "RGAPAVE", "RGAPCHANGE",
+      "RGAPCHANGEAVE", "RGAPCHANGEMAX", "RGAPCHANGEMIN", "RGAPMAX", "RGAPMIN", "RIGHTSTR",
+      "RMSEAVE", "RMSECHANGE", "RMSECHANGEAVE", "RMSECHANGEMAX", "RMSECHANGEMIN", "RMSEMAX",
+      "RMSEMIN", "ROUND", "ROWADD", "ROWAVE", "ROWCNT", "ROWDIV", "ROWFAC", "ROWFIX", "ROWMAX",
+      "ROWMIN", "ROWMPY", "ROWREAD", "ROWSUM", "SIN", "SPEEDFOR", "SQRT", "STR", "STRLEN",
+      "STRLOWER", "STRPOS", "STRPOSEX", "STRUPPER", "SUBSTR", "TAN", "TIMEA", "TIMEP", "TRIM",
+      "VAL", "VALOFCHOICE", "XFERPENA", "XFERPENP", "XWAITA", "XWAITP",
+    ];
+    check("recognized function name list has 138 entries", allFunctionNames.length === 138);
+
+    let allScoped = true;
+    const misses: string[] = [];
+    for (const name of allFunctionNames) {
+      const line = `X = ${name}(1,2,3)`;
+      const [tokens] = tokenizeAll(grammar, [line]);
+      const scopes = scopesAt(tokens, line.indexOf(name));
+      if (!scopes.some((s) => s.includes("support.function"))) {
+        allScoped = false;
+        misses.push(name);
+      }
+    }
+    check(
+      `all ${allFunctionNames.length} recognized function names scope as support.function when called${
+        misses.length ? ` (missed: ${misses.join(", ")})` : ""
+      }`,
+      allScoped
+    );
+  }
+
+  // A recognized function name with no following "(" is never miscolored --
+  // e.g. a keyword=value pair literally named MAX, with no call present.
+  {
+    const line = "MAX = 100";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const scopes = scopesAt(tokens, line.indexOf("MAX"));
+    check("MAX with no following ( is NOT scoped as support.function", !scopes.some((s) => s.includes("support.function")));
+  }
+
+  // BESTJRNY is a real, vendor-documented Public Transport skim value that
+  // is conventionally used *without* a trailing "(...)" -- deliberately
+  // excluded from the 138-name list (data-model.md Sec 1; research.md Sec 2)
+  // since this pattern's entire mechanism keys off the "(" lookahead.
+  {
+    const line = "MW[5] = BESTJRNY";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const scopes = scopesAt(tokens, line.indexOf("BESTJRNY"));
+    check("bare BESTJRNY (no call) is NOT scoped as support.function", !scopes.some((s) => s.includes("support.function")));
+  }
+
+  // A function-shaped substring inside a quoted string is never reachable --
+  // #function-calls is top-level-only, the same string-safety guarantee
+  // #pair-values already documents for itself.
+  {
+    const line = "PRINT LIST='calling REPLACESTR(x) here'";
+    const [tokens] = tokenizeAll(grammar, [line]);
+    const scopes = scopesAt(tokens, line.indexOf("REPLACESTR"));
+    check("REPLACESTR inside a quoted string is NOT scoped as support.function", !scopes.some((s) => s.includes("support.function")));
+    check("REPLACESTR inside a quoted string is still inside string.quoted", scopes.some((s) => s.includes("string.quoted")));
+  }
+
   if (failures > 0) {
     console.error(`${failures} check(s) failed`);
     process.exit(1);

@@ -35,6 +35,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::block::{Block, BlockKind};
 use crate::data_reference;
+use crate::function_call;
 use crate::decode;
 use crate::diagnostic::{Diagnostic, DiagnosticKind};
 use crate::lexer::tokenize;
@@ -99,6 +100,14 @@ pub struct CasingSettings {
     /// One value applies uniformly regardless of which structural shape a
     /// given occurrence takes (FR-005).
     pub data_references: CasingConvention,
+    /// Cube Voyager built-in function names (e.g. `REPLACESTR`, `ROUND`,
+    /// `TRIM`) — `025-function-casing`, function_call.rs's 138-entry
+    /// recognized-name table. Applies only to a name immediately followed
+    /// by `(` with zero intervening whitespace (the unambiguous call
+    /// position — a coincidentally-named pair-keyword or control word,
+    /// e.g. `FORMAT`/`LOG`, is governed by its own category instead;
+    /// function_call.rs's module docs).
+    pub function_calls: CasingConvention,
 }
 
 /// Whether/how `format` normalizes whitespace around operators, commas, and
@@ -366,6 +375,7 @@ fn render(source: &str, nodes: &[Node], diagnostics: &[Diagnostic], options: For
     if options.casing.control_words != CasingConvention::Preserve
         || options.casing.pair_keywords != CasingConvention::Preserve
         || options.casing.data_references != CasingConvention::Preserve
+        || options.casing.function_calls != CasingConvention::Preserve
     {
         collect_casing_edits(nodes, &char_lines, &protected, options.casing, &mut casing_edits);
         for occurrence in data_reference::data_reference_occurrences(nodes, &char_lines) {
@@ -375,6 +385,20 @@ fn render(source: &str, nodes: &[Node], diagnostics: &[Diagnostic], options: For
                 &protected,
                 occurrence.span,
                 options.casing.data_references,
+            );
+        }
+        // 025-function-casing: same shape as the data_references loop above
+        // -- a separate, token-scanning pass (not the AST walk
+        // collect_casing_edits performs), since a function call routinely
+        // appears on an Assignment's right-hand side, which that walk's
+        // Control-only scope doesn't reach (function_call.rs module docs).
+        for occurrence in function_call::function_call_occurrences(nodes) {
+            push_if_present(
+                &mut casing_edits,
+                &char_lines,
+                &protected,
+                occurrence.span,
+                options.casing.function_calls,
             );
         }
     }
@@ -1019,6 +1043,7 @@ mod tests {
                 control_words: CasingConvention::Upper,
                 pair_keywords: CasingConvention::Upper,
                 data_references: CasingConvention::Preserve,
+function_calls: CasingConvention::Preserve,
             },
             indent_top_level: IndentTopLevelMode::default(),
             indent_width: 4,
@@ -1510,6 +1535,7 @@ mod tests {
                 control_words: CasingConvention::Preserve,
                 pair_keywords: CasingConvention::Upper,
                 data_references: CasingConvention::Preserve,
+function_calls: CasingConvention::Preserve,
             },
             indent_top_level: IndentTopLevelMode::default(),
             indent_width: 4,
@@ -1524,6 +1550,7 @@ mod tests {
                 control_words: CasingConvention::Preserve,
                 pair_keywords: CasingConvention::Preserve,
                 data_references: CasingConvention::Upper,
+function_calls: CasingConvention::Preserve,
             },
             indent_top_level: IndentTopLevelMode::default(),
             indent_width: 4,
@@ -1572,6 +1599,7 @@ mod tests {
                     control_words: CasingConvention::Lower,
                     pair_keywords: CasingConvention::Lower,
                     data_references: CasingConvention::Preserve,
+function_calls: CasingConvention::Preserve,
                 },
                 indent_top_level: IndentTopLevelMode::default(),
                 indent_width: 4,
@@ -1597,6 +1625,7 @@ mod tests {
                 control_words: CasingConvention::Preserve,
                 pair_keywords: CasingConvention::Preserve,
                 data_references: CasingConvention::Upper,
+function_calls: CasingConvention::Preserve,
             },
             indent_top_level: IndentTopLevelMode::default(),
             indent_width: 4,

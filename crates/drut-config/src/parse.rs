@@ -79,6 +79,9 @@ fn parse_format_table(path: &Path, table: &toml::Table, warnings: &mut Vec<Confi
             "casing_data_references" => {
                 format.casing_data_references = parse_casing(path, "casing_data_references", value, warnings)
             }
+            "casing_function_calls" => {
+                format.casing_function_calls = parse_casing(path, "casing_function_calls", value, warnings)
+            }
             "indent_top_level" => format.indent_top_level = parse_indent_top_level(path, value, warnings),
             "indent_width" => format.indent_width = parse_indent_width(path, value, warnings),
             "operator_spacing" => format.operator_spacing = parse_operator_spacing(path, value, warnings),

@@ -640,6 +640,61 @@ after this log.)
    or editor setting — reachable through the existing `operator_spacing`
    setting alone. `crates/voyager-core/src/operator_spacing.rs` only, no
    adapter-crate change.
+9. **Function-call syntax highlighting** — *done*, merged 2026-08-18 as
+   `024-function-call-highlighting`. The VS Code grammar colored a Cube
+   Voyager built-in function call (e.g. `REPLACESTR(...)`) only when it
+   happened to sit immediately after `=` and got caught by the unrelated
+   `#pair-values` rule — the identical function nested one token deeper
+   (`RIGHTSTR(TRIM(RouteName),1)` inside an `IF` condition) rendered
+   unstyled. A dedicated `#function-calls` pattern now colors a recognized
+   function name every time `(` immediately follows, regardless of
+   position. The recognized-name list started as a 21-function census of
+   this project's own real corpus, but was deliberately rebuilt to be
+   organization-agnostic: a complete reading of every function-related
+   chapter in two local vendor documentation mirrors (Cube Voyager 6.5.1
+   and OpenPaths Cube/CUBE CONNECT Edition), cross-validated against each
+   other (both editions agree completely) — 138 functions across Numeric/
+   Trig/Character-String (the general Control Language core), Highway/
+   Matrix-program, Public Transport skim, CONVERGE-phase
+   iteration-statistics, and CUBE Cluster utility categories, plus one
+   real-corpus-confirmed function (`PRINTPROGRESS`) absent from both
+   editions. Deliberately excludes a separate camelCase object-model/
+   scripting-API surface found in the same OpenPaths docs (e.g.
+   `addNonTransitLeg()`) — out of scope for the Voyager control-statement
+   language this grammar targets. Verified with a data-driven grammar test
+   iterating all 138 names, not just a hand-picked sample. No
+   `voyager-core`/parser change, no new `[format]` field, CLI flag, MCP
+   parameter, or editor setting — `editors/vscode/syntaxes/
+   drut.tmLanguage.json` and its `grammar.test.ts` coverage only.
+10. **Function-call casing normalization** — *done*, merged 2026-08-18 as
+    `025-function-casing`. A follow-up to item 9 above: reuses that
+    feature's 138-name function list — now ported into `voyager-core`
+    (`function_call.rs`) as the canonical source, `editors/vscode`'s
+    grammar a documented mirror of it, not the other way around — to add a
+    fourth independently-configurable casing category,
+    `casing_function_calls` (`Preserve`/`Upper`/`Lower`, same shape as
+    `casing_control_words`/`casing_pair_keywords`/`casing_data_references`
+    from `017-casing-categories-indent-width`). Unlike item 9, a real
+    formatter-behavior change: recognized via a new, `data_reference.rs`-
+    shaped read-only token scan (a function call routinely appears on an
+    `Assignment`'s right-hand side, which `format.rs`'s `control_words`/
+    `pair_keywords` AST walk never reaches), gated on the name being
+    immediately followed by `(` with zero intervening whitespace — required,
+    not just consistent with item 9's own design, since two real names
+    collide with existing `voyager-core` vocabulary by coincidence
+    (`FORMAT`, a `FILEO` pair-keyword; `LOG`, a control word) and only that
+    position check keeps their two roles from ever colliding. Reachable via
+    `drut.toml` (`casing_function_calls`), the CLI
+    (`--casing-function-calls`), the MCP `format` tool, and the VS Code
+    `drut.format.casingFunctionCalls` setting — the same four surfaces
+    `017`'s own three categories already use. Golden-fixture verified
+    against the real corpus (`golden_casing_function_calls/`, `Upper`
+    variant — e.g. `currenttime()` → `CURRENTTIME()`, `formatdatetime(...)`
+    → `FORMATDATETIME(...)`, `max(...)` → `MAX(...)`, confirmed live in real
+    files, nothing else in each diff); `Lower`'s real-corpus idempotence
+    additionally checked with zero extra fixture files (`check_idempotent`
+    needs no golden file, only a format-twice self-diff). Defaults to
+    `preserve` — zero behavior change for any project that doesn't opt in.
 
 ## Open questions (not part of the pre-publish sequence)
 

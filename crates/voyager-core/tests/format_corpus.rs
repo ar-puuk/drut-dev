@@ -113,6 +113,38 @@ fn normalize_options() -> FormatOptions {
     }
 }
 
+// -- 025-function-casing: one more variant, same golden-directory pattern
+// already established -- applied only to the 9 already-reviewed real_corpus
+// fixtures (research.md Sec 6).
+const REAL_CORPUS_GOLDEN_FUNCTION_CALLS_DIR: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/golden_casing_function_calls/real_corpus");
+
+fn function_calls_upper_options() -> FormatOptions {
+    FormatOptions {
+        casing: CasingSettings {
+            function_calls: CasingConvention::Upper,
+            ..CasingSettings::default()
+        },
+        indent_top_level: IndentTopLevelMode::default(),
+        indent_width: 4,
+        operator_spacing: OperatorSpacing::default(),
+        ..FormatOptions::default()
+    }
+}
+
+fn function_calls_lower_options() -> FormatOptions {
+    FormatOptions {
+        casing: CasingSettings {
+            function_calls: CasingConvention::Lower,
+            ..CasingSettings::default()
+        },
+        indent_top_level: IndentTopLevelMode::default(),
+        indent_width: 4,
+        operator_spacing: OperatorSpacing::default(),
+        ..FormatOptions::default()
+    }
+}
+
 fn script_files_in(dir: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     for entry in fs::read_dir(dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display())) {
@@ -456,6 +488,46 @@ fn real_corpus_fixtures_are_idempotent_under_blank_lines_auto() {
 #[test]
 fn real_corpus_fixtures_preserve_structure_and_diagnostics_under_blank_lines_auto() {
     check_structure_and_diagnostics_preserved(real_corpus_fixtures(), blank_lines_auto_options());
+}
+
+// -- 025-function-casing --
+
+fn golden_function_calls_path_for_real_corpus(fixture: &Path) -> PathBuf {
+    let rel = fixture
+        .strip_prefix(REAL_CORPUS_DIR)
+        .expect("real_corpus_fixtures() only returns paths under REAL_CORPUS_DIR");
+    Path::new(REAL_CORPUS_GOLDEN_FUNCTION_CALLS_DIR).join(rel)
+}
+
+#[test]
+fn real_corpus_fixtures_match_golden_output_under_function_calls_upper() {
+    check_golden(
+        real_corpus_fixtures(),
+        Path::new(REAL_CORPUS_GOLDEN_FUNCTION_CALLS_DIR),
+        golden_function_calls_path_for_real_corpus,
+        function_calls_upper_options(),
+    );
+}
+
+#[test]
+fn real_corpus_fixtures_are_idempotent_under_function_calls_upper() {
+    check_idempotent(real_corpus_fixtures(), function_calls_upper_options());
+}
+
+#[test]
+fn real_corpus_fixtures_preserve_structure_and_diagnostics_under_function_calls_upper() {
+    check_structure_and_diagnostics_preserved(real_corpus_fixtures(), function_calls_upper_options());
+}
+
+// `Lower`'s byte-for-byte output is unit-tested in function_call.rs/format.rs
+// (research.md Sec 6) -- but its real-corpus *idempotence* still needs no
+// golden directory at all (check_idempotent diffs a fixture's format-twice
+// output against itself), so this closes spec.md SC-003's full claim
+// ("every non-preserve value... for every real corpus fixture") without a
+// second golden-fixture directory.
+#[test]
+fn real_corpus_fixtures_are_idempotent_under_function_calls_lower() {
+    check_idempotent(real_corpus_fixtures(), function_calls_lower_options());
 }
 
 /// A structural "shape" — statement kinds/words/pair-keys and block

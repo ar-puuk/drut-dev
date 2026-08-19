@@ -11,6 +11,28 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+### Added
+
+- A fourth, independently-configurable casing category, `casing_function_calls`
+  (`Preserve`/`Upper`/`Lower`, same shape and precedence as the existing
+  `casing_control_words`/`casing_pair_keywords`/`casing_data_references`),
+  covering Cube Voyager built-in function names — e.g. `replacestr(...)` /
+  `REPLACESTR(...)` / `RightStr(...)` — normalized wherever a recognized
+  name is immediately followed by `(`, independent of statement position
+  (an assignment's right-hand side, nested inside another call's arguments,
+  inside a condition). Reuses the same 138-name list `024`'s VS Code
+  highlighting already ships, now canonical inside `voyager-core`
+  (`function_call.rs`) rather than duplicated only in the editor grammar.
+  Two real names collide with existing categories by coincidence —
+  `FORMAT` (also a `FILEO` pair-keyword) and `LOG` (also a control word) —
+  each occurrence's own structural position (`(` vs. `=` vs. leading the
+  statement) decides which category's casing applies, never both, never
+  neither. Reachable via `drut.toml`'s `casing_function_calls`, the CLI's
+  `--casing-function-calls`, the MCP `format` tool's `casing_function_calls`
+  parameter, and the VS Code `drut.format.casingFunctionCalls` setting.
+  Defaults to `preserve` — zero behavior change for any project that
+  doesn't opt in.
+
 ### Changed
 
 - **Breaking**: every `[format]` field name changed to a flat,
@@ -92,6 +114,26 @@ CONTRIBUTING.md's "Versioning" section).
   unset or `"preserve"` is unaffected either way. No new `[format]` field,
   CLI flag, MCP parameter, or editor setting — this is a correction to
   `operator_spacing`'s existing `fixed`/`auto` behavior, not a new one.
+- The VS Code syntax highlighting colored a Cube Voyager built-in function
+  call (e.g. `REPLACESTR(...)`) only by accident, when the call happened to
+  sit immediately after `=` and got caught by an unrelated rule for
+  coloring assignment values — the identical function one token deeper
+  (nested inside another call's arguments, or inside an `IF` condition,
+  e.g. `RIGHTSTR(TRIM(RouteName),1)`) rendered as plain, unstyled text.
+  Added a dedicated function-call recognition rule that colors a
+  recognized built-in function name every time it's immediately followed
+  by `(`, regardless of where in the statement it sits. The recognized-name
+  list (138 functions) was built by reading every function-related chapter
+  of two vendor documentation editions (Cube Voyager 6.5.1 and OpenPaths
+  Cube/CUBE CONNECT Edition) — covering the general-purpose Control
+  Language functions (`ABS`, `TRIM`, `REPLACESTR`, `ROUND`, ...), Highway/
+  Matrix-program functions (`ROWSUM`, `PATHTRACE`, ...), Public Transport
+  skim functions (`TIMEA`, `BRDINGS`, `GCOST`, ...), the CONVERGE-phase
+  iteration-statistics family (`GAPCHANGE`, `RGAPMIN`, ...), and CUBE
+  Cluster utility functions — not just names this project's own real
+  script corpus happens to call. No `voyager-core`/parser change, no new
+  `[format]` field, CLI flag, MCP parameter, or editor setting — purely a
+  VS Code syntax-highlighting correction.
 
 ## [0.2.1] - 2026-08-18
 

@@ -33,6 +33,9 @@ pub struct FormatConfig {
     pub casing_control_words: Option<voyager_core::CasingConvention>,
     pub casing_pair_keywords: Option<voyager_core::CasingConvention>,
     pub casing_data_references: Option<voyager_core::CasingConvention>,
+    /// `025-function-casing`. Same three-value shape and precedence as the
+    /// other three casing fields above.
+    pub casing_function_calls: Option<voyager_core::CasingConvention>,
     pub indent_top_level: Option<voyager_core::IndentTopLevelMode>,
     /// Valid range 1–16 is enforced by `resolve_format_options`, not here —
     /// this field carries whatever integer `drut.toml` actually had, valid
@@ -98,6 +101,7 @@ pub struct ExplicitFormatOverride {
     pub casing_control_words: Option<voyager_core::CasingConvention>,
     pub casing_pair_keywords: Option<voyager_core::CasingConvention>,
     pub casing_data_references: Option<voyager_core::CasingConvention>,
+    pub casing_function_calls: Option<voyager_core::CasingConvention>,
     pub indent_top_level: Option<voyager_core::IndentTopLevelMode>,
     pub indent_width: Option<u8>,
     pub operator_spacing: Option<voyager_core::OperatorSpacing>,
@@ -204,6 +208,11 @@ fn resolve_casing_and_indent(
         .or(config.format.casing_data_references)
         .or(client_defaults.casing_data_references)
         .unwrap_or_default();
+    let function_calls = explicit
+        .casing_function_calls
+        .or(config.format.casing_function_calls)
+        .or(client_defaults.casing_function_calls)
+        .unwrap_or_default();
     let indent_top_level = explicit
         .indent_top_level
         .or(config.format.indent_top_level)
@@ -246,7 +255,7 @@ fn resolve_casing_and_indent(
     );
 
     voyager_core::FormatOptions {
-        casing: voyager_core::CasingSettings { control_words, pair_keywords, data_references },
+        casing: voyager_core::CasingSettings { control_words, pair_keywords, data_references, function_calls },
         indent_top_level,
         indent_width,
         operator_spacing,

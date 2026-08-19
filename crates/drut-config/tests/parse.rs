@@ -210,6 +210,35 @@ fn auto_is_rejected_as_an_unrecognized_casing_value_at_every_casing_field() {
     cleanup(&path);
 }
 
+// -- 025-function-casing: the fourth granular casing field, same shape --
+
+#[test]
+fn casing_function_calls_parses_cleanly_with_zero_warnings() {
+    let path = write_config("casing_function_calls_valid", "[format]\ncasing_function_calls = \"upper\"\n");
+
+    let (config, warnings) = parse(&path);
+    assert_eq!(config.format.casing_function_calls, Some(CasingConvention::Upper));
+    assert!(warnings.is_empty(), "expected zero warnings, got {warnings:?}");
+
+    cleanup(&path);
+}
+
+#[test]
+fn casing_function_calls_rejects_an_invalid_value_without_affecting_other_keys() {
+    let path = write_config(
+        "casing_function_calls_invalid",
+        "[format]\ncasing_function_calls = \"sideways\"\ncasing_control_words = \"upper\"\n",
+    );
+
+    let (config, warnings) = parse(&path);
+    assert_eq!(config.format.casing_function_calls, None);
+    assert_eq!(config.format.casing_control_words, Some(CasingConvention::Upper));
+    assert_eq!(warnings.len(), 1);
+    assert!(matches!(&warnings[0], ConfigWarning::InvalidValue { key, .. } if key == "casing_function_calls"));
+
+    cleanup(&path);
+}
+
 // -- 017-casing-categories-indent-width: indent_width (tasks.md T011) --
 
 #[test]

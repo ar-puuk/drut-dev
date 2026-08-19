@@ -102,6 +102,15 @@
           ],
           "markdownDescription": "Casing convention for data-reference tokens (Matrix/Line/Node/Zone/Database abbreviations, output-record and link-endpoint tokens, and the two reserved loop-index identifiers). A workspace `drut.toml` setting for this field always wins over this personal setting."
         },
+        "drut.format.casingFunctionCalls": {
+          "type": "string",
+          "enum": [
+            "preserve",
+            "upper",
+            "lower"
+          ],
+          "markdownDescription": "Casing convention for Cube Voyager built-in function names (e.g. `REPLACESTR`, `ROUND`, `TRIM`) when immediately followed by `(`. A workspace `drut.toml` setting for this field always wins over this personal setting."
+        },
         "drut.format.indentTopLevel": {
           "type": "string",
           "enum": [

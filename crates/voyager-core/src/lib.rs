@@ -14,6 +14,7 @@ pub mod data_reference;
 pub mod decode;
 pub mod diagnostic;
 pub mod format;
+pub mod function_call;
 pub mod grammar_notes;
 pub mod keywords;
 pub mod lexer;
@@ -31,6 +32,7 @@ pub use format::{
     format, format_bytes, unclosed_fmt_off_markers, BlankLineMode, CasingConvention, CasingSettings, EncodingFidelity,
     FormatOptions, FormatResult, OperatorSpacing, IndentTopLevelMode,
 };
+pub use function_call::{function_call_entries, function_call_occurrences, FunctionCallEntry, FunctionCallOccurrence};
 pub use keywords::{completion_candidates, did_you_mean, CompletionContext, KeywordEntry, KeywordRole};
 pub use span::{Position, Span};
 pub use statement::{Statement, StatementKind};
