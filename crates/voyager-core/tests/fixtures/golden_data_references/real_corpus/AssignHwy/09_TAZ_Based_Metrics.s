@@ -414,7 +414,7 @@ LOOP NumMetrics=1,3
       ZONES = 1
             
             
-      LOOP numrec=1, dbi.1.NUMRECORDS
+      LOOP numrec=1, DBI.1.NUMRECORDS
                 
         PRINT FILE='@ParentDir@@ScenarioDir@\5_AssignHwy\4_Summaries\@RID@ - TAZ-Based Metrics.csv',
                     APPEND=T,

@@ -11,6 +11,18 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+### Fixed
+
+- A data-reference name (the Matrix/Line/Node/Zone/Database family — `MI`,
+  `MW`, `DBA`, `ZONES`, ...) used as a value on a block opener's own line
+  (e.g. a `LOOP`'s bound expression, `LOOP NUMREC = counter,
+  DBI.2.NUMRECORDS`) was invisible to the `casing_data_references` casing
+  rewrite — only that name's *keyword* position on an opener line was ever
+  scanned, never its value position. Found against a real production
+  script. Fixed in `voyager-core` (`Block::opener_tokens`, a new field
+  carrying the opener statement's full token stream, not just its
+  keyword-pair-name spans).
+
 ## [0.3.0] - 2026-08-18
 
 ### Added
