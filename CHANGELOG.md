@@ -92,6 +92,26 @@ CONTRIBUTING.md's "Versioning" section).
   unset or `"preserve"` is unaffected either way. No new `[format]` field,
   CLI flag, MCP parameter, or editor setting — this is a correction to
   `operator_spacing`'s existing `fixed`/`auto` behavior, not a new one.
+- The VS Code syntax highlighting colored a Cube Voyager built-in function
+  call (e.g. `REPLACESTR(...)`) only by accident, when the call happened to
+  sit immediately after `=` and got caught by an unrelated rule for
+  coloring assignment values — the identical function one token deeper
+  (nested inside another call's arguments, or inside an `IF` condition,
+  e.g. `RIGHTSTR(TRIM(RouteName),1)`) rendered as plain, unstyled text.
+  Added a dedicated function-call recognition rule that colors a
+  recognized built-in function name every time it's immediately followed
+  by `(`, regardless of where in the statement it sits. The recognized-name
+  list (138 functions) was built by reading every function-related chapter
+  of two vendor documentation editions (Cube Voyager 6.5.1 and OpenPaths
+  Cube/CUBE CONNECT Edition) — covering the general-purpose Control
+  Language functions (`ABS`, `TRIM`, `REPLACESTR`, `ROUND`, ...), Highway/
+  Matrix-program functions (`ROWSUM`, `PATHTRACE`, ...), Public Transport
+  skim functions (`TIMEA`, `BRDINGS`, `GCOST`, ...), the CONVERGE-phase
+  iteration-statistics family (`GAPCHANGE`, `RGAPMIN`, ...), and CUBE
+  Cluster utility functions — not just names this project's own real
+  script corpus happens to call. No `voyager-core`/parser change, no new
+  `[format]` field, CLI flag, MCP parameter, or editor setting — purely a
+  VS Code syntax-highlighting correction.
 
 ## [0.2.1] - 2026-08-18
 

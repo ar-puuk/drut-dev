@@ -640,6 +640,32 @@ after this log.)
    or editor setting — reachable through the existing `operator_spacing`
    setting alone. `crates/voyager-core/src/operator_spacing.rs` only, no
    adapter-crate change.
+9. **Function-call syntax highlighting** — *done*, merged 2026-08-18 as
+   `024-function-call-highlighting`. The VS Code grammar colored a Cube
+   Voyager built-in function call (e.g. `REPLACESTR(...)`) only when it
+   happened to sit immediately after `=` and got caught by the unrelated
+   `#pair-values` rule — the identical function nested one token deeper
+   (`RIGHTSTR(TRIM(RouteName),1)` inside an `IF` condition) rendered
+   unstyled. A dedicated `#function-calls` pattern now colors a recognized
+   function name every time `(` immediately follows, regardless of
+   position. The recognized-name list started as a 21-function census of
+   this project's own real corpus, but was deliberately rebuilt to be
+   organization-agnostic: a complete reading of every function-related
+   chapter in two local vendor documentation mirrors (Cube Voyager 6.5.1
+   and OpenPaths Cube/CUBE CONNECT Edition), cross-validated against each
+   other (both editions agree completely) — 138 functions across Numeric/
+   Trig/Character-String (the general Control Language core), Highway/
+   Matrix-program, Public Transport skim, CONVERGE-phase
+   iteration-statistics, and CUBE Cluster utility categories, plus one
+   real-corpus-confirmed function (`PRINTPROGRESS`) absent from both
+   editions. Deliberately excludes a separate camelCase object-model/
+   scripting-API surface found in the same OpenPaths docs (e.g.
+   `addNonTransitLeg()`) — out of scope for the Voyager control-statement
+   language this grammar targets. Verified with a data-driven grammar test
+   iterating all 138 names, not just a hand-picked sample. No
+   `voyager-core`/parser change, no new `[format]` field, CLI flag, MCP
+   parameter, or editor setting — `editors/vscode/syntaxes/
+   drut.tmLanguage.json` and its `grammar.test.ts` coverage only.
 
 ## Open questions (not part of the pre-publish sequence)
 
