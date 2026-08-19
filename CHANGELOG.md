@@ -11,6 +11,28 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+### Added
+
+- A fourth, independently-configurable casing category, `casing_function_calls`
+  (`Preserve`/`Upper`/`Lower`, same shape and precedence as the existing
+  `casing_control_words`/`casing_pair_keywords`/`casing_data_references`),
+  covering Cube Voyager built-in function names — e.g. `replacestr(...)` /
+  `REPLACESTR(...)` / `RightStr(...)` — normalized wherever a recognized
+  name is immediately followed by `(`, independent of statement position
+  (an assignment's right-hand side, nested inside another call's arguments,
+  inside a condition). Reuses the same 138-name list `024`'s VS Code
+  highlighting already ships, now canonical inside `voyager-core`
+  (`function_call.rs`) rather than duplicated only in the editor grammar.
+  Two real names collide with existing categories by coincidence —
+  `FORMAT` (also a `FILEO` pair-keyword) and `LOG` (also a control word) —
+  each occurrence's own structural position (`(` vs. `=` vs. leading the
+  statement) decides which category's casing applies, never both, never
+  neither. Reachable via `drut.toml`'s `casing_function_calls`, the CLI's
+  `--casing-function-calls`, the MCP `format` tool's `casing_function_calls`
+  parameter, and the VS Code `drut.format.casingFunctionCalls` setting.
+  Defaults to `preserve` — zero behavior change for any project that
+  doesn't opt in.
+
 ### Changed
 
 - **Breaking**: every `[format]` field name changed to a flat,

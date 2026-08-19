@@ -520,6 +520,65 @@ fn casing_data_references_rejects_auto_as_a_usage_error() {
     assert_eq!(fs::read_to_string(&file).unwrap(), MESSY);
 }
 
+// -- 025-function-casing: the fourth granular casing flag, same shape --
+
+#[test]
+fn casing_function_calls_flag_rewrites_a_recognized_function_call() {
+    let dir = TempDir::new("casing-function-calls");
+    let file = dir.path().join("x.s");
+    fs::write(&file, "RouteName = replacestr(RouteName,'-','',0)\n").unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--casing-function-calls=upper"]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "RouteName = REPLACESTR(RouteName,'-','',0)\n");
+}
+
+#[test]
+fn casing_function_calls_left_at_preserve_by_default_leaves_function_calls_untouched() {
+    let dir = TempDir::new("function-calls-preserve-default");
+    let file = dir.path().join("x.s");
+    let src = "RouteName = replacestr(RouteName,'-','',0)\n";
+    fs::write(&file, src).unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap()]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(String::from_utf8_lossy(&out.stdout), src, "no flag, no drut.toml -- byte-identical");
+}
+
+#[test]
+fn casing_function_calls_never_touches_a_pair_keyword_sharing_the_same_spelling() {
+    // FORMAT is a real dual-category name (research.md Sec 3) -- as a
+    // pair-keyword (`FORMAT=csv`) it must be governed by
+    // --casing-pair-keywords only, never --casing-function-calls.
+    let dir = TempDir::new("format-dual-category");
+    let file = dir.path().join("x.s");
+    fs::write(&file, "FILEO format=csv\nX = format(volume,8,2,',')\n").unwrap();
+
+    let out = drut(&[
+        "format",
+        file.to_str().unwrap(),
+        "--casing-pair-keywords=upper",
+        "--casing-function-calls=lower",
+    ]);
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "FILEO FORMAT=csv\nX = format(volume,8,2,',')\n",
+        "the pair-keyword occurrence uppercases; the function-call occurrence stays lowercase"
+    );
+}
+
+#[test]
+fn casing_function_calls_rejects_auto_as_a_usage_error() {
+    let dir = TempDir::new("casing-function-calls-auto-rejected");
+    let file = dir.path().join("x.s");
+    fs::write(&file, MESSY).unwrap();
+
+    let out = drut(&["format", file.to_str().unwrap(), "--casing-function-calls=auto"]);
+    assert_ne!(out.status.code(), Some(0));
+    assert_eq!(fs::read_to_string(&file).unwrap(), MESSY);
+}
+
 #[test]
 fn indent_width_flag_overrides_the_built_in_default() {
     let dir = TempDir::new("indent-width-flag");

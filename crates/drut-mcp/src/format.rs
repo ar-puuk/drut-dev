@@ -29,6 +29,10 @@ pub struct FormatInput {
     /// link-endpoint tokens, and the two reserved loop-index identifiers
     /// (017-casing-categories-indent-width FR-004).
     pub casing_data_references: Option<String>,
+    /// Independent override for the function-calls category
+    /// (025-function-casing) — a Cube Voyager built-in function name
+    /// immediately followed by `(`.
+    pub casing_function_calls: Option<String>,
     /// Spaces per nesting level of block indentation
     /// (017-casing-categories-indent-width FR-009), 1–16 if given. Same
     /// absent-means-"consult drut.toml, then default (4)" precedence as
@@ -122,6 +126,8 @@ fn explicit_override(input: &FormatInput) -> Result<drut_config::ExplicitFormatO
     let casing_pair_keywords = parse_casing_param("casing_pair_keywords", input.casing_pair_keywords.as_deref())?;
     let casing_data_references =
         parse_casing_param("casing_data_references", input.casing_data_references.as_deref())?;
+    let casing_function_calls =
+        parse_casing_param("casing_function_calls", input.casing_function_calls.as_deref())?;
     if let Some(width) = input.indent_width {
         if !(1..=16).contains(&width) {
             return Err(format!("`indent_width` must be between 1 and 16 if given, got {width}"));
@@ -170,6 +176,7 @@ fn explicit_override(input: &FormatInput) -> Result<drut_config::ExplicitFormatO
         casing_control_words,
         casing_pair_keywords,
         casing_data_references,
+        casing_function_calls,
         indent_top_level,
         indent_width: input.indent_width,
         operator_spacing,
@@ -229,6 +236,7 @@ mod tests {
             casing_control_words: None,
             casing_pair_keywords: None,
             casing_data_references: None,
+            casing_function_calls: None,
             indent_width: None,
             indent_top_level: None,
             operator_spacing: None,
@@ -248,6 +256,7 @@ mod tests {
             casing_control_words: casing_control_words.map(str::to_string),
             casing_pair_keywords: None,
             casing_data_references: None,
+            casing_function_calls: None,
             indent_width: None,
             indent_top_level: indent_top_level.map(str::to_string),
             operator_spacing: None,
@@ -273,6 +282,7 @@ mod tests {
             casing_control_words: casing_control_words.map(str::to_string),
             casing_pair_keywords: casing_pair_keywords.map(str::to_string),
             casing_data_references: casing_data_references.map(str::to_string),
+            casing_function_calls: None,
             indent_width,
             indent_top_level: None,
             operator_spacing: None,
@@ -465,6 +475,37 @@ mod tests {
             result.text, "IF (x=1)\n    mw[1] = 1\nENDIF\n",
             "control_words upper and data_references lower each independently applied"
         );
+    }
+
+    // -- 025-function-casing: the fourth granular casing parameter --
+
+    #[test]
+    fn casing_function_calls_parameter_rewrites_a_recognized_function_call() {
+        let mut input = text_input("RouteName = replacestr(RouteName,'-','',0)\n");
+        input.casing_function_calls = Some("upper".to_string());
+        let result = format(&input).unwrap();
+        assert_eq!(result.text, "RouteName = REPLACESTR(RouteName,'-','',0)\n");
+    }
+
+    #[test]
+    fn casing_function_calls_never_touches_a_pair_keyword_sharing_the_same_spelling() {
+        // FORMAT is a real dual-category name (research.md Sec 3).
+        let mut input = text_input("FILEO format=csv\nX = format(volume,8,2,',')\n");
+        input.casing_pair_keywords = Some("upper".to_string());
+        input.casing_function_calls = Some("lower".to_string());
+        let result = format(&input).unwrap();
+        assert_eq!(
+            result.text, "FILEO FORMAT=csv\nX = format(volume,8,2,',')\n",
+            "the pair-keyword occurrence uppercases; the function-call occurrence stays lowercase"
+        );
+    }
+
+    #[test]
+    fn casing_function_calls_parameter_rejects_an_invalid_value() {
+        let mut input = text_input("X = replacestr(y,'-','',0)\n");
+        input.casing_function_calls = Some("sideways".to_string());
+        let err = format(&input).unwrap_err();
+        assert!(err.contains("casing_function_calls"), "{err}");
     }
 
     #[test]

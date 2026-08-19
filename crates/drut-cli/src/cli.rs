@@ -60,6 +60,11 @@ pub enum Command {
         /// identifiers (017-casing-categories-indent-width FR-004).
         #[arg(long, value_enum)]
         casing_data_references: Option<CasingArg>,
+        /// Independent override for the function-calls category
+        /// (025-function-casing) — a Cube Voyager built-in function name
+        /// immediately followed by `(`.
+        #[arg(long, value_enum)]
+        casing_function_calls: Option<CasingArg>,
         /// Spaces per nesting level of block indentation
         /// (017-casing-categories-indent-width FR-009). `Option`-typed like
         /// `--casing` — omitting the flag means "consult `drut.toml`, then

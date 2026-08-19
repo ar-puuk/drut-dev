@@ -344,6 +344,7 @@ fn parse_client_format_defaults(value: &serde_json::Value) -> drut_config::Expli
         casing_control_words: field("casingControlWords").and_then(parse_client_casing),
         casing_pair_keywords: field("casingPairKeywords").and_then(parse_client_casing),
         casing_data_references: field("casingDataReferences").and_then(parse_client_casing),
+        casing_function_calls: field("casingFunctionCalls").and_then(parse_client_casing),
         indent_top_level: field("indentTopLevel").and_then(parse_client_indent_top_level),
         indent_width: field("indentWidth").and_then(parse_client_u8),
         operator_spacing: field("operatorSpacing").and_then(parse_client_operator_spacing),

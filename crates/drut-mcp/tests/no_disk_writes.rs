@@ -61,6 +61,7 @@ fn every_tool_succeeds_against_a_read_only_fixture_and_leaves_it_unchanged() {
         casing_control_words: None,
         casing_pair_keywords: None,
         casing_data_references: None,
+        casing_function_calls: None,
         indent_width: None,
         indent_top_level: None,
         operator_spacing: None,

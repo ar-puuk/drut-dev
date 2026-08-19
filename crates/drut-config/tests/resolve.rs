@@ -183,6 +183,44 @@ fn all_three_granular_fields_set_independently_resolve_independently() {
 }
 
 #[test]
+fn casing_function_calls_resolves_independently_of_the_other_three_categories() {
+    // 025-function-casing: the fourth granular field, same precedence shape.
+    let target = test_file(
+        "function_calls_granular",
+        "[format]\ncasing_control_words = \"upper\"\ncasing_function_calls = \"lower\"\n",
+    );
+
+    let (options, _warnings) = resolve_format_options(Some(&target), false, ExplicitFormatOverride::default(), ExplicitFormatOverride::default());
+    assert_eq!(options.casing.control_words, CasingConvention::Upper);
+    assert_eq!(options.casing.function_calls, CasingConvention::Lower);
+    assert_eq!(options.casing.pair_keywords, CasingConvention::Preserve, "unset fields still default to Preserve");
+
+    cleanup(&target);
+}
+
+#[test]
+fn explicit_casing_function_calls_override_wins_over_both_config_layers_for_its_own_category_only() {
+    let target = test_file(
+        "explicit_function_calls_wins",
+        "[format]\ncasing_control_words = \"upper\"\ncasing_function_calls = \"upper\"\n",
+    );
+
+    let (options, _warnings) = resolve_format_options(
+        Some(&target),
+        false,
+        ExplicitFormatOverride {
+            casing_function_calls: Some(CasingConvention::Lower),
+            ..Default::default()
+        },
+        ExplicitFormatOverride::default(),
+    );
+    assert_eq!(options.casing.control_words, CasingConvention::Upper, "unaffected by the explicit function_calls override");
+    assert_eq!(options.casing.function_calls, CasingConvention::Lower, "explicit granular override wins over both file layers");
+
+    cleanup(&target);
+}
+
+#[test]
 fn explicit_granular_override_wins_over_both_config_layers_for_its_own_category_only() {
     let target = test_file(
         "explicit_granular_wins",
