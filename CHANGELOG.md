@@ -11,6 +11,22 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-08-19
+
+### Fixed
+
+- The `UnusedToken` diagnostic (`029-unused-token-diagnostic`) still flagged an `Assignment`
+  written directly inside a `RUN PGM=...` block's own body (e.g. `ZONES = 1` for `PGM=MATRIX`,
+  found in a real script), even after 0.4.1's bareword-read fix — such an assignment is very often
+  not a Control-Language variable at all, but a write-only PGM control directive the external
+  program consumes implicitly by name, with no textual reference of any kind ever expected.
+  `voyager-core` deliberately does no per-program semantic validation, so it can't tell a
+  genuinely dead PGM-internal variable apart from a legitimate directive like `ZONES` — rather
+  than guess, every `Assignment` structurally inside a `RUN` block's body is now excluded from
+  this diagnostic's candidate set entirely, via a new `voyager_core::assignments_outside_run_bodies`
+  (used in place of `all_assignments`, which is unchanged and still serves `resolve_token_value`/
+  hover and `020-undefined-token-diagnostic`).
+
 ## [0.4.1] - 2026-08-19
 
 ### Fixed
