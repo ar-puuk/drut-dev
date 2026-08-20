@@ -111,6 +111,8 @@ already been researched or partially unblocked; see the note per item.
    published 2026-08-19 the same way (`release.yml` tag build, then
    `publish.yml` dispatch): the `030-auto-line-wrap` feature (opt-in
    `line_wrap`/`line_wrap_width`/`line_wrap_style`, Fill-style default).
+   v0.4.1 published 2026-08-19 the same way, same day (the `UnusedToken`
+   bareword false-positive fix, item 14 above).
    - ✅ *Fixed 2026-08-13*: `vsce` packaging `editors/vscode/` in isolation
      meant the repo-root `LICENSE-MIT`/`LICENSE-APACHE` files never made it
      into the `.vsix`. Both are now copied into `editors/vscode/` directly,
@@ -826,6 +828,16 @@ after this log.)
     (`undecodable_byte.s`) — fixed by converting the incidental assignments
     to non-`Assignment` statements, verified byte-for-byte that the fixture's
     actual invalid-UTF-8 byte was untouched.
+    - ✅ *Fixed 2026-08-19, v0.4.1*: a real false-positive report
+      (`nextLINKSEQ`) showed this check's original "referenced" definition
+      was too narrow — it only counted an `@name@` reference, but a real
+      Cube Voyager variable that never crosses into a `RUN PGM=...` block is
+      correctly read as a plain bareword for its whole lifetime (`@...@` is
+      only the injection mechanism *into* a PGM's body, confirmed against
+      real-corpus fixtures), so every such ordinary, correctly-used
+      variable was being flagged as dead. Fixed with a new
+      `voyager_core::all_bareword_reads`, unioned into the same
+      "referenced" set the `@name@` check already builds.
 15. **Automatic line-width wrapping** — *done*, merged 2026-08-19 as
     `030-auto-line-wrap`. An opt-in formatter axis (`line_wrap`: `preserve`
     default/`auto`, plus `line_wrap_width` and `line_wrap_style` companion
