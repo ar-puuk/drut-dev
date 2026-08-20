@@ -314,12 +314,7 @@ fn span_of_tokens(tokens: &[Token], fallback_end: Position) -> Span {
     }
 }
 
-/// Every `StatementKind::Assignment` in `nodes`, source order, at any nesting
-/// depth. Empty `Vec` (never a panic) for a document with none.
-pub fn all_assignments(nodes: &[Node]) -> Vec<Assignment<'_>> {
-    let mut statements = Vec::new();
-    collect_statements(nodes, &mut statements);
-
+fn assignments_from_statements(statements: Vec<&Statement>) -> Vec<Assignment<'_>> {
     statements
         .into_iter()
         .filter_map(|s| match &s.kind {
@@ -331,6 +326,65 @@ pub fn all_assignments(nodes: &[Node]) -> Vec<Assignment<'_>> {
             _ => None,
         })
         .collect()
+}
+
+/// Every `StatementKind::Assignment` in `nodes`, source order, at any nesting
+/// depth. Empty `Vec` (never a panic) for a document with none.
+pub fn all_assignments(nodes: &[Node]) -> Vec<Assignment<'_>> {
+    let mut statements = Vec::new();
+    collect_statements(nodes, &mut statements);
+    assignments_from_statements(statements)
+}
+
+/// Depth-first walk collecting every real `Statement` in `nodes`, EXCLUDING
+/// any statement inside a `Run` block's own body (`BlockKind::Run`'s
+/// `children`, matched regardless of `disabled` — a `!RUN` body has the same
+/// structural shape) — 029-unused-token-diagnostic's second
+/// post-implementation correction (see [`all_bareword_reads`]'s doc comment
+/// for the first). An `Assignment` inside a `RUN PGM=...` body belongs to
+/// that external program's own internal scripting language, not the outer
+/// Control Language's `@token@`-tracked variable system this diagnostic is
+/// built around: Matrix, Highway, and every other Voyager PGM each has its
+/// own control-parameter vocabulary — e.g. `ZONES = 1` for `PGM=MATRIX` is a
+/// write-only directive the program engine consumes implicitly, never
+/// referenced again in text at all, found in a real script. `voyager-core`
+/// deliberately does no per-program semantic validation (`block.rs`'s own
+/// module doc, FR-019), so it has no way to tell a genuinely dead
+/// PGM-internal variable apart from a legitimate write-only directive like
+/// `ZONES` — rather than guess, every `Assignment` inside a `Run` body is
+/// excluded from candidacy entirely, the same Principle-IV-consistent trade
+/// (a missed true positive over a false flag on working code) documented on
+/// `all_bareword_reads`.
+fn collect_statements_outside_run_bodies<'a>(nodes: &'a [Node], out: &mut Vec<&'a Statement>) {
+    for node in nodes {
+        match node {
+            Node::Statement(s) => out.push(s),
+            Node::Block(b) => {
+                if matches!(b.kind, BlockKind::Run { .. }) {
+                    continue;
+                }
+                collect_statements_outside_run_bodies(&b.children, out);
+                if let BlockKind::If { branches } = &b.kind {
+                    for branch in branches {
+                        collect_statements_outside_run_bodies(&branch.children, out);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Every `StatementKind::Assignment` in `nodes`, EXCLUDING any assignment
+/// inside a `RUN PGM=...` block's own body — 029-unused-token-diagnostic's
+/// own candidate set (see [`collect_statements_outside_run_bodies`]'s doc
+/// comment for the full rationale). Distinct from [`all_assignments`], which
+/// is unchanged and still used by `resolve_token_value`/hover (016) and 020
+/// — this is a genuinely different function serving a narrower purpose, not
+/// a modification.
+pub fn assignments_outside_run_bodies(nodes: &[Node]) -> Vec<Assignment<'_>> {
+    let mut statements = Vec::new();
+    collect_statements_outside_run_bodies(nodes, &mut statements);
+    assignments_from_statements(statements)
 }
 
 /// `true` if `tokens` contains at least one `VariableRef` token — a
@@ -468,6 +522,42 @@ mod tests {
     fn all_assignments_empty_for_document_with_none() {
         let result = parse("PRINT LIST='hello'\n");
         assert!(all_assignments(&result.nodes).is_empty());
+    }
+
+    #[test]
+    fn assignments_outside_run_bodies_excludes_a_pgm_directive() {
+        // The real reported shape: ZONES = 1 inside RUN PGM=MATRIX is a
+        // write-only MATRIX control directive, never a Control-Language
+        // variable this diagnostic should ever consider.
+        let result = parse("RUN PGM=MATRIX\nZONES = 1\nENDRUN\n");
+        let assignments = assignments_outside_run_bodies(&result.nodes);
+        assert!(assignments.is_empty(), "got {assignments:?}");
+    }
+
+    #[test]
+    fn assignments_outside_run_bodies_still_includes_top_level_and_other_blocks() {
+        let result = parse(
+            "ZoneMsgRate = 50\nIF (a=b)\nUsedZones = 3629\nENDIF\nRUN PGM=MATRIX\nZONES = 1\nENDRUN\n",
+        );
+        let assignments = assignments_outside_run_bodies(&result.nodes);
+        let targets: Vec<&str> = assignments.iter().map(|a| a.target).collect();
+        assert_eq!(targets, vec!["ZoneMsgRate", "UsedZones"]);
+    }
+
+    #[test]
+    fn assignments_outside_run_bodies_excludes_a_disabled_bang_run_body_too() {
+        let result = parse("!RUN PGM=MATRIX\nZONES = 1\nENDRUN\n");
+        assert!(assignments_outside_run_bodies(&result.nodes).is_empty());
+    }
+
+    #[test]
+    fn assignments_outside_run_bodies_still_reaches_all_assignments_unchanged() {
+        // all_assignments (used by resolve_token_value/hover and 020) must
+        // be completely untouched by this new function's existence.
+        let result = parse("RUN PGM=MATRIX\nZONES = 1\nENDRUN\n");
+        let all = all_assignments(&result.nodes);
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].target, "ZONES");
     }
 
     #[test]

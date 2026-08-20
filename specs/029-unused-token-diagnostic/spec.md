@@ -187,6 +187,21 @@ later referenced via `@OtherName@` receives no such underline.
   internal, unrelated variable (not the outer, same-named assignment); and a name used only as a
   bracketed-subscript index on an assignment's own left-hand side isn't scanned (see
   `all_bareword_reads`'s own doc comment for the full rationale).
+
+  **Second post-implementation correction**: the bareword-reads fix above still wasn't enough for
+  every real case — an `Assignment`-shaped statement written directly inside a `RUN PGM=...`
+  block's own body (e.g. `ZONES = 1` for `PGM=MATRIX`, found in a real script) is very often not a
+  Control-Language variable at all, but a write-only *PGM control directive*: a parameter the
+  external program (Matrix, Highway, etc.) consumes implicitly by name when it runs, with no
+  further textual reference of any kind ever expected — not `@name@`, not a bareword read either.
+  `voyager-core` deliberately does no per-program semantic validation (`block.rs`, FR-019), so it
+  has no way to distinguish a genuinely dead PGM-internal variable from a legitimate directive like
+  `ZONES`. Rather than guess, this feature's candidate set now excludes every `Assignment`
+  structurally inside a `RUN` block's body entirely, regardless of whether it's ever referenced
+  again — `voyager_core::assignments_outside_run_bodies`, used in place of `all_assignments` (which
+  remains unchanged, still serving `resolve_token_value`/hover and `020`). The same
+  Principle-IV-consistent trade as the first correction: accepting a missed true positive (a truly
+  dead PGM-internal variable no longer flagged) over a false flag on working code.
 - This feature flags every dead assignment **site** independently when its name has zero
   references anywhere in scope (Clarification Q1) — it does not, however, attempt dead-store
   analysis in the shadowing sense (an earlier assignment overwritten by a later one before ever

@@ -41,6 +41,14 @@ fn referenced_names(nodes: &[voyager_core::Node]) -> impl Iterator<Item = String
 /// returned independently (Clarification Q1) — no dedup to one-per-name.
 /// Applies unconditionally, regardless of whether `doc` itself participates
 /// in any `READ FILE` relationship (Clarification Q2).
+///
+/// Candidates come from `voyager_core::assignments_outside_run_bodies`, not
+/// `all_assignments` — an assignment inside a `RUN PGM=...` block's own body
+/// (e.g. `ZONES = 1` for `PGM=MATRIX`) is that program's own internal,
+/// write-only control directive, never the outer Control Language's
+/// `@token@`-tracked variable system this diagnostic checks (see that
+/// function's doc comment for the full rationale); it is never a candidate
+/// here at all, regardless of whether it's ever referenced again.
 pub fn unused_token_assignments(uri: &lsp_types::Uri, doc: &OpenDocument) -> Vec<UnusedAssignment> {
     let mut referenced: HashSet<String> = referenced_names(&doc.parse_result.nodes).collect();
 
@@ -48,7 +56,7 @@ pub fn unused_token_assignments(uri: &lsp_types::Uri, doc: &OpenDocument) -> Vec
         referenced.extend(referenced_names(&included.nodes));
     }
 
-    voyager_core::all_assignments(&doc.parse_result.nodes)
+    voyager_core::assignments_outside_run_bodies(&doc.parse_result.nodes)
         .into_iter()
         .filter(|a| !referenced.contains(&a.target.to_ascii_uppercase()))
         .map(|a| UnusedAssignment {
@@ -307,6 +315,31 @@ mod tests {
         assert!(
             found.iter().all(|a| a.target != "nextLINKSEQ"),
             "nextLINKSEQ is referenced in an IF condition and must not be flagged"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn as10_a_pgm_directive_inside_run_body_is_never_flagged() {
+        // The real reported false positive: ZONES = 1 inside RUN PGM=MATRIX
+        // is a write-only MATRIX control directive (sets the program's zone
+        // count), never a Control-Language variable meant to be read again
+        // via @name@ or a bareword -- it must never be a candidate at all.
+        let mut state = ServerState::new();
+        let dir = temp_dir("as10");
+        let main_path = dir.join("main.s");
+        let text = "RUN PGM = MATRIX   MSG = 'header'\n    ZONES = 1\n    PRINT FILE = 'out.csv', CSV = T\nENDRUN\n";
+        std::fs::write(&main_path, text).unwrap();
+        let uri = uri_for(&main_path);
+        open(&mut state, &uri, text);
+        let doc = state.get(&uri).unwrap();
+
+        let found = unused_token_assignments(&uri, doc);
+        assert!(
+            found.iter().all(|a| a.target != "ZONES"),
+            "ZONES is a PGM directive inside a RUN body and must never be flagged: {}",
+            found.len()
         );
 
         let _ = std::fs::remove_dir_all(&dir);
