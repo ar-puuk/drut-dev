@@ -112,7 +112,11 @@ already been researched or partially unblocked; see the note per item.
    `publish.yml` dispatch): the `030-auto-line-wrap` feature (opt-in
    `line_wrap`/`line_wrap_width`/`line_wrap_style`, Fill-style default).
    v0.4.1 published 2026-08-19 the same way, same day (the `UnusedToken`
-   bareword false-positive fix, item 14 above).
+   bareword false-positive fix, item 14 above). v0.4.2 published
+   2026-08-19 the same way, same day (a second `UnusedToken` fix, found
+   immediately after 0.4.1's publish: a `RUN PGM=...` body's own write-only
+   control directives, e.g. `ZONES = 1` for `PGM=MATRIX`, were still being
+   flagged — item 14 above).
    - ✅ *Fixed 2026-08-13*: `vsce` packaging `editors/vscode/` in isolation
      meant the repo-root `LICENSE-MIT`/`LICENSE-APACHE` files never made it
      into the `.vsix`. Both are now copied into `editors/vscode/` directly,
