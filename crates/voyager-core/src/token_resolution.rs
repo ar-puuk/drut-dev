@@ -234,6 +234,79 @@ pub fn all_variable_refs_including_openers(nodes: &[Node]) -> Vec<VariableRefAt>
     out
 }
 
+fn push_bareword_reads_in_tokens(tokens: &[Token], out: &mut Vec<String>) {
+    for t in tokens {
+        if t.kind == TokenKind::Word {
+            out.push(t.text.clone());
+        }
+    }
+}
+
+/// Every plain (non-`@...@`) `Word` token appearing in a *value* position —
+/// an `Assignment`'s right-hand side, a `Control` statement's pair values
+/// (never a pair's own keyword name, nor the statement's own leading control
+/// word), an `IfBranch`'s condition, or a `ShellEscape`'s opaque command
+/// text — anywhere in `nodes`, at any nesting depth. Source order not
+/// guaranteed (unlike [`all_variable_refs`]); the one real caller
+/// (029-unused-token-diagnostic) only needs set membership.
+///
+/// This is 029-unused-token-diagnostic's own post-implementation
+/// correction: the feature originally treated *any* `Assignment` whose
+/// target is never wrapped in `@name@` as unused, but a real Cube Voyager
+/// script reads a variable that never crosses into a `RUN PGM=...` block as
+/// a plain bareword for its entire lifetime — `@...@` is only the
+/// mechanism for injecting a Control-Language-level value *into* a PGM's
+/// own body, never required otherwise (confirmed against real-corpus
+/// fixtures: the same name is assigned and read bare at top level, but
+/// wrapped in `@...@` only where it crosses into a `RUN PGM=...` body).
+/// Without this, the diagnostic unconditionally flagged every such
+/// ordinary, correctly-used variable as if it were dead — a real,
+/// structural false-positive class, found against a real script
+/// (`nextLINKSEQ`), which constitution Principle IV treats as unacceptable
+/// (a false flag on working code), unlike a missed true positive.
+///
+/// Deliberately imprecise in two accepted directions, both of which can
+/// only ever *suppress* a real diagnostic, never fabricate one — the
+/// direction Principle IV explicitly prefers:
+/// - A bareword `X` inside a `RUN PGM=...` body may be that PGM's own
+///   internal, unrelated variable (Voyager PGMs have their own local
+///   variable scope) rather than a genuine read of an outer, same-named
+///   Control-Language assignment — this function can't tell the two apart.
+/// - A name used *only* as a bracketed-subscript index on an assignment's
+///   own left-hand side (e.g. `Seg_Idx` in `SUBAREAID[Seg_Idx] = ...`) is
+///   not scanned, since `StatementKind::Assignment::target` collapses a
+///   subscripted target to a single `String`, discarding its own token
+///   structure — a narrow gap, since such an index is realistically also
+///   used elsewhere (as a loop counter, in an expression) in every
+///   real-corpus case found so far.
+pub fn all_bareword_reads(nodes: &[Node]) -> Vec<String> {
+    let mut statements = Vec::new();
+    collect_statements(nodes, &mut statements);
+    let mut out = Vec::new();
+    for s in &statements {
+        match &s.kind {
+            StatementKind::Assignment { value, .. } => push_bareword_reads_in_tokens(value, &mut out),
+            StatementKind::Control { pairs, .. } => {
+                for (_, value) in pairs {
+                    push_bareword_reads_in_tokens(value, &mut out);
+                }
+            }
+            StatementKind::ShellEscape { command_tokens } => {
+                push_bareword_reads_in_tokens(command_tokens, &mut out)
+            }
+            StatementKind::Label { .. } => {}
+        }
+    }
+
+    let mut condition_slices = Vec::new();
+    collect_if_condition_token_slices(nodes, &mut condition_slices);
+    for tokens in condition_slices {
+        push_bareword_reads_in_tokens(tokens, &mut out);
+    }
+
+    out
+}
+
 fn span_of_tokens(tokens: &[Token], fallback_end: Position) -> Span {
     match (tokens.first(), tokens.last()) {
         (Some(first), Some(last)) => first.span.merge(last.span),
@@ -465,6 +538,52 @@ mod tests {
     fn all_variable_refs_including_openers_empty_for_document_with_none() {
         let result = parse("X = 1\n");
         assert!(all_variable_refs_including_openers(&result.nodes).is_empty());
+    }
+
+    #[test]
+    fn all_bareword_reads_finds_an_assignment_value_read() {
+        let result = parse("nextLINKSEQ = 1\nnextLINKSEQ = nextLINKSEQ + 1\n");
+        let reads = all_bareword_reads(&result.nodes);
+        assert!(reads.iter().any(|r| r == "nextLINKSEQ"));
+    }
+
+    #[test]
+    fn all_bareword_reads_finds_a_control_pair_value_read() {
+        // The real reported shape: a top-level variable never wrapped in
+        // @...@ because it never crosses into a RUN PGM=... block, only
+        // ever read bare in an ordinary Control statement's pair value.
+        let result = parse("nextLINKSEQ = 1\nARRAY LINKSEQ=nextLINKSEQ\n");
+        let reads = all_bareword_reads(&result.nodes);
+        assert!(reads.iter().any(|r| r == "nextLINKSEQ"));
+    }
+
+    #[test]
+    fn all_bareword_reads_excludes_a_pairs_own_keyword_name() {
+        // ZONES here is a pair *keyword*, never a read of some same-named
+        // variable -- must not be collected.
+        let result = parse("RUN PGM=NETWORK, ZONES=5\nENDRUN\n");
+        let reads = all_bareword_reads(&result.nodes);
+        assert!(!reads.iter().any(|r| r == "ZONES"));
+    }
+
+    #[test]
+    fn all_bareword_reads_excludes_the_control_words_own_leading_word() {
+        let result = parse("RUN PGM=NETWORK\nENDRUN\n");
+        let reads = all_bareword_reads(&result.nodes);
+        assert!(!reads.iter().any(|r| r == "RUN"));
+    }
+
+    #[test]
+    fn all_bareword_reads_finds_a_read_inside_an_if_condition() {
+        let result = parse("nextLINKSEQ = 1\nIF (nextLINKSEQ = 1)\nENDIF\n");
+        let reads = all_bareword_reads(&result.nodes);
+        assert!(reads.iter().any(|r| r == "nextLINKSEQ"));
+    }
+
+    #[test]
+    fn all_bareword_reads_empty_for_document_with_none() {
+        let result = parse("RUN PGM=MATRIX\nENDRUN\n");
+        assert!(all_bareword_reads(&result.nodes).is_empty());
     }
 
     #[test]

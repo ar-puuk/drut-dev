@@ -169,6 +169,24 @@ later referenced via `@OtherName@` receives no such underline.
   any other way (e.g. a Voyager built-in reads the variable by name directly rather than through
   `@name@` substitution, if such a mechanism exists) is out of scope — this feature only knows
   about the one reference mechanism `voyager-core` already resolves.
+
+  **Post-implementation correction**: that "mechanism" does exist, and is the *common* case, not
+  an edge case — confirmed directly against real-corpus fixtures (`AssignHwy/02_Assign_AM_MD_PM_EV.s`)
+  and a real false-positive report (`nextLINKSEQ`). `@...@` is only the mechanism for injecting a
+  Control-Language-level value *into* a `RUN PGM=...` block's body; a variable that never crosses
+  that boundary is correctly read as a plain bareword for its entire lifetime, with no `@...@`
+  ever required. Originally, this feature flagged *every* such ordinary, correctly-used variable
+  as if it were dead — a real, structural false-positive class, unacceptable under constitution
+  Principle IV (a false flag on working code, not a missed true positive). Fixed by widening the
+  "referenced" check to also count a plain bareword read in a value position (an `Assignment`'s
+  right-hand side, a `Control` statement's pair values, an `IF`/`ELSEIF` condition, or a
+  `ShellEscape`'s command text) — `voyager_core::all_bareword_reads`, unioned into the same
+  `referenced` set `all_variable_refs_including_openers` already populates. Deliberately imprecise
+  in two directions, both accepted because they can only ever suppress a diagnostic, never
+  fabricate one: a bareword `X` inside a `RUN PGM=...` body may actually be that PGM's own
+  internal, unrelated variable (not the outer, same-named assignment); and a name used only as a
+  bracketed-subscript index on an assignment's own left-hand side isn't scanned (see
+  `all_bareword_reads`'s own doc comment for the full rationale).
 - This feature flags every dead assignment **site** independently when its name has zero
   references anywhere in scope (Clarification Q1) — it does not, however, attempt dead-store
   analysis in the shadowing sense (an earlier assignment overwritten by a later one before ever

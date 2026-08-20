@@ -21,18 +21,26 @@ pub struct UnusedAssignment {
 }
 
 fn referenced_names(nodes: &[voyager_core::Node]) -> impl Iterator<Item = String> + '_ {
-    voyager_core::all_variable_refs_including_openers(nodes)
+    let token_refs = voyager_core::all_variable_refs_including_openers(nodes)
         .into_iter()
-        .map(|r: VariableRefAt| r.name.to_ascii_uppercase())
+        .map(|r: VariableRefAt| r.name.to_ascii_uppercase());
+    let bareword_reads = voyager_core::all_bareword_reads(nodes)
+        .into_iter()
+        .map(|name| name.to_ascii_uppercase());
+    token_refs.chain(bareword_reads)
 }
 
 /// Every `Assignment` in `doc` whose target name has no `@name@` reference
-/// anywhere in scope: same file (including block-opener positions, FR-003),
-/// plus one level of directly-included, statically-resolvable `READ FILE`
-/// files. Every dead assignment site is returned independently
-/// (Clarification Q1) — no dedup to one-per-name. Applies unconditionally,
-/// regardless of whether `doc` itself participates in any `READ FILE`
-/// relationship (Clarification Q2).
+/// AND no plain bareword read anywhere in scope: same file (including
+/// block-opener positions, FR-003, and ordinary bareword value/condition
+/// positions, the post-implementation correction documented on
+/// `voyager_core::all_bareword_reads` — a variable that never crosses into a
+/// `RUN PGM=...` block is correctly read bare, with no `@...@` ever
+/// required, and must not be flagged), plus one level of directly-included,
+/// statically-resolvable `READ FILE` files. Every dead assignment site is
+/// returned independently (Clarification Q1) — no dedup to one-per-name.
+/// Applies unconditionally, regardless of whether `doc` itself participates
+/// in any `READ FILE` relationship (Clarification Q2).
 pub fn unused_token_assignments(uri: &lsp_types::Uri, doc: &OpenDocument) -> Vec<UnusedAssignment> {
     let mut referenced: HashSet<String> = referenced_names(&doc.parse_result.nodes).collect();
 
@@ -232,6 +240,73 @@ mod tests {
         assert!(
             found.iter().all(|a| a.target != "ScenarioDir"),
             "ScenarioDir is referenced in a directly-included file and must not be flagged"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn as7_assignment_referenced_only_as_a_plain_bareword_is_not_returned() {
+        // The real reported false positive: a top-level variable that never
+        // crosses into a RUN PGM=... block is correctly read as a plain
+        // bareword for its entire lifetime -- @...@ is never required
+        // outside that boundary (confirmed against real-corpus fixtures),
+        // so a bareword-only read must suppress this diagnostic exactly
+        // like an @name@ reference does.
+        let mut state = ServerState::new();
+        let dir = temp_dir("as7");
+        let main_path = dir.join("main.s");
+        let text = "nextLINKSEQ = 1\nnextLINKSEQ = nextLINKSEQ + 1\n";
+        std::fs::write(&main_path, text).unwrap();
+        let uri = uri_for(&main_path);
+        open(&mut state, &uri, text);
+        let doc = state.get(&uri).unwrap();
+
+        let found = unused_token_assignments(&uri, doc);
+        assert!(
+            found.iter().all(|a| a.target != "nextLINKSEQ"),
+            "nextLINKSEQ is referenced as a plain bareword and must not be flagged: {}",
+            found.len()
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn as8_assignment_referenced_only_in_a_control_pair_value_is_not_returned() {
+        let mut state = ServerState::new();
+        let dir = temp_dir("as8");
+        let main_path = dir.join("main.s");
+        let text = "nextLINKSEQ = 1\nARRAY LINKSEQ=nextLINKSEQ\n";
+        std::fs::write(&main_path, text).unwrap();
+        let uri = uri_for(&main_path);
+        open(&mut state, &uri, text);
+        let doc = state.get(&uri).unwrap();
+
+        let found = unused_token_assignments(&uri, doc);
+        assert!(
+            found.iter().all(|a| a.target != "nextLINKSEQ"),
+            "nextLINKSEQ is referenced as a bareword pair value and must not be flagged"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn as9_assignment_referenced_only_in_an_if_condition_is_not_returned() {
+        let mut state = ServerState::new();
+        let dir = temp_dir("as9");
+        let main_path = dir.join("main.s");
+        let text = "nextLINKSEQ = 1\nIF (nextLINKSEQ = 1)\nENDIF\n";
+        std::fs::write(&main_path, text).unwrap();
+        let uri = uri_for(&main_path);
+        open(&mut state, &uri, text);
+        let doc = state.get(&uri).unwrap();
+
+        let found = unused_token_assignments(&uri, doc);
+        assert!(
+            found.iter().all(|a| a.target != "nextLINKSEQ"),
+            "nextLINKSEQ is referenced in an IF condition and must not be flagged"
         );
 
         let _ = std::fs::remove_dir_all(&dir);
