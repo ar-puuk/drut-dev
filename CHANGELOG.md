@@ -11,6 +11,20 @@ CONTRIBUTING.md's "Versioning" section).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-19
+
+### Fixed
+
+- The `UnusedToken` diagnostic (`029-unused-token-diagnostic`) flagged every assignment whose
+  target was never wrapped in `@name@`, even when the same variable was correctly read as a plain
+  bareword elsewhere — the normal, expected way to reference a variable that never crosses into a
+  `RUN PGM=...` block's body (`@...@` is only needed to inject a value *into* a PGM; confirmed
+  against real-corpus fixtures and a real false-positive report against `nextLINKSEQ`). The
+  "referenced" check now also counts a bareword read in a value position (an `Assignment`'s
+  right-hand side, a `Control` statement's pair values, an `IF`/`ELSEIF` condition, or a
+  `ShellEscape`'s command text) via a new `voyager_core::all_bareword_reads`, not just an
+  `@name@`-shaped reference.
+
 ## [0.4.0] - 2026-08-19
 
 ### Added
